@@ -123,25 +123,30 @@ ${playerContext}
 
 ОТВЕТ:`;
 
-    const modelsToTry = ["gemini-1.5-flash-latest", "gemini-1.5-flash", "gemini-pro", "gemini-1.0-pro"];
+    const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"];
 
+    let lastError = null;
     for (const modelName of modelsToTry) {
         try {
+            console.log(`🤖 Trying Gemini model: ${modelName}...`);
             const model = genAI.getGenerativeModel({ model: modelName });
+
+            // Set a timeout for the AI response
             const result = await model.generateContent(prompt);
             const responseText = result.response.text().trim();
 
             if (responseText.toUpperCase() === 'SKIP') return null;
             return responseText;
         } catch (e) {
-            console.error(`Gemini Error (model: ${modelName}):`, e.message);
-            // If it's the last model, we fail
-            if (modelName === modelsToTry[modelsToTry.length - 1]) {
-                // Log final failure to DB for admin
-                await db.run('INSERT INTO logs (level, message, timestamp, stack) VALUES (?, ?, ?, ?)',
-                    ['ERROR', `AI Support Failed for ${telegramId}: ${e.message}`, new Date().toISOString(), e.stack || '']);
-            }
+            console.error(`❌ Gemini Error (model: ${modelName}):`, e.message);
+            lastError = e.message;
         }
+    }
+
+    // If we reach here, all models failed. Log the failure.
+    if (lastError) {
+        await db.run('INSERT INTO logs (level, message, timestamp, stack) VALUES (?, ?, ?, ?)',
+            ['ERROR', `AI Support Failed for ${telegramId}: ${lastError}`, new Date().toISOString(), '']);
     }
 
     return null;

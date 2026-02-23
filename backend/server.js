@@ -2992,21 +2992,39 @@ app.get('/api/admin/ai-test', adminAuth, async (req, res) => {
     try {
         const aiSupport = require('./ai-support');
         const testId = '799869557';
-        // USE A GAME RELATED MESSAGE to avoid "SKIP"
-        const result = await aiSupport.getAIResponse(testId, "У меня закончился бензин и я не знаю что делать, помоги");
+        const AI_KEY = process.env.GEMINI_API_KEY;
 
-        if (result) {
-            res.json({ success: true, response: result, model: "AI is working!" });
-        } else {
-            // Check recently logged AI errors
-            const lastError = await db.get('SELECT * FROM logs WHERE message LIKE "AI Support Failed%" ORDER BY id DESC LIMIT 1');
-            res.status(500).json({
-                success: false,
-                message: "AI returned null or SKIP. A typical reason is the model not being available or the question being off-topic.",
-                lastLoggedError: lastError ? lastError.message : "No error logged in DB",
-                apiKeyPresent: !!process.env.GEMINI_API_KEY
-            });
+        // 1. Try to list models directly via HTTPS (most reliable diagnostic)
+        const https = require('https');
+        const listModels = () => new Promise((resolve) => {
+            https.get(`https://generativelanguage.googleapis.com/v1beta/models?key=${AI_KEY}`, (apiRes) => {
+                let data = '';
+                apiRes.on('data', chunk => data += chunk);
+                apiRes.on('end', () => resolve(data));
+            }).on('error', e => resolve(`Error: ${e.message}`));
+        });
+
+        const rawModelsList = await listModels();
+        let parsedModels = [];
+        try {
+            const json = JSON.parse(rawModelsList);
+            parsedModels = json.models ? json.models.map(m => m.name) : ["No models found in JSON"];
+        } catch (e) {
+            parsedModels = ["Failed to parse models list"];
         }
+
+        // 2. Try the actual AI support function
+        const aiResponse = await aiSupport.getAIResponse(testId, "У меня закончился бензин и я не знаю что делать, помоги");
+
+        res.json({
+            success: true,
+            aiWorking: !!aiResponse,
+            aiResponse: aiResponse || "SKIP / Error",
+            availableModels: parsedModels,
+            apiKeyPresent: !!AI_KEY,
+            rawApiResponse: rawModelsList.substring(0, 1000) // First 1k for safety
+        });
+
     } catch (e) {
         res.status(500).json({
             success: false,
