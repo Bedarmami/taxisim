@@ -481,57 +481,6 @@ async function loadUserData() {
             updateGarageScreen();
             updatePartnerInfo();
             showNotification('⚠️ Проблемы с сетью. Загружены локальные данные.', 'warning');
-            // ============= v3.3: LEVEL UP WOW EFFECT =============
-            function showLevelUpWow(newLevel) {
-                const modal = document.getElementById('level-up-modal');
-                const badge = document.getElementById('new-level-badge');
-                if (!modal || !badge) return;
-
-                badge.textContent = newLevel;
-                modal.style.display = 'flex';
-
-                try { soundManager.play('achievement'); } catch (e) { }
-
-                // Simple confetti simulation
-                const container = document.getElementById('confetti-container');
-                if (container) {
-                    container.innerHTML = '';
-                    for (let i = 0; i < 50; i++) {
-                        const confetti = document.createElement('div');
-                        confetti.style.position = 'absolute';
-                        confetti.style.width = '8px';
-                        confetti.style.height = '8px';
-                        confetti.style.background = ['#f3a000', '#ff9500', '#ffffff', '#007aff'][Math.floor(Math.random() * 4)];
-                        confetti.style.left = Math.random() * 100 + '%';
-                        confetti.style.top = '-10px';
-                        confetti.style.borderRadius = '50%';
-                        confetti.style.opacity = Math.random();
-                        confetti.style.transform = `rotate(${Math.random() * 360}deg)`;
-
-                        container.appendChild(confetti);
-
-                        const duration = 2000 + Math.random() * 3000;
-                        confetti.animate([
-                            { top: '-10px', transform: `translateX(0) rotate(0deg)` },
-                            { top: '100%', transform: `translateX(${Math.random() * 100 - 50}px) rotate(${Math.random() * 720}deg)` }
-                        ], {
-                            duration: duration,
-                            easing: 'cubic-bezier(0, .9, .6, 1)',
-                            fill: 'forwards'
-                        });
-                    }
-                }
-            }
-
-            // v3.3: Dynamic Backgrounds
-            function updateDistrictBackground() {
-                const screen = document.getElementById('orders-screen');
-                if (!screen) return;
-
-                screen.classList.remove('bg-suburbs', 'bg-center', 'bg-airport');
-                screen.classList.add(`bg-${currentDistrict}`);
-            }
-
             // v2.2: Get available districts
             document.getElementById('buy-coffee-btn')?.addEventListener('click', buyCoffee);
             document.getElementById('claim-streak-btn')?.addEventListener('click', claimStreakReward);
@@ -2025,6 +1974,58 @@ function setupMuteListener() {
     }
 })();
 // End of main script
+
+
+// ============= v3.3: LEVEL UP WOW EFFECT =============
+function showLevelUpWow(newLevel) {
+    const modal = document.getElementById('level-up-modal');
+    const badge = document.getElementById('new-level-badge');
+    if (!modal || !badge) return;
+
+    badge.textContent = newLevel;
+    modal.style.display = 'flex';
+
+    try { soundManager.play('achievement'); } catch (e) { }
+
+    // Simple confetti simulation
+    const container = document.getElementById('confetti-container');
+    if (container) {
+        container.innerHTML = '';
+        for (let i = 0; i < 50; i++) {
+            const confetti = document.createElement('div');
+            confetti.style.position = 'absolute';
+            confetti.style.width = '8px';
+            confetti.style.height = '8px';
+            confetti.style.background = ['#f3a000', '#ff9500', '#ffffff', '#007aff'][Math.floor(Math.random() * 4)];
+            confetti.style.left = Math.random() * 100 + '%';
+            confetti.style.top = '-10px';
+            confetti.style.borderRadius = '50%';
+            confetti.style.opacity = Math.random();
+            confetti.style.transform = `rotate(${Math.random() * 360}deg)`;
+
+            container.appendChild(confetti);
+
+            const duration = 2000 + Math.random() * 3000;
+            confetti.animate([
+                { top: '-10px', transform: `translateX(0) rotate(0deg)` },
+                { top: '100%', transform: `translateX(${Math.random() * 100 - 50}px) rotate(${Math.random() * 720}deg)` }
+            ], {
+                duration: duration,
+                easing: 'cubic-bezier(0, .9, .6, 1)',
+                fill: 'forwards'
+            });
+        }
+    }
+}
+
+// v3.3: Dynamic Backgrounds
+function updateDistrictBackground() {
+    const screen = document.getElementById('orders-screen');
+    if (!screen) return;
+
+    screen.classList.remove('bg-suburbs', 'bg-center', 'bg-airport');
+    screen.classList.add(`bg-${currentDistrict}`);
+}
 
 
 // ============= v2.9:  =============
