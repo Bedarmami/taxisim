@@ -60,6 +60,9 @@ const sendNotification = async (telegramId, type, data) => {
     try {
         let message = '';
         switch (type) {
+            case 'BROADCAST':
+                message = data.text;
+                break;
             case 'AUCTION_BID':
                 message = `⚠️ Вашу ставку на контейнер перебил игрок ${data.newBidder}!\nТекущая ставка: ${data.amount} PLN`;
                 break;
@@ -83,9 +86,21 @@ const sendNotification = async (telegramId, type, data) => {
         }
 
         await bot.telegram.sendMessage(telegramId, message);
+
+        // Optional: Log successful notification for critical types
+        if (type !== 'BROADCAST') {
+            await db.run('INSERT INTO logs (level, message, timestamp) VALUES (?, ?, ?)',
+                ['INFO', `Notification sent: ${type} to ${telegramId}`, new Date().toISOString()]);
+        }
+
         return true;
     } catch (e) {
         console.error(`Failed to send ${type} notification to ${telegramId}:`, e.message);
+
+        // Log failure to DB for Admin Panel visibility
+        await db.run('INSERT INTO logs (level, message, timestamp, stack) VALUES (?, ?, ?, ?)',
+            ['ERROR', `Failed to send ${type} to ${telegramId}: ${e.message}`, new Date().toISOString(), e.stack || '']);
+
         return false;
     }
 };
