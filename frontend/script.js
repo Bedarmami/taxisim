@@ -481,7 +481,58 @@ async function loadUserData() {
             updateGarageScreen();
             updatePartnerInfo();
             showNotification('⚠️ Проблемы с сетью. Загружены локальные данные.', 'warning');
-            // v2.3: Retention features
+            // ============= v3.3: LEVEL UP WOW EFFECT =============
+            function showLevelUpWow(newLevel) {
+                const modal = document.getElementById('level-up-modal');
+                const badge = document.getElementById('new-level-badge');
+                if (!modal || !badge) return;
+
+                badge.textContent = newLevel;
+                modal.style.display = 'flex';
+
+                try { soundManager.play('achievement'); } catch (e) { }
+
+                // Simple confetti simulation
+                const container = document.getElementById('confetti-container');
+                if (container) {
+                    container.innerHTML = '';
+                    for (let i = 0; i < 50; i++) {
+                        const confetti = document.createElement('div');
+                        confetti.style.position = 'absolute';
+                        confetti.style.width = '8px';
+                        confetti.style.height = '8px';
+                        confetti.style.background = ['#f3a000', '#ff9500', '#ffffff', '#007aff'][Math.floor(Math.random() * 4)];
+                        confetti.style.left = Math.random() * 100 + '%';
+                        confetti.style.top = '-10px';
+                        confetti.style.borderRadius = '50%';
+                        confetti.style.opacity = Math.random();
+                        confetti.style.transform = `rotate(${Math.random() * 360}deg)`;
+
+                        container.appendChild(confetti);
+
+                        const duration = 2000 + Math.random() * 3000;
+                        confetti.animate([
+                            { top: '-10px', transform: `translateX(0) rotate(0deg)` },
+                            { top: '100%', transform: `translateX(${Math.random() * 100 - 50}px) rotate(${Math.random() * 720}deg)` }
+                        ], {
+                            duration: duration,
+                            easing: 'cubic-bezier(0, .9, .6, 1)',
+                            fill: 'forwards'
+                        });
+                    }
+                }
+            }
+
+            // v3.3: Dynamic Backgrounds
+            function updateDistrictBackground() {
+                const screen = document.getElementById('orders-screen');
+                if (!screen) return;
+
+                screen.classList.remove('bg-suburbs', 'bg-center', 'bg-airport');
+                screen.classList.add(`bg-${currentDistrict}`);
+            }
+
+            // v2.2: Get available districts
             document.getElementById('buy-coffee-btn')?.addEventListener('click', buyCoffee);
             document.getElementById('claim-streak-btn')?.addEventListener('click', claimStreakReward);
         } else {
@@ -559,12 +610,12 @@ function displayOrders() {
 
     if (!orders || orders.length === 0) {
         ordersList.innerHTML = `
-            <div class="no-orders">
-                <div style="font-size: 40px; margin-bottom: 15px;">🚕</div>
-                <div style="font-size: 18px; font-weight: 700; margin-bottom: 8px;">Нет доступных заказов</div>
-                <div style="font-size: 14px; color: #8e8e93; margin-bottom: 25px;">Нажмите кнопку ниже чтобы получить новые</div>
-                <button class="action-btn" onclick="loadOrders()" style="max-width: 220px; margin: 0 auto;">
-                    🔄 Получить новые заказы
+            <div class="no-orders text-center fade-in">
+                <div style="font-size: 60px; margin-bottom: 20px; filter: drop-shadow(0 0 10px rgba(255,160,0,0.3))">🚕</div>
+                <div style="font-size: 20px; font-weight: 800; margin-bottom: 10px; color: var(--text-color)">Биржа заказов пуста</div>
+                <div style="font-size: 14px; opacity: 0.6; margin-bottom: 30px;">Все клиенты уже уехали. Ожидайте новые вызовы...</div>
+                <button class="menu-btn primary" onclick="loadOrders()" style="max-width: 250px; margin: 0 auto; box-shadow: 0 4px 15px rgba(0,122,255,0.4)">
+                    🔄 Обновить эфир
                 </button>
             </div>
         `;
@@ -573,50 +624,82 @@ function displayOrders() {
 
     let filteredOrders = [...orders];
     switch (currentFilter) {
-        case 'cheap':
-            filteredOrders = orders.filter(o => o.price < 30);
-            break;
-        case 'expensive':
-            filteredOrders = orders.filter(o => o.price >= 50);
-            break;
-        case 'vip':
-            filteredOrders = orders.filter(o => o.is_vip === true);
-            break;
+        case 'cheap': filteredOrders = orders.filter(o => o.price < 30); break;
+        case 'expensive': filteredOrders = orders.filter(o => o.price >= 50); break;
+        case 'vip': filteredOrders = orders.filter(o => o.is_vip === true); break;
     }
 
     if (filteredOrders.length === 0) {
-        ordersList.innerHTML = `
-            <div class="no-orders">
-                <div style="font-size: 32px; margin-bottom: 10px;">🔍</div>
-                <div>Заказы по фильтру не найдены</div>
-            </div>
-        `;
+        ordersList.innerHTML = `<div class="no-orders">Не найдено заказов по фильтру "${currentFilter}" 🔍</div>`;
         return;
     }
 
-    ordersList.innerHTML = filteredOrders.map((order, index) => {
+    ordersList.innerHTML = filteredOrders.map((order) => {
         const canTake = canTakeOrder(order);
+        const orderClass = order.class || 'economy';
+        const passenger = order.passenger || { name: 'Клиент', avatar: '👤', rating: '5.0' };
+
+        // Find current aggregator choice or use default
+        const aggId = 'yodex'; // In a real app we'd track selected app
+        const aggInfo = order.prices[aggId] || { price: order.price, color: '#f3a000', commission: 0.2 };
 
         return `
-            <div class="order-card ${order.is_vip ? 'vip' : ''}" data-order-id="${index}">
+            <div class="order-card ${orderClass}" id="order-${order.id}">
                 <div class="order-header">
-                    <span>${order.is_vip ? '👑 VIP' : '🚖'} Заказ</span>
-                    <span class="timer" data-time="45">⏱️ 45с</span>
+                    <div class="passenger-meta">
+                        <div class="passenger-avatar">${passenger.avatar}</div>
+                        <div class="user-meta">
+                            <span class="passenger-name">${passenger.name}</span>
+                            <span class="passenger-rating">⭐ ${passenger.rating}</span>
+                        </div>
+                    </div>
+                    <div class="aggregator-badge" style="background: ${aggInfo.color}33; color: ${aggInfo.color}; border-color: ${aggInfo.color}55">
+                        ${aggId.toUpperCase()} • ${(aggInfo.commission * 100).toFixed(0)}%
+                    </div>
                 </div>
-                <div class="order-route">
-                    <div>📍 ${order.from}</div>
-                    <div class="order-arrow">→</div>
-                    <div>🏁 ${order.to}</div>
+
+                <div class="order-route-modern">
+                    <div class="route-item">
+                        <span class="route-icon">📍</span>
+                        <span class="route-text">${order.from}</span>
+                    </div>
+                    <div class="route-item" style="padding-left: 2px; border-left: 2px dashed rgba(255,255,255,0.1); margin-left: 7px; height: 15px;"></div>
+                    <div class="route-item">
+                        <span class="route-icon">🏁</span>
+                        <span class="route-text">${order.to}</span>
+                    </div>
                 </div>
+
                 <div class="order-stats">
-                    <span class="order-price">💰 ${order.price.toFixed(2)} PLN</span>
-                    <span class="order-distance">📏 ${order.distance} км</span>
-                    ${order.is_night ? '<span class="night-badge">🌙 Ночной</span>' : ''}
+                    <div class="stat-group">
+                        <span class="stat-label">Расстояние</span>
+                        <span class="stat-value">${order.distance} км</span>
+                    </div>
+                    <div class="stat-group">
+                        <span class="stat-label">Оплата</span>
+                        <span class="stat-value price">${aggInfo.price.toFixed(2)} PLN</span>
+                    </div>
+                    <div class="stat-group">
+                         ${order.is_night ? '<span class="night-badge">🌙 Ночь</span>' : `<span class="timer" data-time="45" id="timer-${order.id}">⏱️ 45с</span>`}
+                    </div>
                 </div>
+
+                <!-- TRIP ANIMATION (HIDDEN BY DEFAULT) -->
+                <div class="trip-progress-container" id="trip-${order.id}">
+                    <div class="trip-track">
+                        <div class="trip-car-icon" id="car-${order.id}">🚕</div>
+                        <div class="trip-fill" id="fill-${order.id}"></div>
+                    </div>
+                    <div class="trip-info">
+                        <span>${order.from}</span>
+                        <span>${order.to}</span>
+                    </div>
+                </div>
+
                 <button class="take-order-btn" 
-                        onclick="takeOrder(${index}, event)"
+                        onclick="takeOrder('${order.id}', event)"
                         ${canTake ? '' : 'disabled'}>
-                    ${canTake ? '✅ Взять' : '❌ Недоступно'}
+                    ${canTake ? '✅ Принять заказ' : '❌ Нет ресурсов'}
                 </button>
             </div>
         `;
@@ -636,8 +719,8 @@ function canTakeOrder(order) {
 }
 
 // ============= ВЗЯТЬ ЗАКАЗ =============
-async function takeOrder(orderIndex, event) {
-    const order = orders[orderIndex];
+async function takeOrder(orderId, event) {
+    const order = orders.find(o => o.id === orderId);
 
     if (!order) {
         showNotification('❌ Заказ не найден', 'error');
@@ -649,23 +732,22 @@ async function takeOrder(orderIndex, event) {
         return;
     }
 
-    // v2.8: Anti-spam cooldown
-    const btn = event?.target?.closest('.take-order-btn');
-    if (btn) {
-        btn.disabled = true;
-        btn.classList.add('cooldown');
-        setTimeout(() => {
-            btn.disabled = false;
-            btn.classList.remove('cooldown');
-        }, 2000);
+    const card = document.getElementById(`order-${orderId}`);
+    if (card) {
+        card.classList.add('in-progress');
     }
 
     try {
         try { soundManager.play('engine'); } catch (e) { }
+
+        // Start animation before/during API call
+        const rideDuration = 3000; // 3 seconds visual ride
+        const animationPromise = animateRide(orderId, rideDuration);
+
         const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/ride`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ order: order.id, useGas: false })
+            body: JSON.stringify({ order: orderId, useGas: false })
         });
 
         if (!response.ok) {
@@ -675,7 +757,11 @@ async function takeOrder(orderIndex, event) {
 
         const result = await response.json();
 
+        // Wait for animation to finish
+        await animationPromise;
+
         if (result.success) {
+            const oldLevel = userData.level;
             userData.balance = result.new_balance;
             userData.fuel = result.new_fuel;
             userData.gas_fuel = result.new_gas_fuel || userData.gas_fuel || 0;
@@ -685,28 +771,32 @@ async function takeOrder(orderIndex, event) {
             userData.level = result.level || userData.level;
             userData.experience = result.experience || userData.experience;
 
-            // Показываем достижения
-            if (result.new_achievements && result.new_achievements.length > 0) {
-                result.new_achievements.forEach(ach => {
-                    showAchievement(ach);
-                });
+            // Check for level up
+            if (userData.level > oldLevel) {
+                showLevelUpWow(userData.level);
             }
 
-            // Показываем событие
+            // Achievements
+            if (result.new_achievements && result.new_achievements.length > 0) {
+                result.new_achievements.forEach(ach => showAchievement(ach));
+            }
+
+            // Events
             if (result.event) {
                 if (result.event.type === 'police_stopped') {
                     handlePoliceEncounter(result.event.fine);
-                    return; // Don't show regular notification
+                    return;
                 }
                 showNotification(`${result.event.message}`, 'info');
             }
 
-            orders.splice(orderIndex, 1);
+            // Remove order
+            const idx = orders.findIndex(o => o.id === orderId);
+            if (idx !== -1) orders.splice(idx, 1);
 
             updateMainScreen();
             displayOrders();
 
-            // Автозагрузка при нехватке заказов
             if (orders.length < 2) {
                 setTimeout(() => loadOrders(), 1500);
             }
@@ -718,7 +808,36 @@ async function takeOrder(orderIndex, event) {
     } catch (error) {
         console.error('Error:', error);
         showNotification(error.message, 'error');
+        if (card) card.classList.remove('in-progress');
     }
+}
+
+function animateRide(orderId, duration) {
+    return new Promise((resolve) => {
+        const car = document.getElementById(`car-${orderId}`);
+        const fill = document.getElementById(`fill-${orderId}`);
+        if (!car || !fill) {
+            resolve();
+            return;
+        }
+
+        let start = null;
+        function step(timestamp) {
+            if (!start) start = timestamp;
+            const progress = (timestamp - start) / duration;
+            const percent = Math.min(progress * 100, 100);
+
+            car.style.left = `${percent}%`;
+            fill.style.width = `${percent}%`;
+
+            if (progress < 1) {
+                window.requestAnimationFrame(step);
+            } else {
+                resolve();
+            }
+        }
+        window.requestAnimationFrame(step);
+    });
 }
 
 // ============= ЗАПРАВКА ТОПЛИВА =============
@@ -1838,6 +1957,7 @@ function setupEventListeners() {
             e.target.classList.add('active');
             currentFilter = e.target.dataset.filter || 'all';
             displayOrders();
+            updateDistrictBackground();
         });
     });
 

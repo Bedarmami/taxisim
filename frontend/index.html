@@ -726,6 +726,21 @@
         </div>
     </div>
 
+    <!-- v3.3: Level Up Modal (Wow effect) -->
+    <div id="level-up-modal" class="modal level-up-modal" style="display: none;">
+        <div class="modal-content level-up-content">
+            <div class="confetti-container" id="confetti-container"></div>
+            <div class="level-up-title">НОВЫЙ УРОВЕНЬ!</div>
+            <div class="level-up-badge" id="new-level-badge">2</div>
+            <div class="level-up-reward">
+                <span>🎁 Награда:</span>
+                <span id="level-up-reward-text">+500 PLN & Полная Энергия</span>
+            </div>
+            <button class="menu-btn online-primary"
+                onclick="this.parentElement.parentElement.style.display='none'">КРУТО! 🚀</button>
+        </div>
+    </div>
+
     <!-- Экран техработ -->
     <div id="maintenance-overlay" class="maintenance-overlay" style="display: none;">
         <div class="maintenance-content">

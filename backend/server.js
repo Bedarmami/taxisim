@@ -153,10 +153,23 @@ app.get('/', (req, res) => {
 
 // ============= v2.6: AGGREGATORS =============
 const AGGREGATORS = {
-    yodex: { id: 'yodex', name: '🚖 Yodex', baseMultiplier: 1.0, commission: 0.20, description: 'Эконом (много заказов)' },
-    ubar: { id: 'ubar', name: '🖤 Ubar', baseMultiplier: 1.3, commission: 0.25, description: 'Комфорт (средне заказов)' },
-    volt: { id: 'volt', name: '⚡ Volt', baseMultiplier: 1.6, commission: 0.30, description: 'Премиум (мало заказов)' }
+    yodex: { id: 'yodex', name: '🚖 Yodex', baseMultiplier: 1.0, commission: 0.20, description: 'Эконом', color: '#f3a000' },
+    ubar: { id: 'ubar', name: '🖤 Ubar', baseMultiplier: 1.3, commission: 0.25, description: 'Комфорт', color: '#1a1a1a' },
+    volt: { id: 'volt', name: '⚡ Volt', baseMultiplier: 1.6, commission: 0.30, description: 'Премиум', color: '#2ecc71' }
 };
+
+const PASSENGERS = [
+    { name: "Marek", avatar: "👨‍💻" },
+    { name: "Zuzanna", avatar: "👩‍💼" },
+    { name: "Antoni", avatar: "👴" },
+    { name: "Lena", avatar: "👩‍🎓" },
+    { name: "Piotr", avatar: "🧔" },
+    { name: "Amelia", avatar: "👩‍🎤" },
+    { name: "Jan", avatar: "👨‍🌾" },
+    { name: "Maria", avatar: "👵" },
+    { name: "Kacper", avatar: "👦" },
+    { name: "Oliwia", avatar: "👧" }
+];
 
 // ============= ОПРЕДЕЛЕНИЕ ВСЕХ МАШИН =============
 let CARS = {};
@@ -883,6 +896,13 @@ function generateOrder(user, districtId = 'suburbs') {
     }
 
     // Return the final order object
+    const passenger = PASSENGERS[Math.floor(Math.random() * PASSENGERS.length)];
+    const passengerRating = (Math.random() * (5.0 - 4.2) + 4.2).toFixed(1);
+
+    let orderClass = 'economy';
+    if (is_vip) orderClass = 'business';
+    else if (districtId === 'center' || districtId === 'airport') orderClass = 'comfort';
+
     return {
         from: from.name,
         to: to.name,
@@ -891,12 +911,29 @@ function generateOrder(user, districtId = 'suburbs') {
         is_night,
         is_vip,
         district: districtId,
-        business_class: district.businessClass || false,
+        class: orderClass,
+        passenger: {
+            name: passenger.name,
+            avatar: passenger.avatar,
+            rating: passengerRating
+        },
         // Calculate aggregators prices for comparison in UI
         prices: {
-            yodex: Math.floor(basePrice * AGGREGATORS.yodex.baseMultiplier),
-            ubar: Math.floor(basePrice * AGGREGATORS.ubar.baseMultiplier),
-            volt: Math.floor(basePrice * AGGREGATORS.volt.baseMultiplier)
+            yodex: {
+                price: Math.floor(basePrice * AGGREGATORS.yodex.baseMultiplier),
+                commission: AGGREGATORS.yodex.commission,
+                color: AGGREGATORS.yodex.color
+            },
+            ubar: {
+                price: Math.floor(basePrice * AGGREGATORS.ubar.baseMultiplier),
+                commission: AGGREGATORS.ubar.commission,
+                color: AGGREGATORS.ubar.color
+            },
+            volt: {
+                price: Math.floor(basePrice * AGGREGATORS.volt.baseMultiplier),
+                commission: AGGREGATORS.volt.commission,
+                color: AGGREGATORS.volt.color
+            }
         }
     };
 }

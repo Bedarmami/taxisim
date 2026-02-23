@@ -1303,115 +1303,188 @@ body {
     padding: 5px 0;
 }
 
+/* ============= PREMIUM ORDER CARDS (GLASSMORPHISM) ============= */
 .order-card {
-    background-color: var(--secondary-bg);
-    padding: 16px;
-    border-radius: 16px;
-    border: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 20px;
+    margin-bottom: 20px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
     animation: slideIn 0.3s ease;
-    flex-shrink: 0;
 }
 
-.order-card.vip {
-    border: 2px solid var(--warning-color);
-    background: linear-gradient(135deg, rgba(255, 149, 0, 0.05), rgba(255, 159, 10, 0.05));
+.order-card:hover {
+    transform: translateY(-4px) scale(1.01);
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
 }
 
-@keyframes slideIn {
-    from {
-        opacity: 0;
-        transform: translateX(-10px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
+/* Class Theming */
+.order-card.economy {
+    box-shadow: 0 8px 32px rgba(100, 100, 100, 0.1);
+    border-left: 6px solid #b0b0b0;
 }
 
-.order-header {
+.order-card.comfort {
+    box-shadow: 0 8px 32px rgba(0, 122, 255, 0.1);
+    border-left: 6px solid #007aff;
+}
+
+.order-card.business {
+    background: linear-gradient(145deg, rgba(20, 20, 20, 0.9), rgba(40, 40, 40, 0.8));
+    border-left: 6px solid #f3a000;
+}
+
+.passenger-meta {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
-    font-weight: 600;
+    gap: 12px;
 }
 
-.order-route {
-    margin-bottom: 12px;
-    font-size: 15px;
-    color: #8e8e93;
+.passenger-avatar {
+    font-size: 24px;
+    background: rgba(255, 255, 255, 0.1);
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.passenger-name {
+    font-weight: 800;
+    font-size: 16px;
+    color: var(--text-color);
+}
+
+.passenger-rating {
+    font-size: 12px;
+    color: #f3a000;
+    font-weight: bold;
+}
+
+.aggregator-badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+/* Route Info */
+.order-route-modern {
+    margin: 15px 0;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+}
+
+.route-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.route-item:last-child {
+    margin-bottom: 0;
+}
+
+.route-icon {
+    font-size: 16px;
+}
+
+.route-text {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+.stat-group {
     display: flex;
     flex-direction: column;
-    gap: 6px;
 }
 
-.order-arrow {
-    text-align: center;
+.stat-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    color: var(--hint-color);
+    letter-spacing: 1px;
+}
+
+.stat-value {
     font-size: 18px;
+    font-weight: 900;
 }
 
-.order-stats {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 12px;
-    flex-wrap: wrap;
-    font-size: 14px;
-}
-
-.order-price {
-    font-size: 18px;
-    font-weight: 700;
+.stat-value.price {
     color: var(--success-color);
 }
 
-.order-distance {
-    color: #8e8e93;
+/* TRIP ANIMATION */
+.trip-progress-container {
+    margin-top: 20px;
+    display: none;
+    /* Shown during ride */
 }
 
-.night-badge {
-    background-color: #5856D6;
-    color: white;
-    padding: 2px 8px;
-    border-radius: 12px;
+.trip-track {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    position: relative;
+    margin-top: 25px;
+}
+
+.trip-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--accent-color);
+    border-radius: 2px;
+    transition: width 0.1s linear;
+}
+
+.trip-car-icon {
+    position: absolute;
+    top: -24px;
+    left: 0%;
+    font-size: 24px;
+    transition: left 0.1s linear;
+    z-index: 2;
+    transform: translateX(-50%);
+}
+
+.trip-info {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 10px;
     font-size: 12px;
-    font-weight: 600;
+    color: var(--hint-color);
 }
 
-.timer {
-    font-size: 12px;
-    color: var(--warning-color);
-    font-weight: 600;
+/* Active State */
+.order-card.in-progress {
+    pointer-events: none;
+    border-color: var(--accent-color);
 }
 
-.take-order-btn {
-    width: 100%;
-    padding: 12px;
-    background-color: var(--accent-color);
-    color: white;
-    border: none;
-    border-radius: 12px;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    -webkit-user-select: none;
-    user-select: none;
-    min-height: 44px;
+.order-card.in-progress .take-order-btn {
+    display: none;
 }
 
-.take-order-btn:active {
-    transform: scale(0.96);
-    opacity: 0.8;
-}
-
-.take-order-btn:disabled {
-    background-color: var(--border-color);
-    color: #8e8e93;
-    cursor: not-allowed;
-    opacity: 0.6;
-    filter: grayscale(0.5);
-    background: #555 !important;
+.order-card.in-progress .trip-progress-container {
+    display: block;
 }
 
 .take-order-btn.cooldown {
@@ -2453,6 +2526,92 @@ button {
     flex-direction: column;
     gap: 10px;
     width: 100%;
+}
+
+/* ============= LEVEL UP MODAL (WOW EFFECT) ============= */
+.level-up-modal .modal-content {
+    background: radial-gradient(circle, rgba(255, 160, 0, 0.2) 0%, rgba(26, 26, 26, 0.95) 100%);
+    border: 2px solid #f3a000;
+    box-shadow: 0 0 50px rgba(243, 160, 0, 0.3);
+    text-align: center;
+    overflow: hidden;
+}
+
+.level-up-title {
+    font-size: 28px;
+    font-weight: 900;
+    color: #f3a000;
+    text-shadow: 0 0 20px rgba(243, 160, 0, 0.5);
+    margin-bottom: 20px;
+    animation: bounce 1s infinite;
+}
+
+.level-up-badge {
+    font-size: 80px;
+    font-weight: 950;
+    color: white;
+    background: linear-gradient(135deg, #f3a000, #ff9500);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 15px rgba(243, 160, 0, 0.5));
+    margin: 20px 0;
+}
+
+.level-up-reward {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 15px;
+    border-radius: 12px;
+}
+
+/* Confetti Simulation */
+.confetti-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: -1;
+}
+
+@keyframes bounce {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+/* ============= DYNAMIC DISTRICT BACKGROUNDS ============= */
+#orders-screen {
+    transition: background 0.5s ease;
+}
+
+#orders-screen.bg-suburbs {
+    background: radial-gradient(circle at top right, rgba(52, 199, 89, 0.1), #1a1a1a);
+}
+
+#orders-screen.bg-center {
+    background: radial-gradient(circle at top right, rgba(0, 122, 255, 0.1), #1a1a1a);
+}
+
+#orders-screen.bg-airport {
+    background: radial-gradient(circle at top right, rgba(255, 149, 0, 0.1), #1a1a1a);
+}
+
+/* Fix for profile avatar hover */
+#profile-trigger:hover .avatar-container {
+    transform: scale(1.05);
+    box-shadow: 0 0 15px rgba(0, 122, 255, 0.3);
+}
+
+.avatar-container {
+    transition: 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 /* ============= v2.9:  ============= */
