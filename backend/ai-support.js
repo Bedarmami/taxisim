@@ -39,20 +39,58 @@ async function getPlayerContext(telegramId) {
 }
 
 /**
+ * Simple keyword-based diagnostics that work without AI.
+ */
+function getHeuristicResponse(user, userMessage) {
+    const msg = userMessage.toLowerCase();
+
+    // 1. Fuel check
+    if ((msg.includes('заказ') || msg.includes('ехать') || msg.includes('работ')) && (user.fuel < 1 && user.gas_fuel < 1)) {
+        return "Похоже, у вас закончилось топливо (бензин и газ по 0л). Чтобы брать новые заказы, вам нужно заправиться на вкладке «Заправка». Если нет денег — можно взять небольшое достижение или ежедневный бонус.";
+    }
+
+    // 2. Stamina check
+    if ((msg.includes('заказ') || msg.includes('ехать') || msg.includes('энерг') || msg.includes('устал')) && user.stamina < 5) {
+        return "Ваш персонаж слишком устал (энергия почти на нуле). Вы не сможете брать заказы, пока не отдохнете. Энергия восстанавливается сама со временем, или можно купить кофе в меню навыков/магазина.";
+    }
+
+    // 3. Balance check for fuel/rent
+    if ((msg.includes('кофе') || msg.includes('заправ')) && user.balance < 10) {
+        return "У вас недостаточно средств на балансе. Попробуйте забрать ежедневный бонус или проверить раздел достижений, чтобы получить стартовый капитал.";
+    }
+
+    // 4. Ban check
+    if (user.is_banned) {
+        return "Ваш аккаунт заблокирован администратором. Пожалуйста, ожидайте ответа поддержки для выяснения причин.";
+    }
+
+    return null;
+}
+
+/**
  * Tries to get an AI-generated answer for the support request.
- * Returns null if AI thinks it's not a technical/gameplay issue it can solve.
  */
 async function getAIResponse(telegramId, userMessage) {
+    let user;
+    try {
+        user = await db.get('SELECT * FROM users WHERE telegram_id = ?', [telegramId]);
+    } catch (e) {
+        console.error('DB Error in AI Support:', e);
+    }
+
+    if (user) {
+        // Try heuristic first (FAST & FREE)
+        const quickAnswer = getHeuristicResponse(user, userMessage);
+        if (quickAnswer) return quickAnswer;
+    }
+
     if (!genAI) {
         console.warn('⚠️ GEMINI_API_KEY not found. AI Support disabled.');
         return null;
     }
 
-    async function tryGenerate(modelName) {
-        const model = genAI.getGenerativeModel({ model: modelName });
-        const playerContext = await getPlayerContext(telegramId);
-
-        const prompt = `
+    const playerContext = await getPlayerContext(telegramId);
+    const prompt = `
 Ты — интеллектуальный помощник поддержки игры "Taxi Simulator Pro" (Telegram бот). 
 Твоя задача: помогать игрокам решать технические и игровые проблемы на основе их текущего статуса.
 
@@ -63,39 +101,35 @@ ${playerContext}
 "${userMessage}"
 
 ИНСТРУКЦИИ:
-1. Если вопрос касается механик игры (почему нет кнопки заказа, как заработать, почему мало топлива и т.д.), используй ДАННЫЕ ИГРОКА для ответа.
-   - Пример: если топлива < 1, а игрок спрашивает "почему не могу ехать", ответь, что нужно заправиться.
-   - Пример: если стамина 0, скажи, что нужно отдохнуть или выпить кофе.
+1. Если вопрос касается механик игры, используй ДАННЫЕ ИГРОКА для ответа.
 2. Отвечай вежливо, дружелюбно, на русском языке.
-3. Если вопрос не касается игры или ты не можешь помочь на основе данных (например, "верните деньги за донат", "почему я забанен" - в сложных случаях), ответь ровно одним словом: SKIP.
-4. Если ты даешь совет, он должен быть коротким и понятным.
+3. Если вопрос сложный или ты не можешь помочь, ответь ровно одним словом: SKIP.
+4. Будь краток.
 
 ОТВЕТ:`;
 
-        const result = await model.generateContent(prompt);
-        return result.response.text().trim();
-    }
+    const modelsToTry = ["gemini-1.5-flash-latest", "gemini-1.5-flash", "gemini-pro", "gemini-1.0-pro"];
 
-    try {
-        let responseText;
+    for (const modelName of modelsToTry) {
         try {
-            // Priority 1: Gemini 1.5 Flash (Modern & Free)
-            responseText = await tryGenerate("gemini-1.5-flash");
-        } catch (flashError) {
-            console.warn(`Gemini 1.5 Flash failed (${flashError.message}), trying fallback to gemini-pro...`);
-            // Priority 2: Gemini Pro (Standard fallback)
-            responseText = await tryGenerate("gemini-pro");
-        }
+            const model = genAI.getGenerativeModel({ model: modelName });
+            const result = await model.generateContent(prompt);
+            const responseText = result.response.text().trim();
 
-        if (responseText.toUpperCase() === 'SKIP') {
-            return null;
+            if (responseText.toUpperCase() === 'SKIP') return null;
+            return responseText;
+        } catch (e) {
+            console.error(`Gemini Error (model: ${modelName}):`, e.message);
+            // If it's the last model, we fail
+            if (modelName === modelsToTry[modelsToTry.length - 1]) {
+                // Log final failure to DB for admin
+                await db.run('INSERT INTO logs (level, message, timestamp, stack) VALUES (?, ?, ?, ?)',
+                    ['ERROR', `AI Support Failed for ${telegramId}: ${e.message}`, new Date().toISOString(), e.stack || '']);
+            }
         }
-
-        return responseText;
-    } catch (e) {
-        console.error('Gemini AI All Models Error:', e.message);
-        return null;
     }
+
+    return null;
 }
 
 module.exports = {
