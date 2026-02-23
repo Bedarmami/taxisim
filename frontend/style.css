@@ -3770,6 +3770,17 @@ button {
 
 /* Ensure main app container is centered and doesn't shift */
 .app {
+    width: 100%;
+    max-width: 500px;
     margin: 0 auto !important;
     position: relative;
+    background: var(--app-bg);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.screen {
+    width: 100% !important;
+    flex: 1;
 }

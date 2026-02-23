@@ -2417,3 +2417,20 @@ function updatePlatesUI() {
         }
     }
 }
+
+function updateBalanceDisplay() {
+    if (!userData) return;
+    const balanceEl = document.getElementById('balance');
+    const fuelBalanceEl = document.getElementById('fuel-balance');
+    const casinoBalanceEl = document.getElementById('casino-balance');
+    const skillsBalanceEl = document.getElementById('skills-balance');
+    const pTotalEarnedEl = document.getElementById('profile-total-earned');
+
+    const formattedBalance = userData.balance?.toFixed(2) || '0.00';
+
+    if (balanceEl) balanceEl.textContent = formattedBalance;
+    if (fuelBalanceEl) fuelBalanceEl.textContent = formattedBalance;
+    if (casinoBalanceEl) casinoBalanceEl.textContent = Math.floor(userData.balance || 0);
+    if (skillsBalanceEl) skillsBalanceEl.textContent = formattedBalance;
+    if (pTotalEarnedEl) pTotalEarnedEl.textContent = userData.total_earned?.toFixed(2) || '0.00';
+}
