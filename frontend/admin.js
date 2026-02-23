@@ -60,7 +60,7 @@ async function checkAuth() {
                 if (!confirm('Вы уверены, что хотите отправить это сообщение ВСЕМ пользователям?')) return;
 
                 try {
-                    const res = await fetch(`${API_BASE_URL}/admin/broadcast`, {
+                    const res = await fetch(`/api/admin/broadcast`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
                         body: JSON.stringify({ message: msg })

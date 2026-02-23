@@ -3233,12 +3233,18 @@ app.post('/api/admin/broadcast', adminAuth, async (req, res) => {
         const { message } = req.body;
         if (!message) return res.status(400).json({ error: 'Message required' });
 
+        // Log the start of the process immediately
+        await db.run('INSERT INTO logs (level, message, timestamp) VALUES (?, ?, ?)',
+            ['INFO', 'Admin initiated broadcast: ' + message.substring(0, 50) + '...', new Date().toISOString()]);
+
         // Fetch users in the background to avoid timeout
         db.query('SELECT telegram_id FROM users').then(async (users) => {
             let successCount = 0;
             let failCount = 0;
 
             console.log(`📣 Starting broadcast to ${users.length} users...`);
+            await db.run('INSERT INTO logs (level, message, timestamp) VALUES (?, ?, ?)',
+                ['INFO', `User query returned ${users.length} users`, new Date().toISOString()]);
             await db.run('INSERT INTO logs (level, message, timestamp) VALUES (?, ?, ?)',
                 ['INFO', `Starting broadcast to ${users.length} users`, new Date().toISOString()]);
 
