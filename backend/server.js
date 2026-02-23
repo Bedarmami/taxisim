@@ -136,6 +136,7 @@ app.use((req, res, next) => {
 
 // v3.0: Register auction routes
 app.use('/api/auction', auctionRouter);
+app.use('/api/admin/containers', auctionRouter);
 
 // Serve static files from the frontend directory
 app.use(express.static(path.join(__dirname, '../frontend')));
@@ -308,7 +309,7 @@ const PARTNERS = [
         description: 'Делим 50/50, их машина, их топливо',
         revenue_split: 0.5,
         provides_car: true,
-        fuel_provided: true,
+        fuel_provided: false,
         weekly_cost: 0,
         requirements: { rides: 0 }
     },
@@ -3232,22 +3233,37 @@ app.post('/api/admin/broadcast', adminAuth, async (req, res) => {
         const { message } = req.body;
         if (!message) return res.status(400).json({ error: 'Message required' });
 
-        const users = await db.query('SELECT telegram_id FROM users');
-        let successCount = 0;
-        let failCount = 0;
+        // Fetch users in the background to avoid timeout
+        db.query('SELECT telegram_id FROM users').then(async (users) => {
+            let successCount = 0;
+            let failCount = 0;
 
-        // Use a slight delay to avoid rate limiting
-        for (const user of users) {
-            try {
+            console.log(`📣 Starting broadcast to ${users.length} users...`);
+
+            for (const user of users) {
                 if (user.telegram_id) {
-                    const sent = await sendNotification(user.telegram_id, 'BROADCAST', { text: message });
-                    if (sent) successCount++;
-                    else failCount++;
+                    try {
+                        const sent = await sendNotification(user.telegram_id, 'BROADCAST', { text: message });
+                        if (sent) successCount++;
+                        else failCount++;
+                    } catch (e) {
+                        failCount++;
+                    }
+                    // Small delay to prevent hitting Telegram rate limits too hard
+                    await new Promise(resolve => setTimeout(resolve, 50));
                 }
-            } catch (e) { failCount++; }
-        }
+            }
 
-        res.json({ success: true, message: `Broadcast sent to ${successCount} users (${failCount} failed)` });
+            console.log(`✅ Broadcast finished. Success: ${successCount}, Failed: ${failCount}`);
+
+            // Log the broadcast event
+            await logError('INFO', `Broadcast sent: ${successCount} success, ${failCount} fail`, message);
+        }).catch(err => {
+            console.error('Broadcast background error:', err);
+        });
+
+        // Return immediately to frontend
+        res.json({ success: true, message: 'Рассылка запущена в фоновом режиме. Проверьте логи для статуса.' });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }

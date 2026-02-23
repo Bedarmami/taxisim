@@ -76,7 +76,7 @@ const PARTNERS = [
         description: 'Делим 50/50, их машина, их топливо',
         revenue_split: 0.5,
         provides_car: true,
-        fuel_provided: true,
+        fuel_provided: false,
         weekly_cost: 0,
         requirements: { rides: 0 }
     },
