@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1a1a1a">
+    <title>🚖 Taxi Simulator PRO</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="casino-styles.css">
+    <link rel="stylesheet" href="retention_styles.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="managers.js" defer></script>
+    <script src="retention.js" defer></script>
+    <script src="casino.js" defer></script>
+    <script src="business.js" defer></script>
+    <script src="skills.js" defer></script>
+    <script src="containers.js" defer></script>
+    <script src="retention_ui.js" defer></script>
+    <script src="tutorial.js" defer></script>
+    <script src="script.js" defer></script>
+</head>
+
+<body>
+    <!-- Splash Screen / Loading Overlay -->
+    <div id="splash-screen" class="splash-screen">
+        <div class="splash-content">
+            <div class="splash-logo-wrap">
+                <div class="splash-logo">🚖</div>
+                <div class="splash-glow"></div>
+            </div>
+            <div class="splash-title">TAXI SIMULATOR PRO</div>
+            <div class="splash-version">v3.0</div>
+            <div class="splash-progress-wrap">
+                <div class="splash-progress-bar">
+                    <div id="splash-progress-fill" class="splash-progress-fill"></div>
+                </div>
+                <div class="splash-progress-info">
+                    <span id="splash-status" class="splash-status">Инициализация...</span>
+                    <span id="splash-percent" class="splash-percent">0%</span>
+                </div>
+            </div>
+            <div id="splash-tip" class="splash-tip">💡 Совет: Заправляйтесь газом — он дешевле бензина!</div>
+            <div class="splash-online">🟢 <span id="splash-online-count">0</span> игроков в сети</div>
+        </div>
+    </div>
+
+    <div class="app">
+        <!-- ============= ГЛАВНЫЙ ЭКРАН ============= -->
+        <div id="main-screen" class="screen active">
+            <div class="header">
+                <div class="header-left" id="profile-trigger">
+                    <div class="avatar-container">
+                        <img id="player-avatar" src="assets/default-avatar.png" alt="Avatar">
+                        <div class="level-overlay" id="level-badge">1</div>
+                    </div>
+                    <div class="user-meta">
+                        <span id="player-name" class="player-name">Загрузка...</span>
+                        <div class="exp-mini-bar">
+                            <div id="exp-mini-fill" class="exp-mini-fill"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <button id="mute-btn" class="icon-btn">🔊</button>
+                    <div class="balance-pill">
+                        <span id="balance">0.00</span> <small>PLN</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- v2.3: Event Banner -->
+            <div class="event-banner" id="event-banner" style="display: none;">
+                <!-- Event info will be displayed here -->
+            </div>
+
+            <div class="dashboard-grid">
+                <!-- Status Dashboard -->
+                <div class="status-card">
+                    <div class="status-header">
+                        <span id="car-model">🚗 Loading...</span>
+                        <span class="level-badge" id="level">LVL 1</span>
+                    </div>
+
+                    <div class="status-bars">
+                        <div class="bar-item">
+                            <div class="bar-labels">
+                                <span>⛽ Топливо</span>
+                                <span><span id="fuel">0.0</span>/<span id="max-fuel">45</span></span>
+                            </div>
+                            <div class="progress-bar">
+                                <div id="fuel-fill" class="fill fuel"></div>
+                            </div>
+                        </div>
+
+                        <div class="bar-item">
+                            <div class="bar-labels">
+                                <span>⚡ Энергия</span>
+                                <span id="stamina">100</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div id="stamina-fill" class="fill stamina"></div>
+                            </div>
+                        </div>
+
+                        <div id="gas-bar-container" class="bar-item" style="display: none;">
+                            <div class="bar-labels">
+                                <span>💧 Газ</span>
+                                <span><span id="gas-fuel">0.0</span>/<span id="gas-max-fuel">0</span></span>
+                            </div>
+                            <div class="progress-bar">
+                                <div id="gas-fill" class="fill gas"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="quick-stats">
+                        <div class="q-stat" id="condition-stat">
+                            <span class="q-label">🔧 Сост.</span>
+                            <span class="q-value"><span id="car-condition">100</span>%</span>
+                        </div>
+                        <div class="q-stat">
+                            <span class="q-label">🚕 Заказы</span>
+                            <span class="q-value"><span id="rides-total">0</span></span>
+                        </div>
+                        <div class="q-stat">
+                            <span class="q-label">⛽ Расход</span>
+                            <span class="q-value"><span id="fuel-consumption-display">0.0</span>
+                                <small>л/100</small></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- v2.8: Online Action -->
+            <div class="online-container">
+                <button id="online-btn" class="main-cta">🚕 ВЫЙТИ В ОНЛАЙН</button>
+            </div>
+
+            <div class="action-grid">
+                <button id="fuel-btn" class="action-item"><span class="icon">⛽</span> Бензин</button>
+                <button id="garage-btn" class="action-item"><span class="icon">🔧</span> Гараж</button>
+                <button id="rest-btn" class="action-item"><span class="icon">😴</span> Отдых</button>
+                <button id="show-partners-btn" class="action-item"><span class="icon">🤝</span> Партнеры</button>
+                <button id="casino-btn" class="action-item"><span class="icon">🎰</span> Казино</button>
+                <button id="business-btn" class="action-item"><span class="icon">💼</span> Бизнес</button>
+                <button id="skills-btn" class="action-item"><span class="icon">🎓</span> Навыки</button>
+                <button id="containers-btn" class="action-item"><span class="icon">📦</span> Контейнеры</button>
+            </div>
+
+            <!-- Предпросмотр достижений (скрыт — полный список перенесён в профиль) -->
+            <div class="achievements-preview" id="achievements-preview" style="display:none;"></div>
+        </div>
+
+        <!-- ============= ЭКРАН ЗАКАЗОВ ============= -->
+        <div id="orders-screen" class="screen">
+            <div class="header">
+                <button id="back-from-orders" class="back-btn">← Назад</button>
+                <h2>Доступные заказы</h2>
+                <div class="time-indicator" id="time-indicator">🌞 День</div>
+            </div>
+
+            <!-- v2.2: District Selector -->
+            <div class="district-selector" id="district-selector">
+                <!-- Districts will be loaded here -->
+            </div>
+
+            <div class="orders-filters">
+                <button class="filter-btn active" data-filter="all">Все</button>
+                <button class="filter-btn" data-filter="cheap">Эконом</button>
+                <button class="filter-btn" data-filter="expensive">Премиум</button>
+                <button class="filter-btn" data-filter="vip">VIP</button>
+            </div>
+
+            <div id="orders-list" class="orders-list">
+                <div class="loading">⏳ Загрузка заказов...</div>
+            </div>
+        </div>
+
+        <!-- ============= ЭКРАН ЗАПРАВКИ ============= -->
+        <div id="fuel-screen" class="screen">
+            <div class="header">
+                <button id="back-from-fuel" class="back-btn">← Назад</button>
+                <h2>⛽ АЗС</h2>
+            </div>
+
+            <div class="fuel-info-card">
+                <div class="fuel-stats">
+                    <div>Текущий уровень: <strong><span id="current-fuel">45.0</span>/<span
+                                id="max-fuel-display">45</span> л</strong></div>
+                    <div class="price-info">
+                        <span class="price-petrol">⛽ Бензин: <strong>6.80</strong> PLN/л</span>
+                        <span class="price-gas">🔵 Газ: <strong>3.60</strong> PLN/л</span>
+                    </div>
+                    <div>Ваш баланс: <strong><span id="fuel-balance">250.00</span> PLN</strong></div>
+                </div>
+            </div>
+
+            <!-- Выбор типа топлива -->
+            <div class="fuel-type-selector">
+                <button class="fuel-type-btn active" data-type="petrol">⛽ Бензин</button>
+                <button class="fuel-type-btn" data-type="gas" id="gas-type-btn" style="display: none;">🔵
+                    Газ</button>
+            </div>
+
+            <!-- Управление заправкой -->
+            <div class="fuel-controls">
+                <div class="fuel-slider-container">
+                    <label for="fuel-range">Выберите количество:</label>
+                    <input type="range" id="fuel-range" min="0" max="45" value="0" step="1">
+                    <div class="fuel-amount-display">
+                        <span id="fuel-liters">0</span> л
+                    </div>
+                </div>
+
+                <!-- Быстрые пресеты -->
+                <div class="fuel-presets">
+                    <button class="preset-btn" data-liters="5">5 л</button>
+                    <button class="preset-btn" data-liters="10">10 л</button>
+                    <button class="preset-btn" data-liters="20">20 л</button>
+                    <button class="preset-btn" data-liters="40">Макс</button>
+                </div>
+
+                <!-- Стоимость -->
+                <div class="fuel-cost-info">
+                    <span>💰 Стоимость:</span>
+                    <span class="cost-amount"><span id="fuel-cost">0.00</span> PLN</span>
+                </div>
+
+                <button id="refuel-btn" class="action-btn primary">⛽ Заправить</button>
+            </div>
+        </div>
+
+        <!-- ============= ЭКРАН ГАРАЖА ============= -->
+        <div id="garage-screen" class="screen">
+            <div class="header">
+                <button id="back-from-garage" class="back-btn">← Назад</button>
+                <h2>🔧 Гараж</h2>
+            </div>
+
+            <div class="garage-content">
+                <!-- Текущая машина -->
+                <div class="current-car-card">
+                    <h3>🚗 Текущий автомобиль</h3>
+                    <div class="car-details">
+                        <div class="car-name" id="garage-car-model">Skoda Fabia</div>
+                        <div class="car-status" id="car-status">📋 Статус</div>
+                        <div class="car-stats">
+                            <div>💰 Уровень: <span id="car-upgrade-level">1</span>/5</div>
+                            <div>⛽ Расход: <span id="car-consumption">7.0</span> л/100км</div>
+                            <div>🛢️ Бак: <span id="car-tank">45</span> л</div>
+                            <div id="garage-condition-container">
+                                <div>🔧 Состояние: <span id="garage-car-condition">100</span>%</div>
+                                <button id="repair-btn" class="action-btn small">🛠️ Починить (150 PLN)</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Доступные для аренды -->
+                <div class="cars-section">
+                    <h3>🚗 Аренда (плата еженедельно)</h3>
+                    <div id="rental-cars-list" class="cars-list">
+                        <div class="loading">⏳ Загрузка...</div>
+                    </div>
+                </div>
+
+                <!-- Доступные для покупки -->
+                <div class="cars-section">
+                    <h3>💰 Покупка (без еженедельной платы)</h3>
+                    <div id="purchase-cars-list" class="cars-list">
+                        <div class="loading">⏳ Загрузка...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============= ЭКРАН ПАРТНЁРОВ ============= -->
+        <div id="partners-screen" class="screen">
+            <div class="header">
+                <button id="back-from-partners" class="back-btn">← Назад</button>
+                <h2>🤝 Партнёры</h2>
+            </div>
+
+            <div class="partners-content">
+                <div id="partners-list" class="partners-list">
+                    <div class="loading">⏳ Загрузка партнёров...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============= ЭКРАН КАЗИНО ============= -->
+        <div id="casino-screen" class="screen">
+            <div class="header">
+                <button id="back-from-casino" class="back-btn">← Назад</button>
+                <h2>🎰 Казино</h2>
+            </div>
+
+            <div class="casino-stats">
+                <div>💰 Баланс: <span id="casino-balance">0</span> PLN</div>
+                <div>🎲 Спинов сегодня: <span id="casino-spins">0</span>/10</div>
+            </div>
+
+            <!-- Слоты -->
+            <div class="casino-game">
+                <h3>🎰 Слот-машина</h3>
+                <div class="slot-machine">
+                    <div class="slot-reels">
+                        <div class="slot-reel" id="reel1">🍒</div>
+                        <div class="slot-reel" id="reel2">🍒</div>
+                        <div class="slot-reel" id="reel3">🍒</div>
+                    </div>
+                    <div class="slot-result" id="slot-result"></div>
+                </div>
+                <div class="bet-controls">
+                    <div class="custom-bet">
+                        <input type="number" id="slots-custom-bet" placeholder="Своя ставка" min="10">
+                        <button id="slots-custom-btn" class="bet-btn small">ОК</button>
+                    </div>
+                    <div class="bet-buttons">
+                        <button class="bet-btn" data-bet="10">10</button>
+                        <button class="bet-btn" data-bet="50">50</button>
+                        <button class="bet-btn" data-bet="100">100</button>
+                        <button class="bet-btn" data-bet="200">200</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Рулетка -->
+            <div class="casino-game">
+                <h3>🎲 Рулетка</h3>
+                <div class="roulette-wheel" id="roulette-wheel">
+                    <div class="roulette-pointer">▼</div>
+                    <div class="roulette-sectors">
+                        <div class="sector">x10</div>
+                        <div class="sector">x0</div>
+                        <div class="sector">x2</div>
+                        <div class="sector">x0.5</div>
+                        <div class="sector">x5</div>
+                        <div class="sector">x1</div>
+                        <div class="sector">x3</div>
+                        <div class="sector">x1</div>
+                    </div>
+                </div>
+                <div class="bet-controls">
+                    <div class="custom-bet">
+                        <input type="number" id="roulette-custom-bet" placeholder="Своя ставка" min="10">
+                    </div>
+                    <button id="spin-roulette-btn" class="spin-btn">🎲 Крутить (100 PLN)</button>
+                </div>
+                <div class="roulette-result" id="roulette-result"></div>
+            </div>
+
+            <!-- Полёт (Crash) -->
+            <div class="casino-game">
+                <h3>🚀 Полёт (Crash)</h3>
+                <div class="crash-area" id="crash-area">
+                    <div class="crash-multiplier" id="crash-multiplier">x1.00</div>
+                    <div class="crash-car" id="crash-car">🚕</div>
+                    <canvas id="crash-canvas"></canvas>
+                </div>
+                <div class="crash-controls">
+                    <div class="custom-bet">
+                        <input type="number" id="crash-bet" placeholder="Ставка" min="10" value="50">
+                    </div>
+                    <button id="crash-start-btn" class="action-btn primary">🚀 ВЗЛЁТ</button>
+                    <button id="crash-cashout-btn" class="action-btn success" style="display: none;">💰 ЗАБРАТЬ: <span
+                            id="cashout-value">0</span></button>
+                </div>
+                <div class="crash-result" id="crash-result"></div>
+            </div>
+        </div>
+
+        <!-- ============= ЭКРАН СУНДУКОВ ============= -->
+        <div id="lootbox-screen" class="screen">
+            <div class="header">
+                <button id="back-from-lootbox" class="back-btn">← Назад</button>
+                <h2>🎁 Сундуки</h2>
+            </div>
+
+            <div class="lootbox-inventory">
+                <div class="lootbox-item" data-type="wooden">
+                    <div class="lootbox-icon">🟤</div>
+                    <div class="lootbox-name">Деревянный</div>
+                    <div class="lootbox-count" id="wooden-count">0</div>
+                    <button class="open-lootbox-btn" data-type="wooden">Открыть</button>
+                </div>
+                <div class="lootbox-item" data-type="silver">
+                    <div class="lootbox-icon">🔵</div>
+                    <div class="lootbox-name">Серебряный</div>
+                    <div class="lootbox-count" id="silver-count">0</div>
+                    <button class="open-lootbox-btn" data-type="silver">Открыть</button>
+                </div>
+                <div class="lootbox-item" data-type="gold">
+                    <div class="lootbox-icon">🟣</div>
+                    <div class="lootbox-name">Золотой</div>
+                    <div class="lootbox-count" id="gold-count">0</div>
+                    <button class="open-lootbox-btn" data-type="gold">Открыть</button>
+                </div>
+                <div class="lootbox-item" data-type="legendary">
+                    <div class="lootbox-icon">💎</div>
+                    <div class="lootbox-name">Легендарный</div>
+                    <div class="lootbox-count" id="legendary-count">0</div>
+                    <button class="open-lootbox-btn" data-type="legendary">Открыть</button>
+                </div>
+            </div>
+
+            <div class="lootbox-reward" id="lootbox-reward" style="display: none;">
+                <!-- Reward animation will appear here -->
+            </div>
+        </div>
+
+        <!-- ============= ЭКРАН БИЗНЕСА ============= -->
+        <div id="business-screen" class="screen">
+            <div class="header">
+                <button id="back-from-business" class="back-btn">← Назад</button>
+                <h2>💼 Бизнес</h2>
+            </div>
+
+            <div class="business-content">
+                <div class="business-stats">
+                    <div class="stat-box">
+                        <span class="label">Водителей</span>
+                        <span class="value" id="drivers-count">0</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="label">Авто в работе</span>
+                        <span class="value" id="rented-cars-count">0</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="label">Доход/ч</span>
+                        <span class="value" id="income-per-hour">0 PLN</span>
+                    </div>
+                </div>
+
+                <div class="drivers-section">
+                    <h3>👨‍✈️ Мои Водители</h3>
+                    <button id="hire-driver-btn" class="action-btn small">➕ Нанять (1000 PLN)</button>
+                    <div id="drivers-list" class="drivers-list">
+                        <!-- Drivers rendered via JS -->
+                    </div>
+                </div>
+
+                <div class="fleet-section">
+                    <h3>🚗 Мой Автопарк</h3>
+                    <div id="fleet-list" class="fleet-list">
+                        <!-- Cars available to rent out -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============= ЭКРАН НАВЫКОВ ============= -->
+        <div id="skills-screen" class="screen">
+            <div class="header">
+                <button id="back-from-skills" class="back-btn">← Назад</button>
+                <h2>🎓 Навыки</h2>
+            </div>
+
+            <div class="skills-grid">
+                <!-- Charisma -->
+                <div class="skill-card">
+                    <div class="skill-icon">💬</div>
+                    <h3>Харизма</h3>
+                    <p>Увеличивает шанс чаевых</p>
+                    <div class="skill-level">Уровень <span id="skill-charisma-level">0</span>/5</div>
+                    <button class="upgrade-btn" data-skill="charisma">⬆️ <span
+                            id="skill-charisma-cost">500</span></button>
+                </div>
+
+                <!-- Mechanic -->
+                <div class="skill-card">
+                    <div class="skill-icon">🔧</div>
+                    <h3>Механик</h3>
+                    <p>Снижает стоимость ремонта</p>
+                    <div class="skill-level">Уровень <span id="skill-mechanic-level">0</span>/5</div>
+                    <button class="upgrade-btn" data-skill="mechanic">⬆️ <span
+                            id="skill-mechanic-cost">500</span></button>
+                </div>
+
+                <!-- Navigator -->
+                <div class="skill-card">
+                    <div class="skill-icon">🧭</div>
+                    <h3>Навигатор</h3>
+                    <p>Ускоряет поиск заказов</p>
+                    <div class="skill-level">Уровень <span id="skill-navigator-level">0</span>/5</div>
+                    <button class="upgrade-btn" data-skill="navigator">⬆️ <span
+                            id="skill-navigator-cost">500</span></button>
+                </div>
+            </div>
+
+            <div class="skill-points-info">
+                Баланс: <span id="skills-balance">0.00</span> PLN
+            </div>
+        </div>
+
+        <!-- ============= ЭКРАН КОНТЕЙНЕРОВ (АУКЦИОН) ============= -->
+        <div id="containers-screen" class="screen">
+            <div class="header">
+                <button id="back-from-containers" class="back-btn">← Назад</button>
+                <h2>Портовые Контейнеры</h2>
+            </div>
+
+            <div class="container-auction-card">
+                <div class="auction-status-badge" id="auction-status">Ожидание...</div>
+
+                <div class="container-visual">
+                    <div class="container-box-emoji" style="font-size: 80px;">📦</div>
+                    <div class="auction-timer" id="auction-timer">00:00</div>
+                </div>
+
+                <div class="auction-info">
+                    <div class="info-row">
+                        <span>Текущая ставка:</span>
+                        <span id="current-auction-bid" class="highlight">0 PLN</span>
+                    </div>
+                    <div class="info-row">
+                        <span>Лидер:</span>
+                        <span id="current-auction-bidder">---</span>
+                    </div>
+                </div>
+
+                <div class="bid-controls">
+                    <div class="bid-input-group">
+                        <button class="bid-step-btn" onclick="adjustAuctionBid(-500)">-500</button>
+                        <input type="number" id="auction-bid-input" value="5000" step="100">
+                        <button class="bid-step-btn" onclick="adjustAuctionBid(500)">+500</button>
+                    </div>
+                    <button id="place-bid-btn" class="main-cta">СДЕЛАТЬ СТАВКУ</button>
+                </div>
+            </div>
+
+            <div class="auction-history-section">
+                <h3>🏆 Последние победители</h3>
+                <div id="auction-history-list" class="history-list">
+                    <!-- Загружается из JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- ============= УВЕДОМЛЕНИЯ ============= -->
+        <div id="notification-container" class="notification-container"></div>
+    </div>
+
+    <!-- Промокод Модалка -->
+    <div id="promo-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-modal" id="close-promo-modal">&times;</span>
+            <h2>🎫 Активация кода</h2>
+            <div class="promo-box">
+                <input type="text" id="promo-input" placeholder="ВВЕДИТЕ КОД" maxlength="20">
+                <button id="redeem-promo-btn" class="take-order-btn">Активировать</button>
+            </div>
+            <div id="promo-result" class="promo-result"></div>
+        </div>
+    </div>
+
+    <!-- Глобальное объявление -->
+    <div id="ann-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-modal" id="close-ann-modal">&times;</span>
+            <div id="ann-header" style="text-align: center; margin-bottom: 15px;">
+                <h2 id="game-ann-title">📢 Объявление</h2>
+            </div>
+            <div id="ann-body"
+                style="text-align: center; color: rgba(255,255,255,0.8); line-height: 1.5; margin-bottom: 20px;">
+                <p id="game-ann-message">Текст сообщения...</p>
+            </div>
+            <button class="take-order-btn" id="close-ann-btn" style="width: 100%;">Понятно</button>
+        </div>
+    </div>
+
+    <!-- v2.7: ГАИ / Штрафы -->
+    <div id="police-modal" class="modal" style="display: none;">
+        <div class="modal-content police-content">
+            <div class="siren-overlay"></div>
+            <h2 style="color: #e74c3c; margin-top: 10px;">🚨 ПАТРУЛЬ ГАИ</h2>
+            <div class="police-icon" style="font-size: 50px; margin: 15px 0;">🚔</div>
+            <p id="police-message" style="margin-bottom: 20px;">Вас остановили за превышение скорости!</p>
+
+            <div id="police-actions">
+                <button id="police-pay-btn" class="take-order-btn"
+                    style="background: #3498db; margin-bottom: 10px;">Оплатить штраф (300 PLN)</button>
+                <button id="police-bribe-btn" class="take-order-btn" style="background: #e67e22;">Договориться на
+                    месте
+                    (50/50)</button>
+            </div>
+
+            <div id="police-result" style="display: none; margin-top: 15px; font-weight: bold;"></div>
+            <button id="police-close-btn" class="take-order-btn"
+                style="display: none; width: 100%; margin-top: 20px;">Поехать дальше</button>
+        </div>
+    </div>
+
+
+    <!-- v2.9: Обучение при первом входе -->
+    <div id="tutorial-modal" class="modal tutorial-modal" style="display: none;">
+        <div class="modal-content tutorial-content">
+            <div class="tutorial-header">
+                <span class="tutorial-badge">ОБУЧЕНИЕ</span>
+                <h2>🚖 Добро пожаловать!</h2>
+            </div>
+
+            <div class="tutorial-body">
+                <div class="tutorial-step">
+                    <div class="step-icon">💰</div>
+                    <div class="step-text">
+                        <strong>Зарабатывайте:</strong> Нажимайте «Выйти в онлайн» и берите заказы. Чем выше класс
+                        машины, тем больше платят.
+                    </div>
+                </div>
+
+                <div class="tutorial-step">
+                    <div class="step-icon">⚡</div>
+                    <div class="step-text">
+                        <strong>Выносливость:</strong> Каждая поездка тратит силы. Если они на нуле — отдохните или
+                        купите кофе.
+                    </div>
+                </div>
+
+                <div class="tutorial-step">
+                    <div class="step-icon">⛽</div>
+                    <div class="step-text">
+                        <strong>Топливо:</strong> Следите за баком! Заправляйтесь вовремя, иначе не сможете брать
+                        заказы.
+                    </div>
+                </div>
+
+                <div class="tutorial-step">
+                    <div class="step-icon">🚨</div>
+                    <div class="step-text">
+                        <strong>Будьте осторожны:</strong> ГАИ может остановить вас. Соблюдайте правила или
+                        готовьтесь
+                        платить.
+                    </div>
+                </div>
+            </div>
+
+            <button id="close-tutorial-btn" class="menu-btn online-primary">ПОЕХАЛИ! 🚀</button>
+        </div>
+    </div>
+
+    <!-- v3.1: Profile Modal -->
+    <div id="profile-modal" class="modal profile-modal" style="display: none;">
+        <div class="modal-content profile-content">
+            <div class="modal-header">
+                <h2>🤵 Профиль игрока</h2>
+                <button class="close-modal" id="close-profile-btn">&times;</button>
+            </div>
+
+            <div class="profile-main-info">
+                <div class="profile-avatar-large">
+                    <img id="profile-avatar-img" src="assets/default-avatar.png" alt="Avatar">
+                </div>
+                <div class="profile-text-info">
+                    <h3 id="profile-name">Загрузка...</h3>
+                    <div class="profile-level-badge">Уровень <span id="profile-level">1</span></div>
+                </div>
+            </div>
+
+            <div class="profile-stats-grid">
+                <div class="p-stat">
+                    <span class="p-label">💰 Всего заработано</span>
+                    <span class="p-value"><span id="profile-total-earned">0.00</span> PLN</span>
+                </div>
+                <div class="p-stat">
+                    <span class="p-label">🚕 Выполнено заказов</span>
+                    <span class="p-value" id="profile-rides-total">0</span>
+                </div>
+                <div class="p-stat">
+                    <span class="p-label">🛣️ Общий пробег</span>
+                    <span class="p-value"><span id="profile-total-distance">0.0</span> км</span>
+                </div>
+                <div class="p-stat">
+                    <span class="p-label">🔥 Серия</span>
+                    <span class="p-value"><span id="profile-streak">0</span> дн.</span>
+                </div>
+            </div>
+
+            <div class="profile-features-grid">
+                <div class="feature-card jackpot">
+                    <div class="feature-icon">🎰</div>
+                    <div class="feature-info">
+                        <span class="feature-label">Джекпот</span>
+                        <span class="feature-value"><span id="jackpot-amount">0.00</span> PLN</span>
+                    </div>
+                </div>
+                <button id="profile-lootbox-btn" class="feature-button">
+                    <span class="f-icon">🎁</span>
+                    <span class="f-label">Сундуки</span>
+                </button>
+                <button id="profile-daily-bonus-btn" class="feature-button">
+                    <span class="f-icon">🧧</span>
+                    <span class="f-label">Бонус</span>
+                </button>
+                <button id="profile-promo-btn" class="feature-button">
+                    <span class="f-icon">🎟️</span>
+                    <span class="f-label">Промо</span>
+                </button>
+                <button id="profile-tutorial-btn" class="feature-button">
+                    <span class="f-icon">❓</span>
+                    <span class="f-label">Помощь</span>
+                </button>
+                <button id="profile-admin-btn" class="feature-button" style="display: none;">
+                    <span class="f-icon">⚙️</span>
+                    <span class="f-label">Админ</span>
+                </button>
+            </div>
+
+            <div class="profile-streak-section" id="profile-streak-container">
+                <div class="streak-header">
+                    <span>🔥 Ежедневная серия</span>
+                    <span id="profile-streak-days">0 дней</span>
+                </div>
+                <button id="profile-claim-streak-btn" class="menu-btn online-primary" style="display: none;">Забрать
+                    награду</button>
+            </div>
+
+            <!-- v3.2: Rewards / Achievements in Profile -->
+            <div class="profile-section">
+                <div class="profile-section-title">🏆 Достижения</div>
+                <div id="profile-achievements-list" class="profile-achievements-list">
+                    <div class="no-achievements">🎯 Выполняйте заказы, чтобы открыть достижения!</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Экран техработ -->
+    <div id="maintenance-overlay" class="maintenance-overlay" style="display: none;">
+        <div class="maintenance-content">
+            <h1>🔧 Техработы</h1>
+            <p>Мы обновляем систему для вашего удобства. Пожалуйста, зайдите через 15-20 минут.</p>
+            <div class="maintenance-icon">🚜</div>
+        </div>
+    </div>
+
+</body>
+
+</html>

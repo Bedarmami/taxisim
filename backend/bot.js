@@ -1,0 +1,113 @@
+const { Telegraf, Markup } = require('telegraf');
+const db = require('./db');
+require('dotenv').config();
+
+const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN || 'DUMMY_TOKEN');
+
+// Main Menu Keyboard
+const mainKeyboard = Markup.keyboard([
+    ['👨‍💻 Поддержка']
+]).resize();
+
+// Database helpers for support
+async function saveSupportMessage(userId, message, fileId = null, isFromAdmin = 0) {
+    try {
+        await db.dbReady;
+        await db.run(
+            'INSERT INTO support_messages (user_id, message, file_id, is_from_admin) VALUES (?, ?, ?, ?)',
+            [userId, message, fileId, isFromAdmin]
+        );
+    } catch (e) {
+        console.error('Error saving support message:', e);
+    }
+}
+
+// Commands
+bot.start((ctx) => {
+    ctx.reply('Привет! Это бот симулятора такси. Чтобы связаться с поддержкой, нажми кнопку ниже.', mainKeyboard);
+});
+
+// Handling user messages
+bot.hears('👨‍💻 Поддержка', (ctx) => {
+    ctx.reply('Опишите вашу проблему. Вы также можете прикрепить фото:');
+});
+
+bot.on('text', async (ctx) => {
+    if (ctx.message.text.startsWith('/')) return; // Ignore commands here
+    if (ctx.message.text === '👨‍💻 Поддержка') return; // Handled by bot.hears
+
+    const userId = ctx.from.id.toString();
+    const text = ctx.message.text;
+
+    await saveSupportMessage(userId, text);
+    await ctx.reply('Ожидайте, скоро вам ответит администратор.');
+});
+
+bot.on('photo', async (ctx) => {
+    const userId = ctx.from.id.toString();
+    const photo = ctx.message.photo;
+    const fileId = photo[photo.length - 1].file_id; // Get the highest resolution
+    const caption = ctx.message.caption || '';
+
+    await saveSupportMessage(userId, caption, fileId);
+    await ctx.reply('Ожидайте, скоро вам ответит администратор.');
+});
+
+// Notification API
+const sendNotification = async (telegramId, type, data) => {
+    if (!process.env.TELEGRAM_BOT_TOKEN) return false;
+
+    try {
+        let message = '';
+        switch (type) {
+            case 'AUCTION_BID':
+                message = `⚠️ Вашу ставку на контейнер перебил игрок ${data.newBidder}!\nТекущая ставка: ${data.amount} PLN`;
+                break;
+            case 'AUCTION_WIN':
+                message = `🎉 Поздравляем! Вы выиграли аукцион!\nВаш приз: ${data.rewardName}.\nЗаберите его в меню Аукциона!`;
+                break;
+            case 'SUPPORT_REPLY':
+                message = `📨 Ответ от администрации:\n\n${data.text}`;
+                break;
+            case 'FLEET_REPORT':
+                message = `📊 Отчет автопарка:\nВаши водители принесли прибыль: ${data.profit} PLN.`;
+                break;
+            case 'MAINTENANCE':
+                message = data.active ? '🔧 В игре начались технические работы. Мы скоро вернемся!' : '✅ Технические работы завершены! Заходите в игру.';
+                break;
+            case 'DAILY_REMINDER':
+                message = '🎁 Ваш ежедневный бонус уже доступен! Не забудьте забрать его.';
+                break;
+            default:
+                message = data.text || 'Уведомление от системы.';
+        }
+
+        await bot.telegram.sendMessage(telegramId, message);
+        return true;
+    } catch (e) {
+        console.error(`Failed to send ${type} notification to ${telegramId}:`, e.message);
+        return false;
+    }
+};
+
+// Start function
+const initBot = () => {
+    if (!process.env.TELEGRAM_BOT_TOKEN) {
+        console.warn('⚠️ TELEGRAM_BOT_TOKEN not found in .env. Bot functionality will be disabled.');
+        return;
+    }
+
+    bot.launch()
+        .then(() => console.log('🚀 Telegram Bot started successfully'))
+        .catch((err) => console.error('❌ Bot launch failed:', err));
+
+    // Enable graceful stop
+    process.once('SIGINT', () => bot.stop('SIGINT'));
+    process.once('SIGTERM', () => bot.stop('SIGTERM'));
+};
+
+module.exports = {
+    initBot,
+    sendNotification,
+    bot
+};

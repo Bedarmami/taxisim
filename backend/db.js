@@ -1,0 +1,406 @@
+const sqlite3 = require('sqlite3').verbose();
+const path = require('path');
+const fs = require('fs');
+
+// Create data directory if it doesn't exist
+const dataDir = path.join(__dirname, 'data');
+if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+}
+
+const dbPath = process.env.DATABASE_PATH || path.join(dataDir, 'taxi.db');
+
+const db = new sqlite3.Database(dbPath, (err) => {
+    if (err) {
+        console.error('Error opening database:', err.message);
+    } else {
+        console.log('Connected to the SQLite database.');
+        // Performance: Enable WAL mode and optimize pragmas
+        db.run('PRAGMA journal_mode = WAL');
+        db.run('PRAGMA synchronous = NORMAL');
+        db.run('PRAGMA cache_size = -20000'); // 20MB cache
+        db.run('PRAGMA temp_store = MEMORY');
+    }
+});
+
+let dbReadyResolve;
+const dbReady = new Promise((resolve) => {
+    dbReadyResolve = resolve;
+});
+
+function initDB() {
+    return new Promise((resolve) => {
+        db.serialize(() => {
+            // Users table
+            db.run(`CREATE TABLE IF NOT EXISTS users (
+                id TEXT PRIMARY KEY,
+                telegram_id TEXT UNIQUE,
+                balance REAL DEFAULT 0,
+                total_earned REAL DEFAULT 0,
+                
+                car_id TEXT,
+                car_data TEXT, -- JSON string
+                owned_cars_data TEXT, -- JSON string
+                
+                fuel REAL DEFAULT 45.0,
+                gas_fuel REAL DEFAULT 0,
+                
+                partner_id INTEGER DEFAULT 1,
+                partner_contract_date TEXT,
+                
+                stamina INTEGER DEFAULT 100,
+                experience INTEGER DEFAULT 0,
+                level INTEGER DEFAULT 1,
+                rating INTEGER DEFAULT 0,
+                
+                rides_completed INTEGER DEFAULT 0,
+                rides_total INTEGER DEFAULT 0,
+                rides_today INTEGER DEFAULT 0,
+                rides_streak INTEGER DEFAULT 0,
+                night_rides INTEGER DEFAULT 0,
+                total_distance REAL DEFAULT 0,
+                is_banned INTEGER DEFAULT 0, -- 0 for normal, 1 for banned
+                
+                days_passed INTEGER DEFAULT 0,
+                week_days INTEGER DEFAULT 0,
+                weeks_passed INTEGER DEFAULT 0,
+                
+                business_data TEXT, -- JSON string for rented cars
+                
+                achievements_data TEXT, -- JSON string
+                last_daily_bonus TEXT, -- ISO Date string
+                created_at TEXT,
+                last_login TEXT
+            )`);
+
+            // Orders history table
+            db.run(`CREATE TABLE IF NOT EXISTS orders_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT,
+                price REAL,
+                distance REAL,
+                fuel_used REAL,
+                fuel_type TEXT,
+                completed_at TEXT,
+                FOREIGN KEY(user_id) REFERENCES users(id)
+            )`);
+
+            console.log('Database tables initialized.');
+
+            // Migration: Add last_daily_bonus column if it doesn't exist
+            db.run(`ALTER TABLE users ADD COLUMN last_daily_bonus TEXT`, (err) => {
+                if (err && !err.message.includes('duplicate column name')) {
+                    console.error('Migration error (last_daily_bonus):', err.message);
+                }
+            });
+
+            // v2.3 Migrations
+            db.run(`ALTER TABLE users ADD COLUMN last_stamina_update TEXT`, (err) => {
+                if (err && !err.message.includes('duplicate column name')) {
+                    console.error('Migration error (last_stamina_update):', err.message);
+                }
+            });
+
+            db.run(`ALTER TABLE users ADD COLUMN login_streak INTEGER DEFAULT 0`, (err) => {
+                if (err && !err.message.includes('duplicate column name')) {
+                    console.error('Migration error (login_streak):', err.message);
+                }
+            });
+
+            db.run(`ALTER TABLE users ADD COLUMN last_login_date TEXT`, (err) => {
+                if (err && !err.message.includes('duplicate column name')) {
+                    console.error('Migration error (last_login_date):', err.message);
+                }
+            });
+
+            // v2.4 Migrations
+            db.run(`ALTER TABLE users ADD COLUMN lootboxes_data TEXT DEFAULT '{}'`, (err) => {
+                if (err && !err.message.includes('duplicate column name')) {
+                    console.error('Migration error (lootboxes_data):', err.message);
+                }
+            });
+
+            db.run(`ALTER TABLE users ADD COLUMN lootboxes_given_data TEXT DEFAULT '{}'`, (err) => {
+                if (err && !err.message.includes('duplicate column name')) {
+                    console.error('Migration error (lootboxes_given_data):', err.message);
+                }
+            });
+
+            db.run(`ALTER TABLE users ADD COLUMN casino_spins_today INTEGER DEFAULT 0`, (err) => {
+                if (err && !err.message.includes('duplicate column name')) {
+                    console.error('Migration error (casino_spins_today):', err.message);
+                }
+            });
+
+            db.run(`ALTER TABLE users ADD COLUMN casino_last_reset TEXT`, (err) => {
+                if (err && !err.message.includes('duplicate column name')) {
+                    console.error('Migration error (casino_last_reset):', err.message);
+                }
+            });
+
+            db.run(`ALTER TABLE users ADD COLUMN casino_stats TEXT DEFAULT '{}'`, (err) => {
+                if (err && !err.message.includes('duplicate column name')) {
+                    console.error('Migration error (casino_stats):', err.message);
+                }
+            });
+
+            // v2.9: Tutorial flag
+            db.run(`ALTER TABLE users ADD COLUMN tutorial_completed INTEGER DEFAULT 0`, (err) => {
+                if (err && !err.message.includes('duplicate column name')) {
+                    console.error('Migration error (tutorial_completed):', err.message);
+                }
+            });
+
+            // v3.0: Auction pending rewards
+            db.run(`ALTER TABLE users ADD COLUMN pending_auction_rewards TEXT DEFAULT '[]'`, (err) => {
+                if (err && !err.message.includes('duplicate column name')) {
+                    console.error('Migration error (pending_auction_rewards):', err.message);
+                }
+            });
+
+            // v3.1: Admin features (is_banned)
+            db.run(`ALTER TABLE users ADD COLUMN is_banned INTEGER DEFAULT 0`, (err) => {
+                if (err && !err.message.includes('duplicate column name')) {
+                    console.error('Migration error (is_banned):', err.message);
+                }
+            });
+
+            // Jackpot history table
+            db.run(`CREATE TABLE IF NOT EXISTS jackpot_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                telegram_id TEXT,
+                amount REAL,
+                won_at TEXT
+            )`);
+
+            // v2.5 Admin Expansion Tables
+            db.run(`CREATE TABLE IF NOT EXISTS promo_codes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                code TEXT UNIQUE,
+                reward TEXT, -- JSON string
+                max_uses INTEGER,
+                current_uses INTEGER DEFAULT 0,
+                expires_at TEXT
+            )`);
+
+            db.run(`CREATE TABLE IF NOT EXISTS promo_usages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT,
+                promo_id INTEGER,
+                used_at TEXT,
+                FOREIGN KEY(user_id) REFERENCES users(id),
+                FOREIGN KEY(promo_id) REFERENCES promo_codes(id)
+            )`);
+
+            db.run(`CREATE TABLE IF NOT EXISTS logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                level TEXT,
+                message TEXT,
+                timestamp TEXT,
+                stack TEXT
+            )`);
+
+            db.run(`CREATE TABLE IF NOT EXISTS global_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            )`);
+
+            // v3.1: User activity for anti-cheat
+            db.run(`CREATE TABLE IF NOT EXISTS user_activity (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT,
+                action TEXT,
+                details TEXT, -- JSON
+                timestamp TEXT,
+                FOREIGN KEY(user_id) REFERENCES users(id)
+            )`);
+
+            // v3.1: Global configs (prices, modifiers)
+            db.run(`CREATE TABLE IF NOT EXISTS global_configs (
+                key TEXT PRIMARY KEY,
+                value TEXT,
+                category TEXT,
+                description TEXT
+            )`);
+
+            // v3.2: Support tickets
+            db.run(`CREATE TABLE IF NOT EXISTS support_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                message TEXT,
+                file_id TEXT,
+                is_from_admin INTEGER DEFAULT 0,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            )`);
+
+            // v3.1: Car definitions (dynamic content)
+            db.run(`CREATE TABLE IF NOT EXISTS car_definitions (
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                model TEXT,
+                image TEXT,
+                description TEXT,
+                purchase_price REAL,
+                rent_price REAL,
+                tank_capacity REAL,
+                fuel_consumption REAL,
+                has_gas INTEGER DEFAULT 0,
+                gas_tank_capacity REAL,
+                gas_consumption REAL,
+                is_premium INTEGER DEFAULT 0,
+                is_container_exclusive INTEGER DEFAULT 0
+            )`);
+
+            // v2.6 Retention Features
+            db.run(`CREATE TABLE IF NOT EXISTS drivers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT,
+                name TEXT,
+                skill INTEGER DEFAULT 1,
+                trust INTEGER DEFAULT 50,
+                salary INTEGER DEFAULT 100,
+                state TEXT DEFAULT 'idle', -- idle, working, resting
+                car_id TEXT,
+                hired_at TEXT,
+                last_collection TEXT,
+                FOREIGN KEY(user_id) REFERENCES users(id)
+            )`);
+
+            db.run(`CREATE TABLE IF NOT EXISTS jackpot_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                winner_id TEXT,
+                amount REAL,
+                won_at TEXT,
+                FOREIGN KEY(winner_id) REFERENCES users(id)
+            )`);
+
+            // Migration: Skills and Hardcore Stats
+            db.run(`ALTER TABLE users ADD COLUMN skills TEXT DEFAULT '{"charisma":0,"mechanic":0,"navigator":0}'`, (err) => {
+                if (err && !err.message.includes('duplicate column name')) console.error('Migration error (skills):', err.message);
+            });
+
+            db.run(`ALTER TABLE users ADD COLUMN cleanliness REAL DEFAULT 100.0`, (err) => {
+                if (err && !err.message.includes('duplicate column name')) console.error('Migration error (cleanliness):', err.message);
+            });
+
+            db.run(`ALTER TABLE users ADD COLUMN tire_condition REAL DEFAULT 100.0`, (err) => {
+                if (err && !err.message.includes('duplicate column name')) console.error('Migration error (tire_condition):', err.message);
+            });
+
+            db.run(`ALTER TABLE orders_history ADD COLUMN district_id TEXT`, (err) => {
+                if (err && !err.message.includes('duplicate column name')) console.error('Migration error (district_id):', err.message);
+            });
+
+            // Initialize Jackpot setting
+            db.run(`INSERT OR IGNORE INTO global_settings (key, value) VALUES ('jackpot_pool', '0')`, () => {
+                // Performance: Add indexes for frequent queries
+                db.run(`CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id)`, (err) => {
+                    if (err && !err.message.includes('already exists')) console.error('Index error:', err.message);
+                });
+                db.run(`CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders_history(user_id)`, (err) => {
+                    if (err && !err.message.includes('already exists')) console.error('Index error:', err.message);
+                });
+                db.run(`CREATE INDEX IF NOT EXISTS idx_orders_completed_at ON orders_history(completed_at)`, (err) => {
+                    if (err && !err.message.includes('already exists')) console.error('Index error:', err.message);
+                });
+                db.run(`CREATE INDEX IF NOT EXISTS idx_drivers_user_id ON drivers(user_id)`, (err) => {
+                    if (err && !err.message.includes('already exists')) console.error('Index error:', err.message);
+                });
+                db.run(`CREATE INDEX IF NOT EXISTS idx_promo_usages_user ON promo_usages(user_id, promo_id)`, (err) => {
+                    if (err && !err.message.includes('already exists')) console.error('Index error:', err.message);
+                });
+
+                console.log('Migrations and initial settings check completed.');
+                console.log('📊 Database indexes verified.');
+
+                // Seed database with initial content
+                seedDB().then(() => {
+                    dbReadyResolve();
+                    resolve();
+                });
+            });
+        });
+    });
+}
+
+async function seedDB() {
+    try {
+        // 1. Seed Global Configs
+        const configs = [
+            { key: 'petrol_price', value: '6.80', category: 'prices', description: 'Цена бензина за литр' },
+            { key: 'gas_price', value: '3.60', category: 'prices', description: 'Цена газа за литр' },
+            { key: 'repair_cost', value: '150', category: 'prices', description: 'Стоимость ремонта (базовая)' },
+            { key: 'car_wash_cost', value: '50', category: 'prices', description: 'Стоимость мойки' },
+            { key: 'earnings_multiplier', value: '1.0', category: 'multipliers', description: 'Глобальный множитель дохода' }
+        ];
+
+        for (const config of configs) {
+            await run(`INSERT OR IGNORE INTO global_configs (key, value, category, description) VALUES (?, ?, ?, ?)`,
+                [config.key, config.value, config.category, config.description]);
+        }
+
+        // 2. Seed Cars
+        const cars = [
+            { id: 'fabia_blue_rent', name: '🚙 Skoda Fabia (Аренда)', model: 'Skoda Fabia', image: '🚙', description: 'Надёжный автомобиль для начала работы', purchase_price: 0, rent_price: 300, tank_capacity: 45, fuel_consumption: 7.2, has_gas: 0 },
+            { id: 'fabia_gas', name: '🚗 Skoda Fabia (ГБО)', model: 'Skoda Fabia', image: '🚗💨', description: 'Своя машина с ГБО, без еженедельной платы', purchase_price: 10000, rent_price: 0, tank_capacity: 45, fuel_consumption: 8.5, has_gas: 1, gas_tank_capacity: 40, gas_consumption: 9.5 },
+            { id: 'prius_20_rent', name: '⚡ Toyota Prius 20 (Аренда)', model: 'Toyota Prius 20', image: '⚡', description: 'Экономичный гибрид', purchase_price: 0, rent_price: 450, tank_capacity: 40, fuel_consumption: 4.5, has_gas: 0 },
+            { id: 'prius_20', name: '⚡ Toyota Prius 20', model: 'Toyota Prius 20', image: '⚡', description: 'Экономичный гибрид в собственность', purchase_price: 35000, rent_price: 0, tank_capacity: 40, fuel_consumption: 4.5, has_gas: 0 },
+            { id: 'prius_30', name: '⚡⚡ Toyota Prius 30', model: 'Toyota Prius 30', image: '⚡⚡', description: 'Улучшенный гибрид', purchase_price: 60000, rent_price: 0, tank_capacity: 43, fuel_consumption: 4.2, has_gas: 0 },
+            { id: 'corolla_sedan', name: '🚘 Toyota Corolla Sedan', model: 'Toyota Corolla', image: '🚘', description: 'Надёжный седан', purchase_price: 85000, rent_price: 500, tank_capacity: 50, fuel_consumption: 6.5, has_gas: 0 },
+            { id: 'camry', name: '🚙 Toyota Camry', model: 'Toyota Camry', image: '🚙', description: 'Премиум автомобиль', purchase_price: 120000, rent_price: 1000, tank_capacity: 60, fuel_consumption: 7.0, has_gas: 0 },
+            // New Cars
+            { id: 'tesla_3', name: '🔋 Tesla Model 3', model: 'Tesla Model 3', image: '🔋', description: 'Полностью электрический седан будущего', purchase_price: 180000, rent_price: 2500, tank_capacity: 100, fuel_consumption: 0.1, has_gas: 0, is_premium: 1 },
+            { id: 'mercedes_s', name: '🤵 Mercedes S-Class', model: 'Mercedes-Benz W223', image: '🤵', description: 'Максимальный комфорт и статус', purchase_price: 450000, rent_price: 5000, tank_capacity: 80, fuel_consumption: 12.0, has_gas: 0, is_premium: 1 }
+        ];
+
+        for (const car of cars) {
+            await run(`INSERT OR IGNORE INTO car_definitions (id, name, model, image, description, purchase_price, rent_price, tank_capacity, fuel_consumption, has_gas, gas_tank_capacity, gas_consumption, is_premium) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [car.id, car.name, car.model, car.image, car.description, car.purchase_price, car.rent_price, car.tank_capacity, car.fuel_consumption, car.has_gas, car.gas_tank_capacity || 0, car.gas_consumption || 0, car.is_premium || 0]);
+        }
+    } catch (e) {
+        console.error('Error seeding database:', e);
+    }
+}
+
+// Call initDB when database is opened
+db.on('open', () => {
+    initDB();
+});
+
+// Promisified helper functions
+function query(sql, params = []) {
+    return new Promise((resolve, reject) => {
+        db.all(sql, params, (err, rows) => {
+            if (err) reject(err);
+            else resolve(rows);
+        });
+    });
+}
+
+function get(sql, params = []) {
+    return new Promise((resolve, reject) => {
+        db.get(sql, params, (err, row) => {
+            if (err) reject(err);
+            else resolve(row);
+        });
+    });
+}
+
+function run(sql, params = []) {
+    return new Promise((resolve, reject) => {
+        db.run(sql, params, function (err) {
+            if (err) reject(err);
+            else resolve({ id: this.lastID, changes: this.changes });
+        });
+    });
+}
+
+module.exports = {
+    db,
+    query,
+    get,
+    run,
+    initDB,
+    dbReady
+};

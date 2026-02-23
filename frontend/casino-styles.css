@@ -1,0 +1,340 @@
+/* ============= v2.4: CASINO ============= */
+.casino-stats {
+    display: flex;
+    justify-content: space-around;
+    background: var(--card-bg);
+    padding: 15px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    font-weight: 700;
+}
+
+.casino-game {
+    background: var(--card-bg);
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+}
+
+.casino-game h3 {
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+/* Slot Machine */
+.slot-machine {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 15px;
+}
+
+.slot-reels {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.slot-reel {
+    width: 80px;
+    height: 80px;
+    background: white;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 48px;
+    animation: spin 0.5s ease-in-out;
+}
+
+@keyframes spin {
+
+    0%,
+    100% {
+        transform: rotateX(0deg);
+    }
+
+    50% {
+        transform: rotateX(180deg);
+    }
+}
+
+.slot-result {
+    text-align: center;
+    font-weight: 700;
+    color: white;
+    min-height: 24px;
+}
+
+.bet-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+.bet-btn {
+    flex: 1;
+    padding: 12px;
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.bet-btn:hover {
+    transform: scale(1.05);
+}
+
+.bet-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Roulette */
+.roulette-wheel {
+    position: relative;
+    width: 250px;
+    height: 250px;
+    margin: 20px auto;
+}
+
+.roulette-pointer {
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 32px;
+    z-index: 10;
+}
+
+.roulette-sectors {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: conic-gradient(from 0deg,
+            #ff6b6b 0deg 45deg,
+            #4ecdc4 45deg 90deg,
+            #ffe66d 90deg 135deg,
+            #a8e6cf 135deg 180deg,
+            #ff6b6b 180deg 225deg,
+            #4ecdc4 225deg 270deg,
+            #ffe66d 270deg 315deg,
+            #a8e6cf 315deg 360deg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: transform 3s cubic-bezier(0.17, 0.67, 0.12, 0.99);
+}
+
+.roulette-sectors.spinning {
+    animation: roulette-spin 3s cubic-bezier(0.17, 0.67, 0.12, 0.99);
+}
+
+@keyframes roulette-spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(1800deg);
+    }
+}
+
+.sector {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    color: white;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.spin-btn {
+    width: 100%;
+    padding: 15px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.spin-btn:hover {
+    transform: scale(1.02);
+}
+
+.spin-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.roulette-result {
+    text-align: center;
+    font-weight: 700;
+    margin-top: 15px;
+    min-height: 24px;
+}
+
+/* ============= v2.4: LOOTBOXES ============= */
+.lootbox-inventory {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+    padding: 15px;
+}
+
+.lootbox-item {
+    background: var(--card-bg);
+    padding: 20px;
+    border-radius: 12px;
+    text-align: center;
+    border: 2px solid transparent;
+    transition: all 0.3s;
+}
+
+.lootbox-item[data-type="wooden"] {
+    border-color: #8B4513;
+}
+
+.lootbox-item[data-type="silver"] {
+    border-color: #C0C0C0;
+    box-shadow: 0 0 10px rgba(192, 192, 192, 0.3);
+}
+
+.lootbox-item[data-type="gold"] {
+    border-color: #FFD700;
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
+}
+
+.lootbox-item[data-type="legendary"] {
+    border-color: #FF1493;
+    box-shadow: 0 0 20px rgba(255, 20, 147, 0.5);
+    animation: legendary-glow 2s infinite;
+}
+
+@keyframes legendary-glow {
+
+    0%,
+    100% {
+        box-shadow: 0 0 20px rgba(255, 20, 147, 0.5);
+    }
+
+    50% {
+        box-shadow: 0 0 30px rgba(255, 20, 147, 0.8);
+    }
+}
+
+.lootbox-icon {
+    font-size: 64px;
+    margin-bottom: 10px;
+}
+
+.lootbox-name {
+    font-weight: 700;
+    margin-bottom: 5px;
+}
+
+.lootbox-count {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--primary-color);
+    margin-bottom: 10px;
+}
+
+.open-lootbox-btn {
+    width: 100%;
+    padding: 10px;
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.open-lootbox-btn:hover {
+    transform: scale(1.05);
+}
+
+.open-lootbox-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.lootbox-reward {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.95);
+    padding: 40px;
+    border-radius: 20px;
+    text-align: center;
+    z-index: 1000;
+    animation: reward-appear 0.5s;
+}
+
+@keyframes reward-appear {
+    0% {
+        transform: translate(-50%, -50%) scale(0);
+    }
+
+    100% {
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+.reward-icon {
+    font-size: 96px;
+    margin-bottom: 20px;
+    animation: reward-bounce 1s infinite;
+}
+
+@keyframes reward-bounce {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-20px);
+    }
+}
+
+.reward-text {
+    font-size: 24px;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 20px;
+}
+
+.reward-close-btn {
+    padding: 12px 24px;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.menu-btn.casino {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.menu-btn.lootbox {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}

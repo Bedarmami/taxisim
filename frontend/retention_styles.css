@@ -1,0 +1,331 @@
+/* Dark Premium Theme for Retention Features */
+
+/* General Overrides */
+body {
+    background-color: #121212 !important;
+    /* Deep dark background */
+    color: #e0e0e0 !important;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Aggregator Selector */
+.aggregator-selector {
+    display: flex;
+    justify-content: space-around;
+    padding: 10px 0;
+    margin-bottom: 15px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+}
+
+.agg-btn {
+    border: 2px solid transparent;
+    background: transparent;
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    opacity: 0.7;
+}
+
+.agg-btn:hover {
+    opacity: 1;
+    transform: translateY(-2px);
+}
+
+.agg-btn.active {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+/* Specific Aggregator Styles */
+.agg-btn[data-agg="yodex"] {
+    color: #f1c40f;
+    border-color: #f1c40f;
+}
+
+.agg-btn[data-agg="yodex"].active {
+    background: #f1c40f;
+    color: #000;
+}
+
+.agg-btn[data-agg="ubar"] {
+    color: #bdc3c7;
+    border-color: #bdc3c7;
+}
+
+.agg-btn[data-agg="ubar"].active {
+    background: #ecf0f1;
+    color: #000;
+    border-color: #fff;
+}
+
+.agg-btn[data-agg="volt"] {
+    color: #9b59b6;
+    border-color: #9b59b6;
+}
+
+.agg-btn[data-agg="volt"].active {
+    background: #9b59b6;
+    color: #fff;
+}
+
+/* Order Cards */
+.order-card {
+    background: #1e1e1e;
+    border: 1px solid #333;
+    border-radius: 12px;
+    padding: 15px;
+    margin-bottom: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s;
+}
+
+.order-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+    border-color: #444;
+}
+
+.order-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #333;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+}
+
+.order-price {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #2ecc71;
+}
+
+.vip-badge {
+    background: linear-gradient(45deg, #f1c40f, #e67e22);
+    color: #000;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    font-weight: bold;
+}
+
+.status-badge {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75em;
+    color: #fff;
+}
+
+.order-route {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 10px;
+    font-size: 0.95em;
+}
+
+.route-arrow {
+    align-self: center;
+    color: #777;
+    font-size: 0.8em;
+}
+
+.order-details {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85em;
+    color: #aaa;
+    margin-bottom: 10px;
+}
+
+.take-order-btn {
+    width: 100%;
+    padding: 10px;
+    background: linear-gradient(to right, #27ae60, #2ecc71);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.take-order-btn:hover {
+    opacity: 0.9;
+}
+
+/* Business Tab Styles */
+.business-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.stat-box {
+    background: #2c2c2c;
+    padding: 10px;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.stat-value {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #3498db;
+    display: block;
+}
+
+.stat-label {
+    font-size: 0.75em;
+    color: #aaa;
+}
+
+.driver-card {
+    background: #252525;
+    border-left: 4px solid #3498db;
+    padding: 12px;
+    margin-bottom: 10px;
+    border-radius: 0 8px 8px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.driver-info {
+    flex-grow: 1;
+}
+
+.driver-name {
+    font-weight: bold;
+    font-size: 1.1em;
+}
+
+.driver-skill {
+    font-size: 0.9em;
+    color: #f1c40f;
+}
+
+.driver-status {
+    font-size: 0.85em;
+    color: #aaa;
+}
+
+.action-btn.small {
+    padding: 5px 10px;
+    font-size: 0.85em;
+    background: #e67e22;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.action-btn.success {
+    background: #2ecc71;
+}
+
+/* Skills Tab Styles */
+.skill-card {
+    background: #202020;
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 12px;
+    border: 1px solid #333;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.skill-icon {
+    font-size: 2em;
+    width: 50px;
+    text-align: center;
+}
+
+.skill-info {
+    flex-grow: 1;
+}
+
+.skill-name {
+    font-weight: bold;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.skill-desc {
+    font-size: 0.8em;
+    color: #888;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.skill-level-bar {
+    height: 6px;
+    background: #444;
+    border-radius: 3px;
+    overflow: hidden;
+    width: 100%;
+    margin-top: 5px;
+}
+
+.skill-level-fill {
+    height: 100%;
+    background: #3498db;
+    width: 0%;
+    /* JS sets this */
+    transition: width 0.5s ease;
+}
+
+.upgrade-btn {
+    background: linear-gradient(to bottom, #3498db, #2980b9);
+    border: none;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    min-width: 80px;
+}
+
+.upgrade-btn.disabled {
+    background: #555;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* Hardcore Stats */
+.hardcore-stat {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9em;
+    margin-bottom: 4px;
+}
+
+.stat-bar {
+    width: 60px;
+    height: 6px;
+    background: #444;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.stat-fill {
+    height: 100%;
+    background: #2ecc71;
+    transition: width 0.3s;
+}
+
+.stat-fill.warn {
+    background: #f1c40f;
+}
+
+.stat-fill.danger {
+    background: #e74c3c;
+}
