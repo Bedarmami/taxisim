@@ -123,7 +123,8 @@ ${playerContext}
 
 ОТВЕТ:`;
 
-    const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"];
+    // Use models confirmed by diagnostic: gemini-2.0-flash, gemini-flash-latest, gemini-pro-latest
+    const modelsToTry = ["gemini-2.0-flash", "gemini-flash-latest", "gemini-pro-latest"];
 
     let lastError = null;
     for (const modelName of modelsToTry) {
