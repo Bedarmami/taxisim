@@ -983,6 +983,12 @@ async function loadAdminPlates() {
         const tbody = document.getElementById('plates-tbody');
         tbody.innerHTML = '';
 
+        if (!Array.isArray(plates)) {
+            console.error('Invalid plates data received:', plates);
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#ff4d4d;">Ошибка загрузки данных</td></tr>';
+            return;
+        }
+
         plates.forEach(p => {
             const tr = document.createElement('tr');
             tr.innerHTML = `

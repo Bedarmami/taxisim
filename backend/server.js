@@ -3096,6 +3096,37 @@ app.get('/api/admin/configs', adminAuth, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// v3.3: Admin License Plates View
+app.get('/api/admin/plates', adminAuth, async (req, res) => {
+    try {
+        const sql = `
+            SELECT lp.*, u.username as owner_name 
+            FROM license_plates lp
+            LEFT JOIN users u ON lp.owner_id = u.telegram_id
+            ORDER BY lp.created_at DESC
+        `;
+        const plates = await db.query(sql);
+        res.json(plates);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// v3.3: Admin Jackpot View
+app.get('/api/admin/jackpot', adminAuth, async (req, res) => {
+    try {
+        const setting = await db.get('SELECT value FROM global_settings WHERE key = "jackpot_pool"');
+        const pool = setting ? parseFloat(setting.value) : 0;
+
+        const history = await db.query(`
+            SELECT j.*, u.telegram_id 
+            FROM jackpot_history j 
+            LEFT JOIN users u ON j.winner_id = u.id 
+            ORDER BY j.won_at DESC LIMIT 10
+        `);
+
+        res.json({ pool, history });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/api/admin/configs', adminAuth, async (req, res) => {
     try {
         const { key, value } = req.body;
