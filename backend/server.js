@@ -106,7 +106,12 @@ const logActivity = async (telegramId, action, details = {}) => {
     }
 };
 
-db.dbReady.then(() => {
+db.dbReady.then(async () => {
+    console.log('✅ Database is ready. Running startup tasks...');
+
+    // Immediate startup log
+    await logError('INFO', 'Server startup: Database ready, initializing systems...', '');
+
     loadJackpot();
     initMaintenanceMode();
     syncCarsFromDB();
@@ -3106,6 +3111,36 @@ app.get('/api/admin/logs', adminAuth, async (req, res) => {
         const logs = await db.query('SELECT * FROM logs ORDER BY id DESC LIMIT 50');
         res.json(logs);
     } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// v3.3: Debug Info for Railway
+app.get('/api/admin/debug-info', adminAuth, async (req, res) => {
+    try {
+        const userCount = await db.get('SELECT COUNT(*) as count FROM users');
+        const logCount = await db.get('SELECT COUNT(*) as count FROM logs');
+        const botTokenPresent = !!process.env.TELEGRAM_BOT_TOKEN;
+        const uptime = process.uptime();
+
+        res.json({
+            success: true,
+            database: {
+                users: userCount.count,
+                logs: logCount.count,
+                path: process.env.DATABASE_PATH || 'default (backend/data/taxi.db)'
+            },
+            bot: {
+                tokenPresent: botTokenPresent,
+                tokenHidden: botTokenPresent ? (process.env.TELEGRAM_BOT_TOKEN.substring(0, 5) + '...') : 'NONE'
+            },
+            server: {
+                uptime: Math.floor(uptime) + 's',
+                node: process.version,
+                env: process.env.NODE_ENV || 'development'
+            }
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 // v2.5 Admin Mode Status

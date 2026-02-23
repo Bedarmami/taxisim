@@ -102,6 +102,19 @@ function logout() {
 async function loadData() {
     await loadStats();
     await loadAnalytics();
+    await loadDebugInfo();
+}
+
+async function loadDebugInfo() {
+    try {
+        const res = await fetch('/api/admin/debug-info', { headers: { 'x-admin-password': adminPassword } });
+        if (!res.ok) return;
+        const data = await res.json();
+
+        document.getElementById('debug-users').textContent = data.database.users;
+        document.getElementById('debug-bot').textContent = data.bot.tokenPresent ? '✅ OK' : '❌ NO TOKEN';
+        document.getElementById('debug-bot').style.color = data.bot.tokenPresent ? '#00ff00' : '#ff0000';
+    } catch (e) { console.error('Debug info fail:', e); }
 }
 
 async function loadStats() {
@@ -313,10 +326,31 @@ async function loadLogs() {
     container.innerHTML = logs.map(l => `
         <div class="log-entry">
             <span class="time">[${new Date(l.timestamp).toLocaleString()}]</span>
-            <span class="level">${l.level}</span>: ${l.message}
-            ${l.stack ? `<pre style="font-size: 10px; color: #666;">${l.stack}</pre>` : ''}
+            <span class="level" style="color: ${l.level === 'ERROR' ? '#ff4444' : l.level === 'WARNING' ? '#ffbb33' : '#44bbff'}">${l.level}</span>: ${l.message}
+            ${l.stack ? `<pre style="font-size: 10px; color: #666; background: rgba(0,0,0,0.3); padding: 5px; margin-top: 5px;">${l.stack}</pre>` : ''}
         </div>
     `).join('') || 'Логов нет';
+}
+
+async function testLog() {
+    try {
+        const res = await fetch('/api/error-report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                error: '🧪 TEST LOG FROM ADMIN',
+                stack: 'Testing frontend -> server -> DB path',
+                telegramId: 'ADMIN_TEST',
+                screen: 'Admin Diagnostics'
+            })
+        });
+        if (res.ok) {
+            alert('Тестовый лог отправлен! Сейчас список обновится.');
+            setTimeout(loadLogs, 500);
+        } else {
+            alert('Ошибка при отправке теста');
+        }
+    } catch (e) { alert('Ошибка сети при тесте'); }
 }
 
 async function clearLogs() {
