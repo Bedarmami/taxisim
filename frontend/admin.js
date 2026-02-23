@@ -811,11 +811,20 @@ async function loadSupportMessages() {
     try {
         const res = await fetch('/api/admin/support', { headers: { 'x-admin-password': adminPassword } });
         allSupportMessages = await res.json();
-        const messages = allSupportMessages;
+
+        // Group messages by user_id to show only one row per player
+        const userGroups = {};
+        allSupportMessages.forEach(m => {
+            if (!userGroups[m.user_id]) {
+                userGroups[m.user_id] = m; // Since they are ordered by timestamp DESC, the first one is the latest
+            }
+        });
+
+        const latestMessages = Object.values(userGroups);
         const tbody = document.getElementById('support-tbody');
         tbody.innerHTML = '';
 
-        messages.forEach(m => {
+        latestMessages.forEach(m => {
             let bubbleClass = 'bubble-user';
             let senderLabel = m.telegram_id || 'User';
 
@@ -837,11 +846,16 @@ async function loadSupportMessages() {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${new Date(m.timestamp).toLocaleString()}</td>
-                <td><b>${senderLabel}</b><br><small>${m.user_id}</small></td>
-                <td><div class="chat-bubble ${bubbleClass}">${m.message || ''}</div></td>
+                <td><b>${m.telegram_id || 'User'}</b><br><small>${m.user_id}</small></td>
+                <td>
+                    <div class="chat-bubble ${bubbleClass}" style="max-width: 100%; cursor: pointer;" onclick="openSupportModal('${m.telegram_id}', '${m.user_id}')">
+                        <small style="opacity:0.7;">Последнее (${senderLabel}):</small><br>
+                        ${m.message || ''}
+                    </div>
+                </td>
                 <td>${mediaHtml}</td>
                 <td>
-                    ${(m.sender_type === 'user' || m.sender_type === 'ai') ? `<button onclick="openSupportModal('${m.telegram_id}', '${m.user_id}')">💬 Ответить</button>` : ''}
+                    <button onclick="openSupportModal('${m.telegram_id}', '${m.user_id}')">💬 Показать чат</button>
                 </td>
             `;
             tbody.appendChild(tr);
