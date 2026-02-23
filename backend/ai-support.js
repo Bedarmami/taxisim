@@ -48,8 +48,8 @@ async function getAIResponse(telegramId, userMessage) {
         return null;
     }
 
-    try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    async function tryGenerate(modelName) {
+        const model = genAI.getGenerativeModel({ model: modelName });
         const playerContext = await getPlayerContext(telegramId);
 
         const prompt = `
@@ -73,7 +73,19 @@ ${playerContext}
 ОТВЕТ:`;
 
         const result = await model.generateContent(prompt);
-        const responseText = result.response.text().trim();
+        return result.response.text().trim();
+    }
+
+    try {
+        let responseText;
+        try {
+            // Priority 1: Gemini 1.5 Flash (Modern & Free)
+            responseText = await tryGenerate("gemini-1.5-flash");
+        } catch (flashError) {
+            console.warn(`Gemini 1.5 Flash failed (${flashError.message}), trying fallback to gemini-pro...`);
+            // Priority 2: Gemini Pro (Standard fallback)
+            responseText = await tryGenerate("gemini-pro");
+        }
 
         if (responseText.toUpperCase() === 'SKIP') {
             return null;
@@ -81,7 +93,7 @@ ${playerContext}
 
         return responseText;
     } catch (e) {
-        console.error('Gemini AI Error:', e.message);
+        console.error('Gemini AI All Models Error:', e.message);
         return null;
     }
 }
