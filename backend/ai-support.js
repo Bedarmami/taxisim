@@ -44,19 +44,32 @@ async function getPlayerContext(telegramId) {
 function getHeuristicResponse(user, userMessage) {
     const msg = userMessage.toLowerCase();
 
-    // 1. Fuel check
-    if ((msg.includes('заказ') || msg.includes('ехать') || msg.includes('работ')) && (user.fuel < 1 && user.gas_fuel < 1)) {
-        return "Похоже, у вас закончилось топливо (бензин и газ по 0л). Чтобы брать новые заказы, вам нужно заправиться на вкладке «Заправка». Если нет денег — можно взять небольшое достижение или ежедневный бонус.";
+    // Helper to check for whole words or specific phrases
+    const has = (words) => words.some(w => msg.includes(w));
+
+    // 1. Fuel check - only if they ask about NOT being able to drive/take order
+    const workWords = ['почему не могу', 'не едет', 'не берет', 'проблема', 'ошибка', 'не получается', 'заказ'];
+    const fuelWords = ['бензин', 'заправка', 'топливо', 'газ'];
+
+    if (user.fuel < 1 && user.gas_fuel < 1) {
+        // Trigger only if they mention work + problem, OR specifically fuel
+        if ((has(workWords) && has(['ехать', 'заказ', 'работ'])) || has(fuelWords)) {
+            return "Похоже, у вас закончилось топливо (бензин и газ по 0л). Чтобы брать новые заказы, вам нужно заправиться на вкладке «Заправка». Если нет денег — можно взять небольшое достижение или ежедневный бонус.";
+        }
     }
 
     // 2. Stamina check
-    if ((msg.includes('заказ') || msg.includes('ехать') || msg.includes('энерг') || msg.includes('устал')) && user.stamina < 5) {
-        return "Ваш персонаж слишком устал (энергия почти на нуле). Вы не сможете брать заказы, пока не отдохнете. Энергия восстанавливается сама со временем, или можно купить кофе в меню навыков/магазина.";
+    if (user.stamina < 5) {
+        if (has(['энерг', 'стамин', 'устал', 'кофе', 'отдохнуть']) || (has(workWords) && has(['заказ', 'работ']))) {
+            return "Ваш персонаж слишком устал (энергия почти на нуле). Вы не сможете брать заказы, пока не отдохнете. Энергия восстанавливается сама со временем, или можно купить кофе в меню навыков/магазина.";
+        }
     }
 
-    // 3. Balance check for fuel/rent
-    if ((msg.includes('кофе') || msg.includes('заправ')) && user.balance < 10) {
-        return "У вас недостаточно средств на балансе. Попробуйте забрать ежедневный бонус или проверить раздел достижений, чтобы получить стартовый капитал.";
+    // 3. Balance check for fuel/rent (only if specifically asking for fuel/renting/buying)
+    if (user.balance < 10) {
+        if (has(['мало денег', 'нет денег', 'баланс', 'заправ', 'купить'])) {
+            return "У вас недостаточно средств на балансе. Попробуйте забрать ежедневный бонус или проверить раздел достижений, чтобы получить стартовый капитал.";
+        }
     }
 
     // 4. Ban check
@@ -65,17 +78,17 @@ function getHeuristicResponse(user, userMessage) {
     }
 
     // 5. New: Selling Car
-    if (msg.includes('продать') && (msg.includes('машин') || msg.includes('авто'))) {
+    if (has(['продать']) && has(['машин', 'авто', 'тачку'])) {
         return "Продать свою машину можно в разделе «Гараж» или «Мои авто». Обычно выкупная цена составляет около 60-70% от первоначальной стоимости. Арендованные авто (Skoda Fabia Rent) продать нельзя.";
     }
 
     // 6. New: Upgrades/Skills
-    if (msg.includes('улучш') || msg.includes('прокач') || msg.includes('навык')) {
+    if (has(['улучш', 'прокач', 'навык'])) {
         return "Улучшить характеристики персонажа можно в меню «Навыки». Там можно прокачать Харизму (чаевые), Механика (дешевле ремонт) и Навигатора (быстрее заказы).";
     }
 
     // 7. New: Jackpot
-    if (msg.includes('джекпот') || msg.includes('выиграть')) {
+    if (has(['джекпот']) || (has(['выиграть']) && has(['деньги', 'приз']))) {
         return "Джекпот накапливается из каждой поездки всех игроков. Шанс выиграть его есть в каждой поездке или в казино. Текущий размер джекпота виден в главном меню.";
     }
 
