@@ -1,0 +1,47 @@
+[
+    {
+        "telegram_id": "565652402",
+        "balance": 1829.63,
+        "total_earned": 2201.63,
+        "level": 9,
+        "experience": 888,
+        "car_id": "fabia_blue_rent",
+        "rides_total": 61,
+        "fuel": 45,
+        "stamina": 10
+    },
+    {
+        "telegram_id": "552807952",
+        "balance": 50000,
+        "total_earned": 1474.06,
+        "level": 5,
+        "experience": 443,
+        "car_id": "fabia_blue_rent",
+        "rides_total": 30,
+        "fuel": 50,
+        "stamina": 100
+    },
+    {
+        "telegram_id": "621034060",
+        "balance": 3420.4,
+        "total_earned": 3084.21,
+        "level": 100,
+        "experience": 5858,
+        "car_id": "prius_20",
+        "rides_total": 77,
+        "fuel": 40,
+        "stamina": 90
+    },
+    {
+        "telegram_id": "vlad_test",
+        "balance": 250,
+        "level": 1,
+        "car_id": "fabia_blue_rent"
+    },
+    {
+        "telegram_id": "test_user",
+        "balance": 250,
+        "level": 1,
+        "car_id": "fabia_blue_rent"
+    }
+]

@@ -1,6 +1,7 @@
 const { Telegraf, Markup } = require('telegraf');
 const db = require('./db');
 require('dotenv').config();
+const aiSupport = require('./ai-support');
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN || 'DUMMY_TOKEN');
 
@@ -38,6 +39,20 @@ bot.on('text', async (ctx) => {
 
     const userId = ctx.from.id.toString();
     const text = ctx.message.text;
+
+    // AI Support Interceptor
+    try {
+        const aiReply = await aiSupport.getAIResponse(userId, text);
+        if (aiReply) {
+            await ctx.reply(`🤖 ИИ-Помощник:\n\n${aiReply}`);
+            // Optionally we can still save to support messages but mark as "answered by AI"
+            // For now, let's just log it to DB for admin to see
+            await saveSupportMessage(userId, `[AI Answered] ${text}`, null, 0);
+            return;
+        }
+    } catch (e) {
+        console.error('AI Support Interceptor Error:', e);
+    }
 
     await saveSupportMessage(userId, text);
     await ctx.reply('Ожидайте, скоро вам ответит администратор.');

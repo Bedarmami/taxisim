@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1a1a1a">
+    <title>🚖 Taxi Simulator PRO</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://telegram.org/js/telegram-web-script.js"></script>
+</head>
+<body>
+    <div class="app">
+        <!-- ============= ГЛАВНЫЙ ЭКРАН ============= -->
+        <div id="main-screen" class="screen active">
+            <div class="header">
+                <h1>🚖 Таксист</h1>
+                <div class="balance">💰 <span id="balance">250.00</span> PLN</div>
+            </div>
+            
+            <!-- Информация о партнёре -->
+            <div class="partner-info" id="partner-info">
+                <div class="partner-header">
+                    <span>🤝 Партнёр:</span>
+                    <span id="partner-name">Начинающий</span>
+                </div>
+                <div class="partner-details" id="partner-details">
+                    <span>50/50</span>
+                    <span>🚗 их машина</span>
+                    <span>⛽ их топливо</span>
+                </div>
+            </div>
+            
+            <!-- Прогресс до следующего партнёра -->
+            <div class="progress-section">
+                <div class="progress-label">
+                    <span>📊 До следующего партнёра:</span>
+                    <span id="rides-to-next">200 заказов</span>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar">
+                        <div id="partner-progress-fill" class="progress-fill" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Уровень и опыт -->
+            <div class="player-level">
+                <span class="level-badge" id="level">Ур. 1</span>
+                <div class="exp-bar">
+                    <div id="exp-fill" class="exp-fill" style="width: 0%"></div>
+                </div>
+            </div>
+            
+            <!-- Информация о машине -->
+            <div class="car-info">
+                <div class="car-model">
+                    🚗 <span id="car-model">Skoda Fabia</span>
+                </div>
+                
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <span class="stat-label">⛽ Топливо:</span>
+                        <span class="stat-value"><span id="fuel">45.0</span>/<span id="max-fuel">45</span> л</span>
+                    </div>
+                    <div class="fuel-bar-container">
+                        <div class="fuel-bar">
+                            <div id="fuel-fill" class="fuel-fill" style="width: 100%"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Газ (если есть ГБО) -->
+                    <div class="stat-item" id="gas-stat" style="display: none;">
+                        <span class="stat-label">🔵 Газ:</span>
+                        <span class="stat-value"><span id="gas-fuel">0</span>/<span id="gas-max-fuel">0</span> л</span>
+                    </div>
+                    <div class="gas-bar-container" id="gas-bar-container" style="display: none;">
+                        <div class="gas-bar">
+                            <div id="gas-fill" class="gas-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-item">
+                        <span class="stat-label">⚡ Выносливость:</span>
+                        <span class="stat-value"><span id="stamina">100</span>%</span>
+                    </div>
+                    <div class="stamina-bar-container">
+                        <div class="stamina-bar">
+                            <div id="stamina-fill" class="stamina-fill" style="width: 100%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-item">
+                        <span class="stat-label">📊 Заказов сегодня:</span>
+                        <span class="stat-value"><span id="rides-today">0</span></span>
+                    </div>
+                    
+                    <div class="stat-item">
+                        <span class="stat-label">🔥 Серия:</span>
+                        <span class="stat-value"><span id="rides-streak">0</span></span>
+                    </div>
+                    
+                    <div class="stat-item">
+                        <span class="stat-label">🎯 Всего заказов:</span>
+                        <span class="stat-value"><span id="rides-total">0</span></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Главное меню -->
+            <div class="main-menu">
+                <button id="online-btn" class="menu-btn primary">🚕 Войти в онлайн</button>
+                <button id="fuel-btn" class="menu-btn secondary">⛽ Заправиться</button>
+                <button id="garage-btn" class="menu-btn secondary">🔧 Гараж</button>
+                <button id="rest-btn" class="menu-btn rest">😴 Отдохнуть</button>
+                <button id="show-partners-btn" class="menu-btn partners">🤝 Партнёры</button>
+            </div>
+            
+            <!-- Предпросмотр достижений -->
+            <div class="achievements-preview" id="achievements-preview">
+                <!-- Достижения будут здесь -->
+            </div>
+        </div>
+
+        <!-- ============= ЭКРАН ЗАКАЗОВ ============= -->
+        <div id="orders-screen" class="screen">
+            <div class="header">
+                <button id="back-from-orders" class="back-btn">← Назад</button>
+                <h2>Доступные заказы</h2>
+                <div class="time-indicator" id="time-indicator">🌞 День</div>
+            </div>
+            
+            <div class="orders-filters">
+                <button class="filter-btn active" data-filter="all">Все</button>
+                <button class="filter-btn" data-filter="cheap">Эконом</button>
+                <button class="filter-btn" data-filter="expensive">Премиум</button>
+                <button class="filter-btn" data-filter="vip">VIP</button>
+            </div>
+            
+            <div id="orders-list" class="orders-list">
+                <div class="loading">⏳ Загрузка заказов...</div>
+            </div>
+        </div>
+
+        <!-- ============= ЭКРАН ЗАПРАВКИ ============= -->
+        <div id="fuel-screen" class="screen">
+            <div class="header">
+                <button id="back-from-fuel" class="back-btn">← Назад</button>
+                <h2>⛽ АЗС</h2>
+            </div>
+
+            <div class="fuel-info-card">
+                <div class="fuel-stats">
+                    <div>Текущий уровень: <strong><span id="current-fuel">45.0</span>/<span id="max-fuel-display">45</span> л</strong></div>
+                    <div class="price-info">
+                        <span class="price-petrol">⛽ Бензин: <strong>6.80</strong> PLN/л</span>
+                        <span class="price-gas">🔵 Газ: <strong>3.60</strong> PLN/л</span>
+                    </div>
+                    <div>Ваш баланс: <strong><span id="fuel-balance">250.00</span> PLN</strong></div>
+                </div>
+            </div>
+
+            <!-- Выбор типа топлива -->
+            <div class="fuel-type-selector">
+                <button class="fuel-type-btn active" data-type="petrol">⛽ Бензин</button>
+                <button class="fuel-type-btn" data-type="gas" id="gas-type-btn" style="display: none;">🔵 Газ</button>
+            </div>
+
+            <!-- Управление заправкой -->
+            <div class="fuel-controls">
+                <div class="fuel-slider-container">
+                    <label for="fuel-range">Выберите количество:</label>
+                    <input type="range" id="fuel-range" min="0" max="45" value="0" step="1">
+                    <div class="fuel-amount-display">
+                        <span id="fuel-liters">0</span> л
+                    </div>
+                </div>
+                
+                <!-- Быстрые пресеты -->
+                <div class="fuel-presets">
+                    <button class="preset-btn" data-liters="5">5 л</button>
+                    <button class="preset-btn" data-liters="10">10 л</button>
+                    <button class="preset-btn" data-liters="20">20 л</button>
+                    <button class="preset-btn" data-liters="40">Макс</button>
+                </div>
+                
+                <!-- Стоимость -->
+                <div class="fuel-cost-info">
+                    <span>💰 Стоимость:</span>
+                    <span class="cost-amount"><span id="fuel-cost">0.00</span> PLN</span>
+                </div>
+                
+                <button id="refuel-btn" class="action-btn primary">⛽ Заправить</button>
+            </div>
+        </div>
+
+        <!-- ============= ЭКРАН ГАРАЖА ============= -->
+        <div id="garage-screen" class="screen">
+            <div class="header">
+                <button id="back-from-garage" class="back-btn">← Назад</button>
+                <h2>🔧 Гараж</h2>
+            </div>
+            
+            <div class="garage-content">
+                <!-- Текущая машина -->
+                <div class="current-car-card">
+                    <h3>🚗 Текущий автомобиль</h3>
+                    <div class="car-details">
+                        <div class="car-name" id="garage-car-model">Skoda Fabia</div>
+                        <div class="car-status" id="car-status">📋 Статус</div>
+                        <div class="car-stats">
+                            <div>💰 Уровень: <span id="car-upgrade-level">1</span>/5</div>
+                            <div>⛽ Расход: <span id="car-consumption">7.0</span> л/100км</div>
+                            <div>🛢️ Бак: <span id="car-tank">45</span> л</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Доступные для аренды -->
+                <div class="cars-section">
+                    <h3>🚗 Аренда (плата еженедельно)</h3>
+                    <div id="rental-cars-list" class="cars-list">
+                        <div class="loading">⏳ Загрузка...</div>
+                    </div>
+                </div>
+                
+                <!-- Доступные для покупки -->
+                <div class="cars-section">
+                    <h3>💰 Покупка (без еженедельной платы)</h3>
+                    <div id="purchase-cars-list" class="cars-list">
+                        <div class="loading">⏳ Загрузка...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============= ЭКРАН ПАРТНЁРОВ ============= -->
+        <div id="partners-screen" class="screen">
+            <div class="header">
+                <button id="back-from-partners" class="back-btn">← Назад</button>
+                <h2>🤝 Партнёры</h2>
+            </div>
+            
+            <div class="partners-content">
+                <div id="partners-list" class="partners-list">
+                    <div class="loading">⏳ Загрузка партнёров...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============= УВЕДОМЛЕНИЯ ============= -->
+        <div id="notification-container" class="notification-container"></div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

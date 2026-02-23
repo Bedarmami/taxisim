@@ -8,14 +8,10 @@
     "dev": "nodemon server.js"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
-    "body-parser": "^1.20.2",
-    "compression": "^1.8.1",
-    "cors": "^2.8.5",
-    "dotenv": "^16.0.3",
     "express": "^4.18.2",
-    "sqlite3": "^5.1.7",
-    "telegraf": "^4.16.3"
+    "cors": "^2.8.5",
+    "body-parser": "^1.20.2",
+    "dotenv": "^16.0.3"
   },
   "devDependencies": {
     "nodemon": "^2.0.22"

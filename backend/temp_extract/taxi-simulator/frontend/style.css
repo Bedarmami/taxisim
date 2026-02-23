@@ -1,0 +1,1332 @@
+:root {
+    --bg-color: #ffffff;
+    --text-color: #000000;
+    --secondary-bg: #f5f5f7;
+    --accent-color: #007AFF;
+    --success-color: #34C759;
+    --warning-color: #FF9500;
+    --danger-color: #FF3B30;
+    --border-color: #e5e5ea;
+    --card-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-color: #1c1c1e;
+        --text-color: #ffffff;
+        --secondary-bg: #2c2c2e;
+        --border-color: #3a3a3c;
+        --card-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 10px;
+    transition: background-color 0.3s ease;
+}
+
+.app {
+    width: 100%;
+    max-width: 500px;
+    min-height: 100vh;
+    max-height: 100vh;
+    background-color: var(--bg-color);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    border-radius: 10px;
+}
+
+.screen {
+    display: none;
+    padding: 15px;
+    height: 100%;
+    min-height: 100vh;
+    overflow-y: auto;
+    animation: fadeIn 0.3s ease;
+    flex: 1;
+}
+
+.screen.active {
+    display: flex;
+    flex-direction: column;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ============= HEADER ============= */
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding: 10px 0;
+    flex-shrink: 0;
+}
+
+.header h1 {
+    font-size: 24px;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent-color), #5856D6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.header h2 {
+    font-size: 20px;
+    font-weight: 600;
+    flex: 1;
+    text-align: center;
+}
+
+.balance {
+    background-color: var(--secondary-bg);
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 16px;
+    border: 1px solid var(--border-color);
+    white-space: nowrap;
+}
+
+.back-btn {
+    background: none;
+    border: none;
+    color: var(--accent-color);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 8px 12px;
+    min-width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background-color 0.2s, transform 0.1s;
+    -webkit-user-select: none;
+    user-select: none;
+    margin-right: 10px;
+}
+
+.back-btn:active {
+    background-color: var(--secondary-bg);
+    transform: scale(0.95);
+}
+
+/* ============= ПАРТНЁРЫ ============= */
+.partner-info {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 15px;
+    border-radius: 16px;
+    margin-bottom: 15px;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    flex-shrink: 0;
+}
+
+.partner-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+.partner-header span:last-child {
+    font-weight: 700;
+    font-size: 16px;
+}
+
+.partner-details {
+    display: flex;
+    gap: 12px;
+    font-size: 13px;
+    background: rgba(255,255,255,0.2);
+    padding: 8px 12px;
+    border-radius: 10px;
+    flex-wrap: wrap;
+}
+
+/* ============= ПРОГРЕСС ============= */
+.progress-section {
+    background-color: var(--secondary-bg);
+    padding: 15px;
+    border-radius: 16px;
+    margin-bottom: 15px;
+    border: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.progress-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.progress-label span:last-child {
+    color: var(--accent-color);
+    font-weight: 600;
+}
+
+.progress-bar-container {
+    width: 100%;
+    height: 8px;
+    background-color: var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea, #764ba2);
+    transition: width 0.3s ease;
+}
+
+/* ============= УРОВЕНЬ И ОПЫТ ============= */
+.player-level {
+    margin-bottom: 15px;
+    flex-shrink: 0;
+}
+
+.level-badge {
+    display: inline-block;
+    padding: 6px 14px;
+    background: linear-gradient(135deg, #5856D6, var(--accent-color));
+    color: white;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.exp-bar {
+    width: 100%;
+    height: 6px;
+    background-color: var(--secondary-bg);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.exp-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #34C759, #30B0C0);
+    transition: width 0.3s ease;
+}
+
+/* ============= ИНФОРМАЦИЯ О МАШИНЕ ============= */
+.car-info {
+    background-color: var(--secondary-bg);
+    padding: 16px;
+    border-radius: 16px;
+    margin-bottom: 15px;
+    border: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.car-model {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.car-level {
+    background-color: var(--accent-color);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+}
+
+.stats-grid {
+    display: grid;
+    gap: 10px;
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+}
+
+.stat-label {
+    color: #8e8e93;
+}
+
+.stat-value {
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.fuel-bar-container, .stamina-bar-container, .gas-bar-container {
+    margin: 4px 0 8px;
+}
+
+.fuel-bar, .stamina-bar, .gas-bar {
+    width: 100%;
+    height: 8px;
+    background-color: var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.fuel-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #34C759, #32D74B);
+    transition: width 0.3s ease;
+}
+
+.stamina-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #FF9500, #FF9F0A);
+    transition: width 0.3s ease;
+}
+
+.gas-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #5AC8FA, #4A90E2);
+    transition: width 0.3s ease;
+}
+
+/* ============= ГЛАВНОЕ МЕНЮ ============= */
+.main-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex-shrink: 0;
+    margin-bottom: 15px;
+}
+
+.menu-btn {
+    padding: 16px 18px;
+    font-size: 16px;
+    font-weight: 600;
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 50px;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+
+.menu-btn:active {
+    transform: scale(0.98);
+    opacity: 0.8;
+}
+
+.menu-btn.primary {
+    background-color: var(--accent-color);
+    color: white;
+}
+
+.menu-btn.secondary {
+    background-color: var(--secondary-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+
+.menu-btn.rest {
+    background: linear-gradient(135deg, #5856D6, #5E5CE6);
+    color: white;
+}
+
+.menu-btn.partners {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+}
+
+/* ============= ДОСТИЖЕНИЯ ============= */
+.achievements-preview {
+    margin-top: 15px;
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 5px 0;
+    flex-shrink: 0;
+}
+
+.achievement-badge {
+    width: 50px;
+    height: 50px;
+    border-radius: 25px;
+    background-color: var(--secondary-bg);
+    border: 2px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.achievement-badge.completed {
+    border-color: var(--success-color);
+    background: linear-gradient(135deg, #34C759, #30B0C0);
+}
+
+/* ============= ЗАКАЗЫ ============= */
+.orders-filters {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 15px;
+    overflow-x: auto;
+    padding: 5px 0;
+    flex-shrink: 0;
+}
+
+.filter-btn {
+    padding: 8px 16px;
+    border: 1px solid var(--border-color);
+    background: var(--secondary-bg);
+    color: var(--text-color);
+    border-radius: 20px;
+    font-size: 14px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+    -webkit-user-select: none;
+    user-select: none;
+    min-height: 36px;
+}
+
+.filter-btn.active {
+    background-color: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+}
+
+.filter-btn:active {
+    transform: scale(0.98);
+}
+
+.orders-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    flex: 1;
+    overflow-y: auto;
+    padding: 5px 0;
+}
+
+.order-card {
+    background-color: var(--secondary-bg);
+    padding: 16px;
+    border-radius: 16px;
+    border: 1px solid var(--border-color);
+    animation: slideIn 0.3s ease;
+    flex-shrink: 0;
+}
+
+.order-card.vip {
+    border: 2px solid var(--warning-color);
+    background: linear-gradient(135deg, rgba(255,149,0,0.05), rgba(255,159,10,0.05));
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.order-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    font-weight: 600;
+}
+
+.order-route {
+    margin-bottom: 12px;
+    font-size: 15px;
+    color: #8e8e93;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.order-arrow {
+    text-align: center;
+    font-size: 18px;
+}
+
+.order-stats {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    font-size: 14px;
+}
+
+.order-price {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--success-color);
+}
+
+.order-distance {
+    color: #8e8e93;
+}
+
+.night-badge {
+    background-color: #5856D6;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.timer {
+    font-size: 12px;
+    color: var(--warning-color);
+    font-weight: 600;
+}
+
+.take-order-btn {
+    width: 100%;
+    padding: 12px;
+    background-color: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    -webkit-user-select: none;
+    user-select: none;
+    min-height: 44px;
+}
+
+.take-order-btn:active {
+    transform: scale(0.96);
+    opacity: 0.8;
+}
+
+.take-order-btn:disabled {
+    background-color: var(--border-color);
+    color: #8e8e93;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.no-orders {
+    text-align: center;
+    padding: 40px 20px;
+    color: #8e8e93;
+    font-size: 16px;
+}
+
+/* ============= ЗАПРАВКА ============= */
+.fuel-info-card {
+    background: linear-gradient(135deg, #FFB800, #FF9500);
+    color: white;
+    padding: 16px;
+    border-radius: 16px;
+    margin-bottom: 15px;
+    flex-shrink: 0;
+}
+
+.fuel-stats {
+    display: grid;
+    gap: 10px;
+    font-size: 14px;
+}
+
+.fuel-stats div {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.price-info {
+    display: flex;
+    justify-content: space-between;
+    margin: 8px 0;
+    padding: 8px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 8px;
+}
+
+.price-petrol, .price-gas {
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.price-gas {
+    color: #5AC8FA;
+}
+
+.fuel-type-selector {
+    display: flex;
+    gap: 10px;
+    margin: 15px 0;
+    flex-shrink: 0;
+}
+
+.fuel-type-btn {
+    flex: 1;
+    padding: 12px;
+    border: 2px solid var(--border-color);
+    background: var(--secondary-bg);
+    color: var(--text-color);
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    -webkit-user-select: none;
+    user-select: none;
+    min-height: 44px;
+}
+
+.fuel-type-btn.active {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+}
+
+.fuel-type-btn[data-type="gas"].active {
+    background: #5AC8FA;
+    border-color: #5AC8FA;
+}
+
+.fuel-type-btn:active {
+    transform: scale(0.98);
+}
+
+.fuel-controls {
+    background-color: var(--secondary-bg);
+    padding: 16px;
+    border-radius: 16px;
+    border: 1px solid var(--border-color);
+    flex: 1;
+    overflow-y: auto;
+}
+
+.fuel-slider-container {
+    margin-bottom: 15px;
+}
+
+.fuel-slider-container label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #8e8e93;
+}
+
+#fuel-range {
+    width: 100%;
+    height: 8px;
+    border-radius: 4px;
+    background: var(--border-color);
+    outline: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+}
+
+#fuel-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--accent-color);
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,122,255,0.3);
+}
+
+#fuel-range::-moz-range-thumb {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--accent-color);
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 8px rgba(0,122,255,0.3);
+}
+
+.fuel-amount-display {
+    text-align: center;
+    font-size: 28px;
+    font-weight: 700;
+    margin: 12px 0;
+    color: var(--accent-color);
+}
+
+.fuel-presets {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin: 15px 0;
+}
+
+.preset-btn {
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-color);
+    color: var(--text-color);
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13px;
+    transition: all 0.2s;
+    -webkit-user-select: none;
+    user-select: none;
+    min-height: 44px;
+}
+
+.preset-btn:active {
+    background-color: var(--accent-color);
+    color: white;
+    transform: scale(0.95);
+}
+
+.fuel-cost-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 15px 0;
+    padding: 12px;
+    background-color: var(--bg-color);
+    border-radius: 12px;
+}
+
+.cost-amount {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--success-color);
+}
+
+#refuel-btn {
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, var(--accent-color), #5856D6);
+    color: white;
+    border: none;
+    border-radius: 14px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    -webkit-user-select: none;
+    user-select: none;
+    min-height: 50px;
+}
+
+#refuel-btn:active {
+    transform: scale(0.96);
+    opacity: 0.8;
+}
+
+/* ============= ГАРАЖ ============= */
+.garage-content {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.current-car-card {
+    background-color: var(--secondary-bg);
+    padding: 16px;
+    border-radius: 16px;
+    border: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.current-car-card h3 {
+    margin-bottom: 12px;
+    font-size: 16px;
+}
+
+.car-details {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.car-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--accent-color);
+}
+
+.car-status {
+    font-size: 14px;
+    color: #8e8e93;
+    margin-bottom: 8px;
+}
+
+.car-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    color: #8e8e93;
+    font-size: 14px;
+}
+
+.car-stats span {
+    color: var(--text-color);
+    font-weight: 600;
+}
+
+.cars-section {
+    flex-shrink: 0;
+}
+
+.cars-section h3 {
+    margin-bottom: 12px;
+    font-size: 16px;
+    color: var(--text-color);
+}
+
+.cars-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.car-card {
+    background-color: var(--secondary-bg);
+    border-radius: 16px;
+    padding: 14px;
+    border: 1px solid var(--border-color);
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.car-card:active {
+    transform: translateY(-2px);
+}
+
+.car-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.car-icon {
+    font-size: 32px;
+}
+
+.car-name {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.car-specs {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    background-color: rgba(0,0,0,0.05);
+    padding: 10px;
+    border-radius: 10px;
+    margin-bottom: 8px;
+    font-size: 13px;
+}
+
+.gas-badge {
+    grid-column: span 2;
+    background-color: #5AC8FA;
+    color: white;
+    padding: 4px;
+    text-align: center;
+    border-radius: 5px;
+    font-weight: 600;
+}
+
+.car-description {
+    font-size: 13px;
+    color: #8e8e93;
+    margin-bottom: 10px;
+}
+
+.rent-car-btn, .buy-car-btn {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    -webkit-user-select: none;
+    user-select: none;
+    min-height: 44px;
+}
+
+.rent-car-btn {
+    background: linear-gradient(135deg, #FF9500, #FF9F0A);
+    color: white;
+}
+
+.buy-car-btn {
+    background: linear-gradient(135deg, #34C759, #30B0C0);
+    color: white;
+}
+
+.rent-car-btn:active, .buy-car-btn:active {
+    transform: scale(0.96);
+    opacity: 0.8;
+}
+
+.rent-car-btn:disabled, .buy-car-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.no-cars {
+    text-align: center;
+    padding: 20px;
+    background-color: var(--secondary-bg);
+    border-radius: 12px;
+    color: #8e8e93;
+    font-size: 14px;
+}
+
+.loading {
+    text-align: center;
+    padding: 20px;
+    color: #8e8e93;
+    font-size: 14px;
+}
+
+/* ============= ПАРТНЁРЫ ============= */
+.partners-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 5px 0;
+}
+
+.partners-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.partner-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 16px;
+    border-radius: 16px;
+    margin-bottom: 0;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    flex-shrink: 0;
+}
+
+.partner-card.current {
+    border: 3px solid var(--success-color);
+}
+
+.partner-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.partner-header h3 {
+    font-size: 16px;
+    font-weight: 700;
+    margin: 0;
+}
+
+.current-badge {
+    background: var(--success-color);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.partner-description {
+    font-size: 13px;
+    opacity: 0.9;
+    margin-bottom: 10px;
+}
+
+.partner-stats {
+    background: rgba(255,255,255,0.1);
+    padding: 10px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    font-size: 13px;
+    display: grid;
+    gap: 6px;
+}
+
+.partner-requirement {
+    background: rgba(255,255,255,0.2);
+    padding: 8px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.switch-partner-btn {
+    width: 100%;
+    padding: 12px;
+    background: white;
+    color: #667eea;
+    border: none;
+    border-radius: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    -webkit-user-select: none;
+    user-select: none;
+    min-height: 44px;
+}
+
+.switch-partner-btn:active:not(:disabled) {
+    transform: scale(0.96);
+    opacity: 0.8;
+}
+
+.switch-partner-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: rgba(255,255,255,0.5);
+    color: rgba(102, 126, 234, 0.6);
+}
+
+/* ============= УВЕДОМЛЕНИЯ ============= */
+.notification-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+    max-width: 300px;
+}
+
+.notification {
+    background-color: rgba(0,0,0,0.9);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 25px;
+    font-size: 13px;
+    animation: slideInRight 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    backdrop-filter: blur(10px);
+    pointer-events: auto;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.notification.success {
+    background-color: rgba(52,199,89,0.9);
+}
+
+.notification.warning {
+    background-color: rgba(255,149,0,0.9);
+}
+
+.notification.error {
+    background-color: rgba(255,59,48,0.9);
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOut {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+.achievement-popup {
+    position: fixed;
+    bottom: 30px;
+    left: 20px;
+    right: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 15px;
+    border-radius: 16px;
+    animation: slideUp 0.5s ease;
+    z-index: 999;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: 350px;
+}
+
+.achievement-icon {
+    font-size: 32px;
+    min-width: 32px;
+}
+
+.achievement-text {
+    flex: 1;
+}
+
+.achievement-title {
+    font-weight: 700;
+    font-size: 14px;
+    margin-bottom: 2px;
+}
+
+.achievement-name {
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.achievement-desc {
+    font-size: 12px;
+    opacity: 0.9;
+}
+
+.achievement-reward {
+    font-size: 16px;
+    font-weight: 700;
+    color: #FFD700;
+    margin-top: 4px;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* ============= АДАПТИВ ============= */
+@media (max-width: 600px) {
+    .app {
+        border-radius: 0;
+        max-width: 100%;
+        min-height: 100vh;
+    }
+    
+    body {
+        padding: 0;
+    }
+    
+    .notification-container {
+        top: 10px;
+        right: 10px;
+        left: 10px;
+        max-width: none;
+    }
+    
+    .achievement-popup {
+        left: 10px;
+        right: 10px;
+        max-width: none;
+    }
+}
+
+/* ============= ОБЩИЕ СТИЛИ ============= */
+button {
+    font-family: inherit;
+}
+
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-color);
+}
+
+
+/* ============= ДЕНЬ СТАТИСТИКА ============= */
+.day-statistic-popup {
+    position: fixed;
+    bottom: 30px;
+    left: 20px;
+    right: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 20px;
+    animation: slideUp 0.4s ease;
+    z-index: 999;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.3);
+    max-width: 350px;
+    margin: 0 auto;
+}
+
+.day-stat-content {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.stat-title {
+    font-size: 18px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 12px;
+    font-size: 16px;
+}
+
+.stat-label {
+    font-weight: 600;
+}
+
+.stat-value {
+    font-size: 20px;
+    font-weight: 700;
+    color: #FFD700;
+}
+
+.week-progress {
+    background: rgba(255,255,255,0.1);
+    padding: 15px;
+    border-radius: 12px;
+}
+
+.week-label {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    opacity: 0.9;
+}
+
+.week-bar {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.week-day {
+    flex: 1;
+    height: 30px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 6px;
+    transition: all 0.3s ease;
+}
+
+.week-day.filled {
+    background: linear-gradient(135deg, #34C759, #32D74B);
+    box-shadow: 0 4px 12px rgba(52,199,89,0.3);
+}
+
+.week-counter {
+    text-align: center;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.week-completed-badge {
+    background: linear-gradient(135deg, #34C759, #30B0C0);
+    padding: 15px;
+    border-radius: 12px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 16px;
+    animation: pulse 0.6s ease;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+}
