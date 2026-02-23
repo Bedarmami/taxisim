@@ -70,7 +70,8 @@ function initDB() {
                 achievements_data TEXT, -- JSON string
                 last_daily_bonus TEXT, -- ISO Date string
                 created_at TEXT,
-                last_login TEXT
+                last_login TEXT,
+                free_plate_rolls INTEGER DEFAULT 0
             )`);
 
             // Orders history table
@@ -158,10 +159,15 @@ function initDB() {
                 }
             });
 
-            // v3.1: Admin features (is_banned)
             db.run(`ALTER TABLE users ADD COLUMN is_banned INTEGER DEFAULT 0`, (err) => {
                 if (err && !err.message.includes('duplicate column name')) {
                     console.error('Migration error (is_banned):', err.message);
+                }
+            });
+
+            db.run(`ALTER TABLE users ADD COLUMN free_plate_rolls INTEGER DEFAULT 0`, (err) => {
+                if (err && !err.message.includes('duplicate column name')) {
+                    console.error('Migration error (free_plate_rolls):', err.message);
                 }
             });
 
