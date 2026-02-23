@@ -2180,12 +2180,24 @@ function setupPlatesListeners() {
     }
 }
 
-function switchPlatesTab(tab) {
+function switchPlatesTab(tab, event) {
     document.querySelectorAll('.plate-tab-content').forEach(el => el.style.display = 'none');
     document.querySelectorAll('.plates-tabs .tab-btn').forEach(el => el.classList.remove('active'));
 
-    document.getElementById(`plates-tab-${tab}`).style.display = 'block';
-    event.currentTarget.classList.add('active');
+    const tabContent = document.getElementById(`plates-tab-${tab}`);
+    if (tabContent) tabContent.style.display = 'block';
+
+    if (event && event.currentTarget) {
+        event.currentTarget.classList.add('active');
+    } else {
+        // Fallback: find the button by its onclick attribute or text if event is missing
+        const buttons = document.querySelectorAll('.plates-tabs .tab-btn');
+        buttons.forEach(btn => {
+            if (btn.getAttribute('onclick')?.includes(`'${tab}'`)) {
+                btn.classList.add('active');
+            }
+        });
+    }
 
     if (tab === 'market') loadMarketPlates();
 }
