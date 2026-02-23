@@ -113,14 +113,16 @@ const initBot = () => {
     }
 
     bot.launch()
-        .then(() => {
+        .then(async () => {
             console.log('🚀 Telegram Bot started successfully');
-            db.run('INSERT INTO logs (level, message, timestamp) VALUES (?, ?, ?)',
+            await db.dbReady;
+            await db.run('INSERT INTO logs (level, message, timestamp) VALUES (?, ?, ?)',
                 ['INFO', 'Bot launched successfully', new Date().toISOString()]);
         })
-        .catch((err) => {
+        .catch(async (err) => {
             console.error('❌ Bot launch failed:', err);
-            db.run('INSERT INTO logs (level, message, timestamp, stack) VALUES (?, ?, ?, ?)',
+            await db.dbReady;
+            await db.run('INSERT INTO logs (level, message, timestamp, stack) VALUES (?, ?, ?, ?)',
                 ['ERROR', `Bot launch failed: ${err.message}`, new Date().toISOString(), err.stack || '']);
         });
 

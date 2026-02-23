@@ -131,7 +131,20 @@ app.post('/api/lootbox/open', async (req, res) => {
                 break;
             case 'car':
             case 'exclusive_car':
-                // Add car logic here if needed
+                if (reward.carId) {
+                    user.pending_auction_rewards = user.pending_auction_rewards || [];
+                    user.pending_auction_rewards.push({
+                        type: 'car',
+                        id: reward.carId,
+                        carName: CARS[reward.carId]?.name || reward.carId,
+                        carImage: CARS[reward.carId]?.image || '🚗',
+                        purchasePrice: CARS[reward.carId]?.purchase_price || 0,
+                        sellPrice: Math.floor((CARS[reward.carId]?.purchase_price || 0) * 0.6),
+                        wonAt: new Date().toISOString(),
+                        source: 'lootbox'
+                    });
+                    console.log(`🎁 Reward ${reward.carId} from lootbox added to ${telegramId} pending rewards`);
+                }
                 break;
         }
 

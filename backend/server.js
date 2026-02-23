@@ -112,9 +112,9 @@ db.dbReady.then(async () => {
     // Immediate startup log
     await logError('INFO', 'Server startup: Database ready, initializing systems...', '');
 
-    loadJackpot();
-    initMaintenanceMode();
-    syncCarsFromDB();
+    await loadJackpot();
+    await initMaintenanceMode();
+    await syncCarsFromDB();
 
     // v3.2: Initialize Telegram Bot
     initBot();
@@ -206,7 +206,10 @@ async function syncCarsFromDB() {
             };
         });
 
-        CARS = newCars;
+        // Mutate existing CARS object instead of re-assigning to keep references in other modules (like auction.js)
+        Object.keys(CARS).forEach(key => delete CARS[key]);
+        Object.assign(CARS, newCars);
+
         console.log(`🚗 Loaded ${Object.keys(CARS).length} car definitions from DB`);
     } catch (e) {
         console.error('Error syncing cars:', e);

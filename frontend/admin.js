@@ -352,6 +352,7 @@ async function testLog() {
         }
     } catch (e) { alert('Ошибка сети при тесте'); }
 }
+window.testLog = testLog;
 
 async function clearLogs() {
     if (!confirm('Очистить все логи?')) return;
@@ -458,7 +459,9 @@ async function resetUserProgress() {
     }
 }
 
-checkAuth();// Announcement logic
+checkAuth();
+
+// Announcement logic
 async function loadAnnouncement() {
     const res = await fetch('/api/announcement');
     const data = await res.json();
