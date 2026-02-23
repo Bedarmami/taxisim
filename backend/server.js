@@ -2770,7 +2770,7 @@ app.get('/api/lootbox/:telegramId', async (req, res) => {
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
 const adminAuth = (req, res, next) => {
-    const password = req.headers['x-admin-password'] || req.query.admin_password;
+    const password = req.headers['x-admin-password'] || req.query.admin_password || req.query.password || req.query.p;
     if (password === ADMIN_PASSWORD) {
         next();
     } else {
