@@ -146,6 +146,9 @@ app.post('/api/lootbox/open', async (req, res) => {
                     console.log(`🎁 Reward ${reward.carId} from lootbox added to ${telegramId} pending rewards`);
                 }
                 break;
+            case 'free_plate_roll':
+                user.free_plate_rolls = (user.free_plate_rolls || 0) + 1;
+                break;
         }
 
         user.lootboxes[boxType]--;

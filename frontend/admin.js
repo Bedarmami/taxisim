@@ -975,3 +975,26 @@ async function saveOnlineOffset() {
         alert('Ошибка сети');
     }
 }
+
+async function loadAdminPlates() {
+    try {
+        const response = await fetch('/api/admin/plates');
+        const plates = await response.json();
+        const tbody = document.getElementById('plates-tbody');
+        tbody.innerHTML = '';
+
+        plates.forEach(p => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><span class="license-plate ${p.rarity?.toLowerCase() || 'standard'}">${p.plate_number}</span></td>
+                <td>${p.owner_name || '---'} (${p.owner_id})</td>
+                <td>${p.rarity || 'Common'}</td>
+                <td>${p.is_equipped ? '✅ Экипирован' : '📦 В запасе'}</td>
+                <td>${p.market_price ? `💰 ${p.market_price} PLN` : '---'}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (error) {
+        console.error('Error loading admin plates:', error);
+    }
+}

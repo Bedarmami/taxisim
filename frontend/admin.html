@@ -48,9 +48,8 @@
                 <button class="tab-link" onclick="openTab(event, 'tab-containers')">📦 Контейнеры</button>
                 <button class="tab-link" onclick="openTab(event, 'tab-cars-editor')">🚗 Машины</button>
                 <button class="tab-link" onclick="openTab(event, 'tab-settings')">⚙️ Настройки</button>
-                <button class="tab-link" onclick="openTab(event, 'tab-activities')">🕵️ Активность</button>
-                <button class="tab-link" onclick="openTab(event, 'tab-support')">📨 Поддержка</button>
                 <button class="tab-link" onclick="openTab(event, 'tab-logs')">🚨 Ошибки</button>
+                <button class="tab-link" onclick="openTab(event, 'tab-plates')">🆔 Номера</button>
             </nav>
 
             <!-- Вкладка: Дашборд -->
@@ -407,6 +406,30 @@
                 </div>
                 <div class="logs-container" id="logs-container">
                     <!-- Логи будут здесь -->
+                </div>
+            </div>
+
+            <!-- Вкладка: Номера -->
+            <div id="tab-plates" class="tab-content">
+                <div class="section-header">
+                    <h2>Управление номерными знаками</h2>
+                    <button onclick="loadAdminPlates()">🔄 Обновить</button>
+                </div>
+                <div class="table-container">
+                    <table id="plates-table">
+                        <thead>
+                            <tr>
+                                <th>Номер</th>
+                                <th>Владелец</th>
+                                <th>Редкость</th>
+                                <th>Статус</th>
+                                <th>Рынок</th>
+                            </tr>
+                        </thead>
+                        <tbody id="plates-tbody">
+                            <!-- Номера загрузятся сюда -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </main>

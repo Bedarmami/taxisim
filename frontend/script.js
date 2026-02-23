@@ -468,12 +468,10 @@ async function loadUserData() {
         updateMainScreen();
         updateFuelScreen();
         updateGarageScreen();
-        updatePartnerInfo();
-
-        if (typeof startRetentionIntervals === 'function') {
-            startRetentionIntervals();
-        }
-
+        updateBalanceDisplay();
+        updatePlatesUI();
+        if (typeof checkRetentionMilestones === 'function') checkRetentionMilestones();
+        startRetentionIntervals();
     } catch (error) {
         clearTimeout(timeoutId);
         console.error('Error loading user data:', error);
@@ -484,13 +482,14 @@ async function loadUserData() {
             updateMainScreen();
             updateFuelScreen();
             updateGarageScreen();
-            updatePartnerInfo();
+            updateBalanceDisplay();
+            updatePlatesUI();
             showNotification('⚠️ Проблемы с сетью. Загружены локальные данные.', 'warning');
-            // v2.2: Get available districts
-            document.getElementById('buy-coffee-btn')?.addEventListener('click', buyCoffee);
-            document.getElementById('claim-streak-btn')?.addEventListener('click', claimStreakReward);
+            if (typeof startRetentionIntervals === 'function') {
+                startRetentionIntervals();
+            }
         } else {
-            throw error; // Rethrow if no local data
+            throw error;
         }
     }
 }
@@ -2400,4 +2399,21 @@ function initStreetFeed() {
             content.style.opacity = '1';
         }, 500);
     }, 15000);
+}
+
+function updatePlatesUI() {
+    const rollBtn = document.querySelector('.roll-plate-box .menu-btn.primary');
+    if (rollBtn && userData) {
+        if (userData.free_plate_rolls > 0) {
+            rollBtn.innerHTML = `🎰 Использовать бесплатный ролл (Доступно: ${userData.free_plate_rolls})`;
+            rollBtn.style.background = 'linear-gradient(45deg, #FFD700, #FFA500)';
+            rollBtn.style.color = '#000';
+            rollBtn.style.fontWeight = '800';
+        } else {
+            rollBtn.innerHTML = `🎰 Выбить номер (50,000 PLN)`;
+            rollBtn.style.background = ''; // Reset to CSS default
+            rollBtn.style.color = '';
+            rollBtn.style.fontWeight = '';
+        }
+    }
 }

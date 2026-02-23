@@ -544,7 +544,8 @@ const LOOTBOX_TYPES = {
         rewards: [
             { type: 'money', min: 1000, max: 3000, chance: 0.4 },
             { type: 'exclusive_car', chance: 0.4 },
-            { type: 'all_upgrades', chance: 0.2 }
+            { type: 'all_upgrades', chance: 0.2 },
+            { type: 'free_plate_roll', chance: 0.05 } // Added free_plate_roll as a possible reward
         ]
     }
 };
@@ -1024,6 +1025,8 @@ async function getUser(telegramId) {
     row.rides_completed = Number(row.rides_completed);
     row.total_earned = Number(row.total_earned);
 
+    row.free_plate_rolls = parseInt(row.free_plate_rolls) || 0;
+
     // v3.4: Store original values for delta-based atomic updates
     row._originalBalance = row.balance;
     row._originalEarned = row.total_earned;
@@ -1108,7 +1111,7 @@ async function saveUser(user) {
         last_stamina_update = ?, login_streak = ?, last_login_date = ?,
         lootboxes_data = ?, lootboxes_given_data = ?, casino_spins_today = ?, casino_last_reset = ?, casino_stats = ?, last_login = ?,
         skills = ?, cleanliness = ?, tire_condition = ?,
-        tutorial_completed = ?, pending_auction_rewards = ?, is_banned = ?
+        tutorial_completed = ?, pending_auction_rewards = ?, free_plate_rolls = ?, is_banned = ?
         WHERE telegram_id = ?`;
 
     const params = [
@@ -1136,6 +1139,7 @@ async function saveUser(user) {
         user.tire_condition || 100,
         user.tutorial_completed || 0,
         JSON.stringify(user.pending_auction_rewards || []),
+        user.free_plate_rolls || 0,
         user.is_banned || 0,
         user.telegram_id
     ];
