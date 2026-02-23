@@ -113,8 +113,16 @@ const initBot = () => {
     }
 
     bot.launch()
-        .then(() => console.log('🚀 Telegram Bot started successfully'))
-        .catch((err) => console.error('❌ Bot launch failed:', err));
+        .then(() => {
+            console.log('🚀 Telegram Bot started successfully');
+            db.run('INSERT INTO logs (level, message, timestamp) VALUES (?, ?, ?)',
+                ['INFO', 'Bot launched successfully', new Date().toISOString()]);
+        })
+        .catch((err) => {
+            console.error('❌ Bot launch failed:', err);
+            db.run('INSERT INTO logs (level, message, timestamp, stack) VALUES (?, ?, ?, ?)',
+                ['ERROR', `Bot launch failed: ${err.message}`, new Date().toISOString(), err.stack || '']);
+        });
 
     // Enable graceful stop
     process.once('SIGINT', () => bot.stop('SIGINT'));

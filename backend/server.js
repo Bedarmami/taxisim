@@ -3239,6 +3239,14 @@ app.post('/api/admin/broadcast', adminAuth, async (req, res) => {
             let failCount = 0;
 
             console.log(`📣 Starting broadcast to ${users.length} users...`);
+            await db.run('INSERT INTO logs (level, message, timestamp) VALUES (?, ?, ?)',
+                ['INFO', `Starting broadcast to ${users.length} users`, new Date().toISOString()]);
+
+            if (users.length === 0) {
+                await db.run('INSERT INTO logs (level, message, timestamp) VALUES (?, ?, ?)',
+                    ['WARNING', 'Broadcast aborted: No users found in database', new Date().toISOString()]);
+                return;
+            }
 
             for (const user of users) {
                 if (user.telegram_id) {
