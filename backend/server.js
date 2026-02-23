@@ -2987,6 +2987,32 @@ app.get('/api/admin/analytics', adminAuth, async (req, res) => {
 });
 // Middleware and Auth definitions moved up
 
+// v3.4: AI Diagnostic Endpoint
+app.get('/api/admin/ai-test', adminAuth, async (req, res) => {
+    try {
+        const aiSupport = require('./ai-support');
+        const testId = '799869557'; // Using your ID for context if needed, or just dummy
+        const result = await aiSupport.getAIResponse(testId, "Привет, это тестовое сообщение. Как дела?");
+
+        if (result) {
+            res.json({ success: true, response: result, model: "AI is working!" });
+        } else {
+            res.status(500).json({
+                success: false,
+                message: "AI returned null or SKIP. Check server logs for errors.",
+                apiKeyPresent: !!process.env.GEMINI_API_KEY
+            });
+        }
+    } catch (e) {
+        res.status(500).json({
+            success: false,
+            error: e.message,
+            stack: e.stack,
+            apiKeyPresent: !!process.env.GEMINI_API_KEY
+        });
+    }
+});
+
 // ============= v3.0: AUCTION ENDPOINTS =============
 
 // Redundant auction endpoints removed. Using auction.js routes.
