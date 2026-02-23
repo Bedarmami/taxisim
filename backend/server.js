@@ -2857,6 +2857,7 @@ app.get('/api/admin/support', adminAuth, async (req, res) => {
                 m.message,
                 m.file_id,
                 m.is_from_admin,
+                m.sender_type,
                 m.timestamp
             FROM support_messages m
             ORDER BY m.timestamp DESC 

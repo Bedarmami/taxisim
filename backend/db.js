@@ -231,8 +231,18 @@ function initDB() {
                 message TEXT,
                 file_id TEXT,
                 is_from_admin INTEGER DEFAULT 0,
+                sender_type TEXT DEFAULT 'user',
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
             )`);
+
+            // Migration: Add sender_type if it doesn't exist
+            db.run(`ALTER TABLE support_messages ADD COLUMN sender_type TEXT DEFAULT 'user'`, (err) => {
+                if (!err) {
+                    // Update existing rows based on is_from_admin
+                    db.run(`UPDATE support_messages SET sender_type = 'admin' WHERE is_from_admin = 1`);
+                    db.run(`UPDATE support_messages SET sender_type = 'user' WHERE is_from_admin = 0`);
+                }
+            });
 
             // v3.1: Car definitions (dynamic content)
             db.run(`CREATE TABLE IF NOT EXISTS car_definitions (

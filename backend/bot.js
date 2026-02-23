@@ -11,12 +11,14 @@ const mainKeyboard = Markup.keyboard([
 ]).resize();
 
 // Database helpers for support
-async function saveSupportMessage(userId, message, fileId = null, isFromAdmin = 0) {
+async function saveSupportMessage(userId, message, fileId = null, isFromAdmin = 0, senderType = 'user') {
     try {
         await db.dbReady;
+        // isFromAdmin is kept for compatibility with existing queries if needed, 
+        // but sender_type is the new preferred way.
         await db.run(
-            'INSERT INTO support_messages (user_id, message, file_id, is_from_admin) VALUES (?, ?, ?, ?)',
-            [userId, message, fileId, isFromAdmin]
+            'INSERT INTO support_messages (user_id, message, file_id, is_from_admin, sender_type) VALUES (?, ?, ?, ?, ?)',
+            [userId, message, fileId, isFromAdmin, senderType]
         );
     } catch (e) {
         console.error('Error saving support message:', e);
@@ -45,16 +47,16 @@ bot.on('text', async (ctx) => {
         const aiReply = await aiSupport.getAIResponse(userId, text);
         if (aiReply) {
             await ctx.reply(`🤖 ИИ-Помощник:\n\n${aiReply}`);
-            // Optionally we can still save to support messages but mark as "answered by AI"
-            // For now, let's just log it to DB for admin to see
-            await saveSupportMessage(userId, `[AI Answered] ${text}`, null, 0);
+            // Log both the user message and the AI response
+            await saveSupportMessage(userId, text, null, 0, 'user');
+            await saveSupportMessage(userId, aiReply, null, 0, 'ai');
             return;
         }
     } catch (e) {
         console.error('AI Support Interceptor Error:', e);
     }
 
-    await saveSupportMessage(userId, text);
+    await saveSupportMessage(userId, text, null, 0, 'user');
     await ctx.reply('Ожидайте, скоро вам ответит администратор.');
 });
 
@@ -101,6 +103,10 @@ const sendNotification = async (telegramId, type, data) => {
         }
 
         await bot.telegram.sendMessage(telegramId, message);
+
+        // Log to support history
+        const senderType = type === 'SUPPORT_REPLY' ? 'admin' : 'system';
+        await saveSupportMessage(telegramId.toString(), message, null, (senderType === 'admin' ? 1 : 0), senderType);
 
         // Optional: Log successful notification for critical types
         if (type !== 'BROADCAST') {

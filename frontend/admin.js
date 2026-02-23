@@ -805,29 +805,43 @@ async function unbanUser(tid) {
 }
 
 // ============= SUPPORT SYSTEM =============
+let allSupportMessages = [];
 
 async function loadSupportMessages() {
     try {
         const res = await fetch('/api/admin/support', { headers: { 'x-admin-password': adminPassword } });
-        const messages = await res.json();
+        allSupportMessages = await res.json();
+        const messages = allSupportMessages;
         const tbody = document.getElementById('support-tbody');
         tbody.innerHTML = '';
 
         messages.forEach(m => {
-            const tr = document.createElement('tr');
-            tr.className = m.is_from_admin ? 'support-row-admin' : 'support-row-user';
+            let bubbleClass = 'bubble-user';
+            let senderLabel = m.telegram_id || 'User';
+
+            if (m.sender_type === 'admin') {
+                bubbleClass = 'bubble-admin';
+                senderLabel = 'Админ';
+            } else if (m.sender_type === 'ai') {
+                bubbleClass = 'bubble-ai';
+                senderLabel = '🤖 ИИ';
+            } else if (m.sender_type === 'system') {
+                bubbleClass = 'bubble-system';
+                senderLabel = '⚙️ Система';
+            }
 
             const mediaHtml = m.file_id ?
                 `<img src="/api/admin/support/media/${m.file_id}?admin_password=${adminPassword}" class="media-thumbnail" onclick="showFullImage(this.src)">` :
                 '---';
 
+            const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${new Date(m.timestamp).toLocaleString()}</td>
-                <td><b>${m.telegram_id || 'Admin'}</b><br><small>${m.user_id}</small></td>
-                <td><div class="chat-bubble ${m.is_from_admin ? 'bubble-admin' : 'bubble-user'}">${m.message || ''}</div></td>
+                <td><b>${senderLabel}</b><br><small>${m.user_id}</small></td>
+                <td><div class="chat-bubble ${bubbleClass}">${m.message || ''}</div></td>
                 <td>${mediaHtml}</td>
                 <td>
-                    ${!m.is_from_admin ? `<button onclick="openSupportModal('${m.telegram_id}', '${m.user_id}')">💬 Ответить</button>` : ''}
+                    ${(m.sender_type === 'user' || m.sender_type === 'ai') ? `<button onclick="openSupportModal('${m.telegram_id}', '${m.user_id}')">💬 Ответить</button>` : ''}
                 </td>
             `;
             tbody.appendChild(tr);
@@ -855,10 +869,28 @@ function openSupportModal(telegramId, userId) {
     document.getElementById('support-telegram-id').value = telegramId;
     document.getElementById('support-reply-text').value = '';
 
-    // Load history for this user (filtering the current list)
-    // For a real production app, we'd have a separate endpoint for history
+    // Load history for this user
     const historyDiv = document.getElementById('support-chat-history');
-    historyDiv.innerHTML = '<p style="text-align:center; opacity:0.5;">Загрузка истории...</p>';
+    const userHistory = allSupportMessages
+        .filter(m => m.user_id === userId)
+        .reverse(); // Show chronological order (oldest first in chat)
+
+    if (userHistory.length === 0) {
+        historyDiv.innerHTML = '<p style="text-align:center; opacity:0.5;">История пуста</p>';
+    } else {
+        historyDiv.innerHTML = userHistory.map(m => {
+            let bubbleClass = 'bubble-user';
+            if (m.sender_type === 'admin') bubbleClass = 'bubble-admin';
+            else if (m.sender_type === 'ai') bubbleClass = 'bubble-ai';
+            else if (m.sender_type === 'system') bubbleClass = 'bubble-system';
+
+            const time = new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            return `
+                <div class="chat-time">${time}</div>
+                <div class="chat-bubble ${bubbleClass}">${m.message || ''}</div>
+            `;
+        }).join('');
+    }
 
     document.getElementById('support-modal').style.display = 'block';
 
