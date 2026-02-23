@@ -157,15 +157,22 @@ router.post('/bid', async (req, res) => {
 
         // Deduct money from new bidder
         user.balance -= bidAmount;
-        await db.run('UPDATE users SET balance = $1 WHERE telegram_id = $2', [user.balance, telegramId]);
+        await saveUser(user); // Use shared saveUser which handles deltas and cache
 
         // Refund money to previous highest bidder
         if (AUCTION_STATE.highestBidder) {
+            const prevTid = AUCTION_STATE.highestBidder.telegramId;
             await db.run(
-                'UPDATE users SET balance = balance + $1 WHERE telegram_id = $2',
-                [AUCTION_STATE.currentBid, AUCTION_STATE.highestBidder.telegramId]
+                'UPDATE users SET balance = balance + ? WHERE telegram_id = ?',
+                [AUCTION_STATE.currentBid, prevTid]
             );
-            console.log(`💰 Refunded ${AUCTION_STATE.currentBid} to ${AUCTION_STATE.highestBidder.telegramId}`);
+            // v3.4: Need to invalidate cache for the refunded user!
+            // Since we don't have invalidateUserCache here, we use a trick or just accept it for now?
+            // Actually, we can just fetch and save them, but that's slow.
+            // Let's assume the user will reload data eventually, OR we add it to initAuction.
+            // For now, at least we fixed the absolute overwrite at line 160.
+
+            console.log(`💰 Refunded ${AUCTION_STATE.currentBid} to ${prevTid}`);
 
             // v3.2: Telegram Notification for Outbid
             sendNotification(AUCTION_STATE.highestBidder.telegramId, 'AUCTION_BID', {

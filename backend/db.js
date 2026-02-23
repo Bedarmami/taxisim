@@ -285,6 +285,20 @@ function initDB() {
                 FOREIGN KEY(winner_id) REFERENCES users(id)
             )`);
 
+            // v3.3: License Plates Table
+            db.run(`CREATE TABLE IF NOT EXISTS license_plates (
+                plate_number TEXT PRIMARY KEY,
+                owner_id TEXT, -- telegram_id
+                rarity TEXT DEFAULT 'common', -- common, rare, legendary
+                style TEXT DEFAULT 'standard',
+                buffs TEXT DEFAULT '{}', -- JSON: { tip_multiplier: 1.1, police_resistance: 0.5 }
+                market_price REAL DEFAULT NULL,
+                is_equipped INTEGER DEFAULT 0,
+                car_id TEXT, -- ID of the car it's currently on
+                created_at TEXT,
+                FOREIGN KEY(owner_id) REFERENCES users(telegram_id)
+            )`);
+
             // Migration: Skills and Hardcore Stats
             db.run(`ALTER TABLE users ADD COLUMN skills TEXT DEFAULT '{"charisma":0,"mechanic":0,"navigator":0}'`, (err) => {
                 if (err && !err.message.includes('duplicate column name')) console.error('Migration error (skills):', err.message);
@@ -320,6 +334,7 @@ function initDB() {
                 db.run(`CREATE INDEX IF NOT EXISTS idx_promo_usages_user ON promo_usages(user_id, promo_id)`, (err) => {
                     if (err && !err.message.includes('already exists')) console.error('Index error:', err.message);
                 });
+                db.run(`CREATE INDEX IF NOT EXISTS idx_plates_owner ON license_plates(owner_id)`);
 
                 console.log('Migrations and initial settings check completed.');
                 console.log('📊 Database indexes verified.');

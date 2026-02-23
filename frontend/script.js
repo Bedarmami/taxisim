@@ -407,6 +407,11 @@ async function initApp() {
         }
 
         showNotification('🚖 Добро пожаловать в Такси Симулятор!', 'info');
+
+        // v3.3: License Plates & Social Feed
+        setupPlatesListeners();
+        initStreetFeed();
+
         // Initialize crash status polling
         if (typeof updateCrashStatus === 'function') {
             updateCrashStatus();
@@ -913,6 +918,21 @@ function updateMainScreen() {
     const levelBadge = document.getElementById('level-badge');
     if (levelBadge) levelBadge.textContent = userData.level || 1;
 
+    // v3.3: Plate rendering on main screen
+    const plateContainer = document.getElementById('main-car-plate');
+    if (plateContainer && userData.car) {
+        if (userData.car.plate) {
+            plateContainer.innerHTML = `
+                <div class="license-plate ${userData.car.plate.rarity}">
+                    ${userData.car.plate.number}
+                </div>
+            `;
+            plateContainer.style.display = 'flex';
+        } else {
+            plateContainer.style.display = 'none';
+        }
+    }
+
     // Mini-exp bar
     const expMiniFill = document.getElementById('exp-mini-fill');
     if (expMiniFill) {
@@ -1157,11 +1177,20 @@ async function loadMyCars() {
                     `;
                     }
 
+                    const plateHtml = car.plate ? `
+                        <div class="license-plate ${car.plate.rarity}" style="font-size: 10px; height: 18px; min-width: 60px; margin-bottom: 5px;">
+                            ${car.plate.number}
+                        </div>
+                    ` : '';
+
                     return `
                 <div class="car-card ${car.is_selected ? 'selected-car' : ''}" style="${car.is_selected ? 'border: 2px solid #34C759;' : ''}">
                     <div class="car-card-header">
                         <span class="car-icon">${car.image || '🚗'}</span>
-                        <span class="car-name">${car.name}</span>
+                        <div style="display: flex; flex-direction: column;">
+                            <span class="car-name">${car.name}</span>
+                            ${plateHtml}
+                        </div>
                     </div>
                     <div class="car-specs">
                         <div>⛽ ${car.fuel_consumption} л/100км</div>
@@ -2138,4 +2167,237 @@ function updateProfileScreen() {
             }
         } catch (e) { console.error('Error rendering profile achievements:', e); }
     }
+}
+// ============= v3.3: LICENSE PLATE MANAGEMENT =============
+
+function setupPlatesListeners() {
+    const btn = document.getElementById('plates-btn');
+    if (btn) {
+        btn.onclick = () => {
+            document.getElementById('plates-modal').style.display = 'flex';
+            loadPlates();
+            switchPlatesTab('my');
+        };
+    }
+}
+
+function switchPlatesTab(tab) {
+    document.querySelectorAll('.plate-tab-content').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.plates-tabs .tab-btn').forEach(el => el.classList.remove('active'));
+
+    document.getElementById(`plates-tab-${tab}`).style.display = 'block';
+    event.currentTarget.classList.add('active');
+
+    if (tab === 'market') loadMarketPlates();
+}
+
+function updatePlatePreview() {
+    const input = document.getElementById('custom-plate-input');
+    const preview = document.getElementById('custom-plate-preview');
+    const priceEl = document.getElementById('create-plate-price');
+
+    let text = input.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+    input.value = text;
+    preview.textContent = text || 'YOUR-NAME';
+
+    // Simple price calc mirror of backend for UI
+    const basePrice = 500000;
+    const charSurcharge = 750000;
+    const baseLength = 4;
+    let price = basePrice;
+    if (text.length > baseLength) {
+        price = Math.min(5000000, basePrice + (text.length - baseLength) * charSurcharge);
+    }
+    priceEl.textContent = `Цена: ${price.toLocaleString()} PLN`;
+}
+
+async function loadPlates() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/plates`);
+        const data = await response.json();
+        if (data.success) {
+            displayPlates(data.plates);
+        }
+    } catch (e) { console.error(e); }
+}
+
+function displayPlates(plates) {
+    const list = document.getElementById('plates-list');
+    if (!list) return;
+
+    if (plates.length === 0) {
+        list.innerHTML = '<div class="text-center opacity-60 p-4">У вас пока нет уникальных номеров.</div>';
+        return;
+    }
+
+    list.innerHTML = plates.map(p => `
+        <div class="plate-item-card ${p.rarity}">
+            <div class="license-plate ${p.rarity}">${p.plate_number}</div>
+            <div class="plate-info">
+                <div class="plate-rarity-label">${p.rarity.toUpperCase()}</div>
+                <div class="plate-buffs">${formatBuffs(p.buffs)}</div>
+            </div>
+            <div class="plate-actions">
+                ${p.is_equipped ? '<span class="equipped-badge">✅ Стандарт</span>' : `<button class="p-btn" onclick="equipPlate('${p.plate_number}')">Надеть</button>`}
+                ${!p.is_equipped ? `<button class="p-btn sell" onclick="listPlatePrompt('${p.plate_number}')">Продать</button>` : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+function formatBuffs(buffs) {
+    let res = [];
+    if (buffs.tip_multiplier > 1) res.push(`+${Math.round((buffs.tip_multiplier - 1) * 100)}% чаевых`);
+    if (buffs.police_resistance < 1) res.push(`-${Math.round((1 - buffs.police_resistance) * 100)}% шанс ГАИ`);
+    return res.join('<br>');
+}
+
+async function equipPlate(plateNumber) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/plates/equip`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ plateNumber })
+        });
+        const data = await response.json();
+        if (data.success) {
+            showNotification('✅ Номер успешно установлен!', 'success');
+            loadUserData(); // Refresh car data
+            loadPlates();
+        } else {
+            showNotification(`❌ ${data.error}`, 'error');
+        }
+    } catch (e) { console.error(e); }
+}
+
+async function rollPlate() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/plates/roll`, { method: 'POST' });
+        const data = await response.json();
+        if (data.success) {
+            showLevelUpWow('NEW_PLATE');
+            showNotification(`🎉 Вы выбили номер: ${data.plate.plate_number}!`, 'success');
+            userData.balance = data.balance;
+            updateMainScreen();
+            loadPlates();
+        } else {
+            showNotification(`❌ ${data.error}`, 'error');
+        }
+    } catch (e) { console.error(e); }
+}
+
+async function createCustomPlate() {
+    const text = document.getElementById('custom-plate-input').value;
+    if (!text) return;
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/plates/create`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text })
+        });
+        const data = await response.json();
+        if (data.success) {
+            showNotification(`✨ Номер ${data.plate.plate_number} создан!`, 'success');
+            userData.balance = data.balance;
+            updateMainScreen();
+            loadPlates();
+            switchPlatesTab('my');
+        } else {
+            showNotification(`❌ ${data.error}`, 'error');
+        }
+    } catch (e) { console.error(e); }
+}
+
+async function loadMarketPlates() {
+    const list = document.getElementById('market-plates-list');
+    list.innerHTML = '<div class="loading">Загрузка рынка...</div>';
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/plates/market`);
+        const data = await response.json();
+        if (data.success) {
+            if (data.plates.length === 0) {
+                list.innerHTML = '<div class="text-center p-4">На рынке пока нет номеров.</div>';
+                return;
+            }
+            list.innerHTML = data.plates.map(p => `
+                <div class="market-plate-item ${p.rarity}">
+                    <div class="license-plate ${p.rarity}">${p.plate_number}</div>
+                    <div class="market-info">
+                        <div class="m-buffs">${formatBuffs(p.buffs)}</div>
+                        <div class="m-price">${p.market_price.toLocaleString()} PLN</div>
+                    </div>
+                    <button class="buy-btn" onclick="buyMarketPlate('${p.plate_number}')">Купить</button>
+                </div>
+            `).join('');
+        }
+    } catch (e) { console.error(e); }
+}
+
+async function buyMarketPlate(plateNumber) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/plates/buy`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ plateNumber })
+        });
+        const data = await response.json();
+        if (data.success) {
+            showNotification(data.message, 'success');
+            userData.balance = data.balance;
+            updateMainScreen();
+            loadMarketPlates();
+        } else {
+            showNotification(`❌ ${data.error}`, 'error');
+        }
+    } catch (e) { console.error(e); }
+}
+
+function listPlatePrompt(plateNumber) {
+    const price = prompt('Введите цену продажи (PLN):');
+    if (!price || isNaN(price)) return;
+
+    listPlateForSale(plateNumber, parseInt(price));
+}
+
+async function listPlateForSale(plateNumber, price) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/plates/list`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ plateNumber, price })
+        });
+        const data = await response.json();
+        if (data.success) {
+            showNotification(data.message, 'success');
+            loadPlates();
+        } else {
+            showNotification(`❌ ${data.error}`, 'error');
+        }
+    } catch (e) { console.error(e); }
+}
+
+// v3.3: Global Street Feed Logic
+function initStreetFeed() {
+    const content = document.getElementById('street-feed-content');
+    if (!content) return;
+
+    // Simulate real-time updates
+    const events = [
+        "Vlad только что выиграл Skoda Octavia в контейнере!",
+        "Artem выполнил VIP заказ на 12,000 PLN!",
+        "Система: Джекпот составляет уже 450,000 PLN!",
+        "Igor выбил легендарный номер BOSS!",
+        "Maks продал номер AA-777-AA на рынке за 2,000,000 PLN!"
+    ];
+
+    setInterval(() => {
+        const msg = events[Math.floor(Math.random() * events.length)];
+        content.style.opacity = '0';
+        setTimeout(() => {
+            content.textContent = `⚡ ${msg}`;
+            content.style.opacity = '1';
+        }, 500);
+    }, 15000);
 }

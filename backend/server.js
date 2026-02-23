@@ -12,6 +12,7 @@ const { initBot, sendNotification, bot } = require('./bot');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const plates = require('./plates');
 
 // Middleware
 app.use(cors());
@@ -1010,14 +1011,22 @@ async function getUser(telegramId) {
     }
 
     // Ensure numeric types
-    row.stamina = Number(row.stamina);
-    row.balance = Number(row.balance);
-    row.fuel = Number(row.fuel);
-    row.gas_fuel = Number(row.gas_fuel);
+    row.balance = parseFloat(row.balance) || 0;
+    row.total_earned = parseFloat(row.total_earned) || 0;
+    row.fuel = parseFloat(row.fuel) || 0;
+    row.gas_fuel = parseFloat(row.gas_fuel) || 0;
+    row.stamina = parseInt(row.stamina) || 0;
+    row.experience = parseInt(row.experience) || 0;
+    row.level = parseInt(row.level) || 1;
+    row.rating = parseInt(row.rating) || 0;
     row.cleanliness = Number(row.cleanliness || 100);
     row.tire_condition = Number(row.tire_condition || 100);
     row.rides_completed = Number(row.rides_completed);
     row.total_earned = Number(row.total_earned);
+
+    // v3.4: Store original values for delta-based atomic updates
+    row._originalBalance = row.balance;
+    row._originalEarned = row.total_earned;
 
     // v2.3: Stamina regeneration (1 per 5 minutes)
     const now = new Date();
@@ -1083,8 +1092,12 @@ async function getConfig(key, defaultValue) {
 }
 
 async function saveUser(user) {
+    // v3.4: Use delta-based atomic updates for balance and total_earned
+    const balanceDelta = user.balance - (user._originalBalance || 0);
+    const earnedDelta = user.total_earned - (user._originalEarned || 0);
+
     const sql = `UPDATE users SET 
-        balance = ?, total_earned = ?, 
+        balance = balance + ?, total_earned = total_earned + ?, 
         car_id = ?, car_data = ?, owned_cars_data = ?, 
         fuel = ?, gas_fuel = ?, 
         partner_id = ?, partner_contract_date = ?, 
@@ -1099,7 +1112,7 @@ async function saveUser(user) {
         WHERE telegram_id = ?`;
 
     const params = [
-        user.balance, user.total_earned,
+        balanceDelta, earnedDelta,
         user.car_id || user.car?.id, JSON.stringify(user.car), JSON.stringify(user.owned_cars),
         user.fuel, user.gas_fuel,
         user.partner_id, user.partner_contract_date,
@@ -1128,8 +1141,37 @@ async function saveUser(user) {
     ];
 
     await db.run(sql, params);
+
+    // Update original values for future saves in the same request life
+    user._originalBalance = user.balance;
+    user._originalEarned = user.total_earned;
+
     // Invalidate cache on save
     invalidateUserCache(user.telegram_id);
+    console.log(`[DB] Saved user ${user.telegram_id}. Delta Balance: ${balanceDelta > 0 ? '+' : ''}${balanceDelta}, Final Ref: ${user.balance}`);
+}
+
+/**
+ * v3.4: Helper for atomic balance updates to prevent race conditions.
+ * Always invalidates cache.
+ */
+async function updateBalanceAtomic(telegramId, amount, updateTotalEarned = false) {
+    if (isNaN(amount)) return;
+
+    let sql = 'UPDATE users SET balance = balance + ?';
+    const params = [amount];
+
+    if (updateTotalEarned && amount > 0) {
+        sql += ', total_earned = total_earned + ?';
+        params.push(amount);
+    }
+
+    sql += ' WHERE telegram_id = ?';
+    params.push(telegramId);
+
+    await db.run(sql, params);
+    invalidateUserCache(telegramId);
+    console.log(`[DB] Atomic balance update for ${telegramId}: ${amount > 0 ? '+' : ''}${amount}. (Earnings: ${updateTotalEarned})`);
 }
 
 // v2.9: Mark tutorial complete
@@ -1408,12 +1450,16 @@ app.post('/api/user/:telegramId/ride', async (req, res) => {
         if (isNaN(user.fuel)) user.fuel = 0;
         if (isNaN(user.gas_fuel)) user.gas_fuel = 0;
 
-        // Расчет дохода с учётом партнёра
+        // Расчет дохода
         let earnings = order.price;
 
         if (partner) {
             earnings *= (1 - partner.revenue_split);
         }
+
+        // v3.3: Plate Buffs
+        const plateBuffs = user.car.plate?.buffs || { tip_multiplier: 1.0, police_resistance: 1.0 };
+        earnings *= (plateBuffs.tip_multiplier || 1.0);
 
         // --- v2.1 Features ---
         let event = null;
@@ -1425,8 +1471,9 @@ app.post('/api/user/:telegramId/ride', async (req, res) => {
         }
 
         // 2. Random Events (10% normal, 7% police)
+        const policeChance = 0.07 * (plateBuffs.police_resistance || 1.0);
         const policeRoll = Math.random();
-        if (policeRoll < 0.07) {
+        if (policeRoll < policeChance) {
             event = {
                 type: 'police_stopped',
                 message: '👮 Вас остановил патруль ГАИ!',
@@ -2464,7 +2511,193 @@ app.post('/api/casino/slots', async (req, res) => {
     }
 });
 
-// v2.4: Play Roulette
+// ============= v3.3: LICENSE PLATES =============
+
+// Get all plates owned by user
+app.get('/api/user/:telegramId/plates', async (req, res) => {
+    try {
+        const lp = await db.query('SELECT * FROM license_plates WHERE owner_id = ?', [req.params.telegramId]);
+        res.json({ success: true, plates: lp.map(p => ({ ...p, buffs: JSON.parse(p.buffs) })) });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Roll a random plate (Cost: 50,000 PLN)
+app.post('/api/user/:telegramId/plates/roll', async (req, res) => {
+    try {
+        const user = await getUser(req.params.telegramId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const ROLL_COST = 50000;
+        if (user.balance < ROLL_COST) return res.status(400).json({ error: 'Недостаточно денег (50,000 PLN)' });
+
+        user.balance -= ROLL_COST;
+
+        let plateNumber;
+        let isUnique = false;
+        let attempts = 0;
+
+        // Find a unique plate number
+        while (!isUnique && attempts < 10) {
+            plateNumber = plates.generateRandomPlate();
+            const existing = await db.get('SELECT plate_number FROM license_plates WHERE plate_number = ?', [plateNumber]);
+            if (!existing) isUnique = true;
+            attempts++;
+        }
+
+        if (!isUnique) return res.status(500).json({ error: 'Could not generate unique plate' });
+
+        const rarity = plates.getRarity(plateNumber);
+        const buffs = plates.getBuffs(rarity);
+
+        await db.run(`INSERT INTO license_plates (plate_number, owner_id, rarity, buffs, created_at) VALUES (?, ?, ?, ?, ?)`,
+            [plateNumber, user.telegram_id, rarity, JSON.stringify(buffs), new Date().toISOString()]);
+
+        await saveUser(user);
+
+        res.json({ success: true, plate: { plate_number: plateNumber, rarity, buffs }, balance: user.balance });
+
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Create custom plate (SlavIk-001 style)
+app.post('/api/user/:telegramId/plates/create', async (req, res) => {
+    try {
+        const { text } = req.body;
+        const user = await getUser(req.params.telegramId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        if (!plates.validatePlate(text)) {
+            return res.status(400).json({ error: 'Недопустимый формат номера. Используйте A-Z и 0-9, макс 10 симв.' });
+        }
+
+        const plateNumber = text.toUpperCase();
+        const existing = await db.get('SELECT plate_number FROM license_plates WHERE plate_number = ?', [plateNumber]);
+        if (existing) return res.status(400).json({ error: 'Этот номер уже занят другим игроком!' });
+
+        const cost = plates.calculatePlatePrice(plateNumber);
+        if (user.balance < cost) {
+            return res.status(400).json({ error: `Недостаточно денег. Цена этого номера: ${cost.toLocaleString()} PLN` });
+        }
+
+        user.balance -= cost;
+        const rarity = plates.getRarity(plateNumber);
+        const buffs = plates.getBuffs(rarity);
+
+        await db.run(`INSERT INTO license_plates (plate_number, owner_id, rarity, buffs, created_at) VALUES (?, ?, ?, ?, ?)`,
+            [plateNumber, user.telegram_id, rarity, JSON.stringify(buffs), new Date().toISOString()]);
+
+        await saveUser(user);
+
+        res.json({ success: true, plate: { plate_number: plateNumber, rarity, buffs }, balance: user.balance });
+
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Equip a plate to the current car
+app.post('/api/user/:telegramId/plates/equip', async (req, res) => {
+    try {
+        const { plateNumber } = req.body;
+        const user = await getUser(req.params.telegramId);
+
+        const plate = await db.get('SELECT * FROM license_plates WHERE plate_number = ? AND owner_id = ?', [plateNumber, user.telegram_id]);
+        if (!plate) return res.status(404).json({ error: 'Номер не найден или вы не владелец' });
+
+        // Unequip current plate from this car ID if any
+        await db.run('UPDATE license_plates SET is_equipped = 0, car_id = NULL WHERE owner_id = ? AND car_id = ?', [user.telegram_id, user.car_id]);
+
+        // Equip new plate
+        await db.run('UPDATE license_plates SET is_equipped = 1, car_id = ? WHERE plate_number = ?', [user.car_id, plateNumber]);
+
+        // Update user's car_data JSON to include plate for easy rendering
+        user.car.plate = {
+            number: plate.plate_number,
+            rarity: plate.rarity,
+            buffs: JSON.parse(plate.buffs)
+        };
+        await saveUser(user);
+
+        res.json({ success: true, plate: user.car.plate });
+
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Marketplace: Get all plates for sale
+app.get('/api/plates/market', async (req, res) => {
+    try {
+        const lp = await db.query('SELECT * FROM license_plates WHERE market_price IS NOT NULL');
+        res.json({ success: true, plates: lp.map(p => ({ ...p, buffs: JSON.parse(p.buffs) })) });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Marketplace: List a plate for sale
+app.post('/api/user/:telegramId/plates/list', async (req, res) => {
+    try {
+        const { plateNumber, price } = req.body;
+        const user = await getUser(req.params.telegramId);
+
+        if (price < 1000) return res.status(400).json({ error: 'Минимальная цена продажи: 1000 PLN' });
+
+        const plate = await db.get('SELECT * FROM license_plates WHERE plate_number = ? AND owner_id = ?', [plateNumber, user.telegram_id]);
+        if (!plate) return res.status(404).json({ error: 'Номер не найден или вы не владелец' });
+
+        if (plate.is_equipped) {
+            return res.status(400).json({ error: 'Нельзя продать номер, который установлен на машину. Сначала снимите его.' });
+        }
+
+        await db.run('UPDATE license_plates SET market_price = ? WHERE plate_number = ?', [price, plateNumber]);
+
+        res.json({ success: true, message: `Номер ${plateNumber} выставлен на продажу за ${price} PLN` });
+
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Marketplace: Buy a plate
+app.post('/api/user/:telegramId/plates/buy', async (req, res) => {
+    try {
+        const { plateNumber } = req.body;
+        const buyer = await getUser(req.params.telegramId);
+        if (!buyer) return res.status(404).json({ error: 'Buyer not found' });
+
+        const plate = await db.get('SELECT * FROM license_plates WHERE plate_number = ?', [plateNumber]);
+        if (!plate || plate.market_price === null) return res.status(404).json({ error: 'Этот номер не продается' });
+
+        if (buyer.balance < plate.market_price) {
+            return res.status(400).json({ error: 'Недостаточно денег для покупки' });
+        }
+
+        if (plate.owner_id === buyer.telegram_id) {
+            return res.status(400).json({ error: 'Вы не можете купить свой собственный номер' });
+        }
+
+        const sellerId = plate.owner_id;
+        const price = plate.market_price;
+        const commission = Math.floor(price * 0.1); // 10% tax
+        const netAmount = price - commission;
+
+        // Transaction
+        buyer.balance -= price;
+        await saveUser(buyer);
+
+        const seller = await getUser(sellerId);
+        if (seller) {
+            seller.balance += netAmount;
+            await saveUser(seller);
+        } else {
+            // If seller offline, update DB directly
+            await db.run('UPDATE users SET balance = balance + ? WHERE telegram_id = ?', [netAmount, sellerId]);
+            invalidateUserCache(sellerId);
+        }
+
+        // Transfer ownership and clear market status
+        await db.run('UPDATE license_plates SET owner_id = ?, market_price = NULL, is_equipped = 0, car_id = NULL WHERE plate_number = ?',
+            [buyer.telegram_id, plateNumber]);
+
+        res.json({ success: true, message: `Поздравляем! Вы купили номер ${plateNumber}`, balance: buyer.balance });
+
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ============= v2.4: Play Roulette
 app.post('/api/casino/roulette', async (req, res) => {
     try {
         const { telegramId, bet } = req.body;
