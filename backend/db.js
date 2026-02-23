@@ -71,7 +71,8 @@ function initDB() {
                 last_daily_bonus TEXT, -- ISO Date string
                 created_at TEXT,
                 last_login TEXT,
-                free_plate_rolls INTEGER DEFAULT 0
+                free_plate_rolls INTEGER DEFAULT 0,
+                username TEXT
             )`);
 
             // Orders history table
@@ -168,6 +169,12 @@ function initDB() {
             db.run(`ALTER TABLE users ADD COLUMN free_plate_rolls INTEGER DEFAULT 0`, (err) => {
                 if (err && !err.message.includes('duplicate column name')) {
                     console.error('Migration error (free_plate_rolls):', err.message);
+                }
+            });
+
+            db.run(`ALTER TABLE users ADD COLUMN username TEXT`, (err) => {
+                if (err && !err.message.includes('duplicate column name')) {
+                    console.error('Migration error (username):', err.message);
                 }
             });
 

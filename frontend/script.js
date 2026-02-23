@@ -452,7 +452,10 @@ async function loadUserData() {
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
     try {
-        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}`, {
+        const url = new URL(`${API_BASE_URL}/user/${TELEGRAM_ID}`);
+        if (PLAYER_NAME) url.searchParams.append('username', PLAYER_NAME);
+
+        const response = await fetch(url, {
             signal: controller.signal
         });
         clearTimeout(timeoutId);

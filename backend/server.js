@@ -1206,6 +1206,7 @@ app.get('/api/health', (req, res) => {
 app.get('/api/user/:telegramId', async (req, res) => {
     try {
         const { telegramId } = req.params;
+        const { username } = req.query;
         let user = await getUser(telegramId);
 
         if (!user) {
@@ -1241,7 +1242,8 @@ app.get('/api/user/:telegramId', async (req, res) => {
                 cleanliness: 100,
                 tire_condition: 100,
                 created_at: now.toISOString(),
-                last_login: now.toISOString()
+                last_login: now.toISOString(),
+                username: username || 'Таксист'
             };
 
             await db.run(`INSERT INTO users (
@@ -1255,8 +1257,8 @@ app.get('/api/user/:telegramId', async (req, res) => {
                 business_data, achievements_data, 
                 skills, cleanliness, tire_condition,
                 lootboxes_data, lootboxes_given_data,
-                created_at, last_login
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+                created_at, last_login, username
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
                 newUser.id, newUser.telegram_id, newUser.balance, newUser.total_earned,
                 newUser.car_id, JSON.stringify(newUser.car), JSON.stringify(newUser.owned_cars),
                 newUser.fuel, newUser.gas_fuel,
@@ -1269,10 +1271,14 @@ app.get('/api/user/:telegramId', async (req, res) => {
                 JSON.stringify(newUser.skills), newUser.cleanliness, newUser.tire_condition,
                 JSON.stringify({ wooden: 0, silver: 0, gold: 0, legendary: 0 }),
                 JSON.stringify({ wooden: 0, silver: 0, gold: 0, legendary: 0 }),
-                newUser.created_at, newUser.last_login
+                newUser.created_at, newUser.last_login, newUser.username
             ]);
 
             user = newUser;
+        } else if (username && user.username !== username) {
+            // Update username if it changed or was missing
+            user.username = username;
+            await db.run('UPDATE users SET username = ? WHERE telegram_id = ?', [username, telegramId]);
         }
 
         const partner = PARTNERS.find(p => p.id === user.partner_id);
