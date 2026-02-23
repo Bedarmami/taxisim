@@ -2991,15 +2991,19 @@ app.get('/api/admin/analytics', adminAuth, async (req, res) => {
 app.get('/api/admin/ai-test', adminAuth, async (req, res) => {
     try {
         const aiSupport = require('./ai-support');
-        const testId = '799869557'; // Using your ID for context if needed, or just dummy
-        const result = await aiSupport.getAIResponse(testId, "Привет, это тестовое сообщение. Как дела?");
+        const testId = '799869557';
+        // USE A GAME RELATED MESSAGE to avoid "SKIP"
+        const result = await aiSupport.getAIResponse(testId, "У меня закончился бензин и я не знаю что делать, помоги");
 
         if (result) {
             res.json({ success: true, response: result, model: "AI is working!" });
         } else {
+            // Check recently logged AI errors
+            const lastError = await db.get('SELECT * FROM logs WHERE message LIKE "AI Support Failed%" ORDER BY id DESC LIMIT 1');
             res.status(500).json({
                 success: false,
-                message: "AI returned null or SKIP. Check server logs for errors.",
+                message: "AI returned null or SKIP. A typical reason is the model not being available or the question being off-topic.",
+                lastLoggedError: lastError ? lastError.message : "No error logged in DB",
                 apiKeyPresent: !!process.env.GEMINI_API_KEY
             });
         }
