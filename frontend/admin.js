@@ -978,7 +978,9 @@ async function saveOnlineOffset() {
 
 async function loadAdminPlates() {
     try {
-        const response = await fetch('/api/admin/plates');
+        const response = await fetch('/api/admin/plates', {
+            headers: { 'x-admin-password': adminPassword }
+        });
         const plates = await response.json();
         const tbody = document.getElementById('plates-tbody');
         tbody.innerHTML = '';

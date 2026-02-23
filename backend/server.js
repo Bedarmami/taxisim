@@ -1546,9 +1546,9 @@ app.post('/api/user/:telegramId/ride', async (req, res) => {
             JACKPOT_POOL = 0;
             // Log jackpot win
             try {
-                await db.run('INSERT INTO jackpot_history (user_id, telegram_id, amount, won_at) VALUES (?, ?, ?, ?)',
-                    [user.id, telegramId, jackpotWin, new Date().toISOString()]);
-            } catch (e) { /* table might not exist */ }
+                await db.run('INSERT INTO jackpot_history (winner_id, amount, won_at) VALUES (?, ?, ?)',
+                    [user.id, jackpotWin, new Date().toISOString()]);
+            } catch (e) { console.error('Jackpot log error:', e); }
         }
         await saveJackpot();
 
@@ -2347,7 +2347,7 @@ app.get('/api/jackpot', async (req, res) => {
         const jackpot = setting ? parseFloat(setting.value) : 0;
 
         const history = await db.query(`
-            SELECT j.*, u.telegram_id, u.car_data 
+            SELECT j.amount, j.won_at, u.telegram_id, u.car_data 
             FROM jackpot_history j 
             JOIN users u ON j.winner_id = u.id 
             ORDER BY j.won_at DESC LIMIT 5
@@ -3117,7 +3117,7 @@ app.get('/api/admin/jackpot', adminAuth, async (req, res) => {
         const pool = setting ? parseFloat(setting.value) : 0;
 
         const history = await db.query(`
-            SELECT j.*, u.telegram_id 
+            SELECT j.amount, j.won_at, u.telegram_id 
             FROM jackpot_history j 
             LEFT JOIN users u ON j.winner_id = u.id 
             ORDER BY j.won_at DESC LIMIT 10

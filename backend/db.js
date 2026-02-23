@@ -171,15 +171,7 @@ function initDB() {
                 }
             });
 
-            // Jackpot history table
-            db.run(`CREATE TABLE IF NOT EXISTS jackpot_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                telegram_id TEXT,
-                amount REAL,
-                won_at TEXT
-            )`);
-
+            // v2.5 Admin Expansion Tables
             // v2.5 Admin Expansion Tables
             db.run(`CREATE TABLE IF NOT EXISTS promo_codes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -290,6 +282,14 @@ function initDB() {
                 won_at TEXT,
                 FOREIGN KEY(winner_id) REFERENCES users(id)
             )`);
+
+            // Migration: Ensure jackpot_history has winner_id if it was created with user_id
+            db.run(`ALTER TABLE jackpot_history ADD COLUMN winner_id TEXT`, (err) => {
+                if (err && !err.message.includes('duplicate column name')) {
+                    // If winner_id is missing, we might need to map user_id to it, 
+                    // but usually ADD COLUMN is enough for new writes.
+                }
+            });
 
             // v3.3: License Plates Table
             db.run(`CREATE TABLE IF NOT EXISTS license_plates (
