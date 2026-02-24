@@ -73,7 +73,8 @@ function initDB() {
                 last_login TEXT,
                 free_plate_rolls INTEGER DEFAULT 0,
                 username TEXT,
-                current_district TEXT DEFAULT 'suburbs'
+                current_district TEXT DEFAULT 'suburbs',
+                uncollected_fleet_revenue REAL DEFAULT 0
             )`);
 
             // Orders history table
@@ -182,6 +183,12 @@ function initDB() {
             db.run(`ALTER TABLE users ADD COLUMN current_district TEXT DEFAULT 'suburbs'`, (err) => {
                 if (err && !err.message.includes('duplicate column name')) {
                     console.error('Migration error (current_district):', err.message);
+                }
+            });
+
+            db.run(`ALTER TABLE users ADD COLUMN uncollected_fleet_revenue REAL DEFAULT 0`, (err) => {
+                if (err && !err.message.includes('duplicate column name')) {
+                    console.error('Migration error (uncollected_fleet_revenue):', err.message);
                 }
             });
 
@@ -329,11 +336,15 @@ function initDB() {
                 revenue_total REAL DEFAULT 0,
                 price_petrol REAL DEFAULT 6.80,
                 price_gas REAL DEFAULT 3.60,
+                fuel_stock REAL DEFAULT 0,
+                uncollected_revenue REAL DEFAULT 0,
                 FOREIGN KEY(owner_id) REFERENCES users(telegram_id)
             )`);
 
             db.run(`ALTER TABLE gas_stations ADD COLUMN price_petrol REAL DEFAULT 6.80`, (err) => { });
             db.run(`ALTER TABLE gas_stations ADD COLUMN price_gas REAL DEFAULT 3.60`, (err) => { });
+            db.run(`ALTER TABLE gas_stations ADD COLUMN fuel_stock REAL DEFAULT 0`, (err) => { });
+            db.run(`ALTER TABLE gas_stations ADD COLUMN uncollected_revenue REAL DEFAULT 0`, (err) => { });
 
             // Migration: Skills and Hardcore Stats
             db.run(`ALTER TABLE users ADD COLUMN skills TEXT DEFAULT '{"charisma":0,"mechanic":0,"navigator":0}'`, (err) => {
@@ -422,14 +433,14 @@ async function seedDB() {
 
         // 3. Seed Gas Stations
         const stations = [
-            { id: 'suburbs_gas_1', name: '🟢 Газ Зеленая Долина', district_id: 'suburbs', purchase_price: 15000 },
-            { id: 'suburbs_gas_2', name: '⛽ Быстрая Заправка (Пригород)', district_id: 'suburbs', purchase_price: 18000 },
-            { id: 'center_gas_1', name: '🏢 Городской Энергоцентр', district_id: 'center', purchase_price: 45000 },
-            { id: 'center_gas_2', name: '💎 Элитный Центр Газа', district_id: 'center', purchase_price: 55000 },
-            { id: 'airport_gas_1', name: '✈️ Заправка Азимут', district_id: 'airport', purchase_price: 85000 },
-            { id: 'airport_gas_2', name: '🚀 Реактивный Газ', district_id: 'airport', purchase_price: 95000 },
-            { id: 'industrial_gas_1', name: '🏗️ Дизель-Пром', district_id: 'industrial', purchase_price: 65000 },
-            { id: 'night_gas_1', name: '🌙 Полуночная Точка', district_id: 'night', purchase_price: 75000 }
+            { id: 'suburbs_gas_1', name: '🟢 Газ Зеленая Долина', district_id: 'suburbs', purchase_price: 160000 },
+            { id: 'suburbs_gas_2', name: '⛽ Быстрая Заправка (Пригород)', district_id: 'suburbs', purchase_price: 165000 },
+            { id: 'center_gas_1', name: '🏢 Городской Энергоцентр', district_id: 'center', purchase_price: 180000 },
+            { id: 'center_gas_2', name: '💎 Элитный Центр Газа', district_id: 'center', purchase_price: 190000 },
+            { id: 'airport_gas_1', name: '✈️ Заправка Азимут', district_id: 'airport', purchase_price: 210000 },
+            { id: 'airport_gas_2', name: '🚀 Реактивный Газ', district_id: 'airport', purchase_price: 225000 },
+            { id: 'industrial_gas_1', name: '🏗️ Дизель-Пром', district_id: 'industrial', purchase_price: 175000 },
+            { id: 'night_gas_1', name: '🌙 Полуночная Точка', district_id: 'night', purchase_price: 200000 }
         ];
 
         for (const station of stations) {

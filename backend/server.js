@@ -1805,9 +1805,8 @@ app.post('/api/user/:telegramId/rest', async (req, res) => {
             }
 
             if (fleetIncome > 0) {
-                user.balance += fleetIncome;
-                user.total_earned += fleetIncome; // Count as earnings? logical.
-                message += `\n💼 Доход автопарка: +${fleetIncome} PLN`;
+                user.uncollected_fleet_revenue = (user.uncollected_fleet_revenue || 0) + fleetIncome;
+                message += `\n💼 Начислен доход автопарка: +${fleetIncome} PLN (в кассу)`;
             }
             // --------------------------------
         }
@@ -1874,8 +1873,15 @@ app.post('/api/user/:telegramId/fuel', async (req, res) => {
         const actualLitersRounded = Number(actualLiters.toFixed(1));
 
         const districtId = user.current_district || 'suburbs';
-        // Randomly pick an owned station in the district (usually only 1 or 2 available)
-        const station = await db.get('SELECT * FROM gas_stations WHERE district_id = ? AND owner_id IS NOT NULL ORDER BY RANDOM() LIMIT 1', [districtId]);
+        // Randomly pick a station in the district
+        const station = await db.get('SELECT * FROM gas_stations WHERE district_id = ? ORDER BY RANDOM() LIMIT 1', [districtId]);
+
+        if (station && station.owner_id) {
+            // Check fuel stock for owned stations
+            if ((station.fuel_stock || 0) < actualLitersRounded) {
+                return res.status(400).json({ error: 'На заправке закончилось топливо! Владелец должен сделать закупку.' });
+            }
+        }
 
         let effectivePetrolPrice = 6.80; // Default
         let effectiveGasPrice = 3.60;
@@ -1899,17 +1905,23 @@ app.post('/api/user/:telegramId/fuel', async (req, res) => {
             user.fuel = Number((currentFuel + actualLitersRounded).toFixed(1));
         }
 
-        // Commission payout
-        const commission = Number((cost * 0.05).toFixed(2));
-        if (station && station.owner_id !== telegramId) {
-            // Pay commission to owner
-            await db.run('UPDATE users SET balance = balance + ?, total_earned = total_earned + ? WHERE telegram_id = ?', [commission, commission, station.owner_id]);
-            await db.run('UPDATE gas_stations SET revenue_total = revenue_total + ? WHERE id = ?', [commission, station.id]);
+        // Commission payout for owned stations
+        if (station && station.owner_id) {
+            // Fuel cost for the owner (base price they paid or standard cost)
+            // Let's assume a fixed base price for the owner's stock: Petrol 5.0, Gas 2.5
+            const basePrice = type === 'gas' ? 2.5 : 5.0;
+            const profit = Number((actualLitersRounded * (pricePerLitre - basePrice)).toFixed(2));
 
-            // Sync user cache for the owner
-            const owner = await getUserFromDB(station.owner_id);
-            if (owner) USER_CACHE.set(station.owner_id, owner);
-            console.log(`[Investment] Paid ${commission.toFixed(2)} PLN commission to ${station.owner_id} for refueling at ${station.name}`);
+            if (profit > 0) {
+                // Add to uncollected revenue and reduce stock
+                await db.run('UPDATE gas_stations SET uncollected_revenue = uncollected_revenue + ?, fuel_stock = fuel_stock - ? WHERE id = ?',
+                    [profit, actualLitersRounded, station.id]);
+
+                console.log(`[Investment] Profit ${profit} PLN added to ${station.name} (${station.owner_id}). Stock left: ${station.fuel_stock - actualLitersRounded}L`);
+            } else {
+                // If owner sells at or below base price, they just lose stock
+                await db.run('UPDATE gas_stations SET fuel_stock = fuel_stock - ? WHERE id = ?', [actualLitersRounded, station.id]);
+            }
         }
 
         await saveUser(user);
@@ -2364,7 +2376,7 @@ app.get('/api/user/:telegramId/business', async (req, res) => {
                 };
             });
 
-        res.json({ success: true, drivers, fleet, currentCarId: user.car_id, balance: user.balance });
+        res.json({ success: true, drivers, fleet, currentCarId: user.car_id, balance: user.balance, uncollected_fleet_revenue: user.uncollected_fleet_revenue || 0 });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -2674,6 +2686,95 @@ app.post('/api/investments/update-prices', async (req, res) => {
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Update failed' });
+    }
+});
+
+app.post('/api/investments/withdraw', async (req, res) => {
+    try {
+        const { telegramId, stationId } = req.body;
+        const user = await getUser(telegramId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const station = await db.get('SELECT * FROM gas_stations WHERE id = ? AND owner_id = ?', [stationId, telegramId]);
+        if (!station) return res.status(404).json({ error: 'Station not found or not owned by you' });
+
+        const amount = station.uncollected_revenue || 0;
+        if (amount <= 0) return res.status(400).json({ error: 'Нет прибыли для снятия' });
+
+        const tax = amount * 0.10;
+        const netAmount = amount - tax;
+
+        user.balance += netAmount;
+        user.total_earned += netAmount;
+        await saveUser(user);
+
+        await db.run('UPDATE gas_stations SET uncollected_revenue = 0 WHERE id = ?', [stationId]);
+
+        res.json({
+            success: true,
+            message: `Снято ${amount.toFixed(2)} PLN. Налог 10% (-${tax.toFixed(2)}). На баланс: +${netAmount.toFixed(2)} PLN`,
+            balance: user.balance
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/investments/buy-stock', async (req, res) => {
+    try {
+        const { telegramId, stationId, liters } = req.body;
+        const user = await getUser(telegramId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const station = await db.get('SELECT * FROM gas_stations WHERE id = ? AND owner_id = ?', [stationId, telegramId]);
+        if (!station) return res.status(404).json({ error: 'Station not found or not owned by you' });
+
+        // Base price for stock: 5.0 pentru Petrol, let's assume average or allow choice? 
+        // For simplicity, let's say owner buys "Generic Fuel Stock" at 4.0 PLN/L
+        const STOCK_PRICE_PER_LITER = 4.0;
+        const cost = liters * STOCK_PRICE_PER_LITER;
+
+        if (user.balance < cost) return res.status(400).json({ error: `Недостаточно средств. Нужно ${cost.toFixed(2)} PLN` });
+
+        user.balance -= cost;
+        await saveUser(user);
+
+        await db.run('UPDATE gas_stations SET fuel_stock = fuel_stock + ? WHERE id = ?', [liters, stationId]);
+
+        res.json({
+            success: true,
+            message: `Закуплено ${liters}л сырья за ${cost.toFixed(2)} PLN`,
+            balance: user.balance,
+            new_stock: (station.fuel_stock || 0) + liters
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/user/:telegramId/withdraw-fleet', async (req, res) => {
+    try {
+        const user = await getUser(req.params.telegramId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const amount = user.uncollected_fleet_revenue || 0;
+        if (amount <= 0) return res.status(400).json({ error: 'Нет прибыли в кассе автопарка' });
+
+        const tax = amount * 0.10;
+        const netAmount = amount - tax;
+
+        user.balance += netAmount;
+        user.total_earned += netAmount;
+        user.uncollected_fleet_revenue = 0;
+        await saveUser(user);
+
+        res.json({
+            success: true,
+            message: `Снято ${amount.toFixed(2)} PLN с автопарка. Налог 10% (-${tax.toFixed(2)}). На баланс: +${netAmount.toFixed(2)} PLN`,
+            balance: user.balance
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
     }
 });
 

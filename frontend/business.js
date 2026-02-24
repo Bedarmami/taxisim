@@ -102,6 +102,7 @@ class BusinessManager {
             this.fleet = bizData.fleet || [];
             this.currentCarId = bizData.currentCarId;
             this.balance = bizData.balance || 0;
+            this.uncollectedFleetRevenue = bizData.uncollected_fleet_revenue || 0;
             this.availableCars = (carsData.cars || []).filter(c => c.purchase_price > 0);
 
             // v3.4: Populate global CARS map for display names
@@ -138,6 +139,23 @@ class BusinessManager {
         });
         document.getElementById('income-per-hour').textContent = `${income} PLN`;
 
+        // Update Fleet withdrawal button if it exists
+        const fleetWithdrawContainer = document.getElementById('fleet-withdraw-container');
+        if (fleetWithdrawContainer) {
+            if (this.uncollectedFleetRevenue > 0) {
+                fleetWithdrawContainer.innerHTML = `
+                    <div style="background:rgba(46, 204, 113, 0.1); border:1px solid #2ecc71; border-radius:12px; padding:12px; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <div style="font-size:0.75em; color:#888; text-transform:uppercase;">Касса автопарка</div>
+                            <div style="font-size:1.1em; font-weight:bold; color:#2ecc71;">${this.uncollectedFleetRevenue.toFixed(2)} PLN</div>
+                        </div>
+                        <button class="action-btn success small" onclick="businessManager.withdrawFleetProfit()">💰 Снять (-10%)</button>
+                    </div>
+                `;
+            } else {
+                fleetWithdrawContainer.innerHTML = '';
+            }
+        }
         // Drivers List
         const driversList = document.getElementById('drivers-list');
         driversList.innerHTML = '';
@@ -258,7 +276,7 @@ class BusinessManager {
                 
                 <div style="margin-top:15px; display:flex; justify-content:space-between; align-items:center;">
                     <div style="font-size:0.85em; color:#aaa;">
-                        💰 Общий доход: <span style="color:#2ecc71;">${(station.revenue_total || 0).toFixed(2)} PLN</span>
+                        <span title="Общий доход за все время">📊 Всего: ${(station.revenue_total || 0).toFixed(2)} PLN</span>
                     </div>
                     ${!isOwned ?
                     `<button class="action-btn success small" 
@@ -284,15 +302,34 @@ class BusinessManager {
                             </div>
                             <button class="action-btn small" 
                                     style="margin-top:14px; height:34px; padding:0 12px; background:#3498db;" 
-                                    onclick="businessManager.updatePrices('${station.id}')">
+                                    onclick="businessManager.updatePrices('${station.id}')" title="Сохранить цены">
                                 💾
                             </button>
                         </div>
+                        
+                        <div style="margin-top:12px; display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.3); padding:10px; border-radius:10px;">
+                            <div>
+                                <div style="font-size:0.75em; color:#888;">📦 Запас топлива:</div>
+                                <div style="font-weight:bold; color:${station.fuel_stock < 50 ? '#e74c3c' : '#2ecc71'};">${(station.fuel_stock || 0).toFixed(1)} л</div>
+                            </div>
+                            <button class="action-btn small" style="background:#f39c12; padding:4px 10px;" onclick="businessManager.buyStock('${station.id}')">➕ Закупка</button>
+                        </div>
+
+                        ${(station.uncollected_revenue || 0) > 0 ? `
+                        <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center; background:rgba(46, 204, 113, 0.1); padding:10px; border-radius:10px; border:1px solid #2ecc71;">
+                            <div>
+                                <div style="font-size:0.75em; color:#888;">💰 В кассе:</div>
+                                <div style="font-weight:bold; color:#2ecc71;">${(station.uncollected_revenue || 0).toFixed(2)} PLN</div>
+                            </div>
+                            <button class="action-btn success small" onclick="businessManager.withdrawStationProfit('${station.id}')">💰 Снять</button>
+                        </div>
+                        ` : ''}
                     </div>
                 ` : `
-                    <div style="margin-top:10px; display:flex; gap:15px; font-size:0.8em; color:#777;">
+                    <div style="margin-top:10px; display:flex; gap:15px; font-size:0.8em; color:#777; background:rgba(255,255,255,0.03); padding:8px; border-radius:8px;">
                         <span>⛽ ${station.price_petrol?.toFixed(2) || '6.80'}</span>
                         <span>🔵 ${station.price_gas?.toFixed(2) || '3.60'}</span>
+                        <span style="margin-left:auto; color:${station.fuel_stock < 20 ? '#e74c3c' : '#888'};">📦 ${station.fuel_stock?.toFixed(0) || 0}л</span>
                     </div>
                 `}
             `;
