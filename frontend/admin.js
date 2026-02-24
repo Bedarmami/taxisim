@@ -1006,3 +1006,31 @@ async function loadAdminPlates() {
         console.error('Error loading admin plates:', error);
     }
 }
+
+async function exportDB() {
+    if (!confirm('Вы уверены, что хотите скачать файл базы данных?')) return;
+
+    try {
+        const response = await fetch('/api/admin/db/export', {
+            headers: { 'x-admin-password': adminPassword }
+        });
+
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `taxi_backup_${new Date().toISOString().split('T')[0]}.db`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        } else {
+            const error = await response.json();
+            alert(`Ошибка экспорта: ${error.error}`);
+        }
+    } catch (e) {
+        console.error(e);
+        alert('Ошибка при скачивании базы данных');
+    }
+}

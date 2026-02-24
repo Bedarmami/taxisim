@@ -3604,6 +3604,24 @@ app.get('/api/admin/plates', adminAuth, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// v3.5: Database Export (Urgent)
+app.get('/api/admin/db/export', adminAuth, (req, res) => {
+    try {
+        const dataDir = path.join(__dirname, 'data');
+        const dbPath = process.env.DATABASE_PATH || path.join(dataDir, 'taxi.db');
+
+        if (!fs.existsSync(dbPath)) {
+            return res.status(404).json({ error: 'Database file not found' });
+        }
+
+        const date = new Date().toISOString().split('T')[0];
+        res.download(dbPath, `taxi_backup_${date}.db`);
+    } catch (e) {
+        console.error('DB Export Error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // v3.3: Admin Jackpot View
 app.get('/api/admin/jackpot', adminAuth, async (req, res) => {
     try {
