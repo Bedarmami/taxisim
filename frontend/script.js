@@ -593,17 +593,22 @@ async function relocate() {
     }
 }
 
-function forceReload() {
-    if (typeof Telegram !== 'undefined' && Telegram.WebApp && Telegram.WebApp.HapticFeedback) {
-        Telegram.WebApp.HapticFeedback.notificationOccurred('warning');
+// v3.5: Automatic Cache Busting on startup
+(function () {
+    if (!sessionStorage.getItem('app_freshened')) {
+        sessionStorage.setItem('app_freshened', 'true');
+        const url = new URL(window.location.href);
+        url.searchParams.set('v', Date.now());
+        window.location.href = url.toString();
     }
-    const v = Date.now();
-    const url = new URL(window.location.href);
-    url.searchParams.set('v', v);
-    window.location.href = url.toString();
+})();
+
+function forceReload() {
+    // Keep function for internal use if needed, but it now uses the same logic
+    sessionStorage.removeItem('app_freshened');
+    window.location.reload();
 }
 
-window.forceReload = forceReload;
 window.relocate = relocate;
 
 // ============= ОТОБРАЖЕНИЕ ЗАКАЗОВ =============
