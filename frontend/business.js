@@ -13,21 +13,18 @@ class BusinessManager {
         if (btn) btn.addEventListener('click', () => this.openScreen());
 
         const backBtn = document.getElementById('back-from-business');
-        if (backBtn) backBtn.addEventListener('click', () => this.closeScreen());
+        if (backBtn) backBtn.addEventListener('click', () => showScreen('main'));
 
         const hireBtn = document.getElementById('hire-driver-btn');
         if (hireBtn) hireBtn.addEventListener('click', () => this.hireDriver());
     }
 
     openScreen() {
-        document.getElementById('main-screen').style.display = 'none';
-        document.getElementById('business-screen').style.display = 'block';
-        this.loadData();
+        showScreen('business');
     }
 
     closeScreen() {
-        document.getElementById('business-screen').style.display = 'none';
-        document.getElementById('main-screen').style.display = 'block';
+        showScreen('main');
         if (window.updateUI) window.updateUI();
     }
 
@@ -331,4 +328,4 @@ class BusinessManager {
     }
 }
 
-const businessManager = new BusinessManager();
+window.businessManager = new BusinessManager();

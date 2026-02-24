@@ -11,7 +11,7 @@ class SkillsManager {
         if (btn) btn.addEventListener('click', () => this.openScreen());
 
         const backBtn = document.getElementById('back-from-skills');
-        if (backBtn) backBtn.addEventListener('click', () => this.closeScreen());
+        if (backBtn) backBtn.addEventListener('click', () => showScreen('main'));
 
         // Upgrade buttons (match HTML data-skill attributes)
         document.querySelectorAll('.upgrade-btn[data-skill]').forEach(btn => {
@@ -25,14 +25,11 @@ class SkillsManager {
     }
 
     openScreen() {
-        document.getElementById('main-screen').style.display = 'none';
-        document.getElementById('skills-screen').style.display = 'block';
-        this.loadData();
+        showScreen('skills');
     }
 
     closeScreen() {
-        document.getElementById('skills-screen').style.display = 'none';
-        document.getElementById('main-screen').style.display = 'block';
+        showScreen('main');
         if (window.updateUI) window.updateUI();
     }
 
@@ -113,4 +110,4 @@ class SkillsManager {
     }
 }
 
-const skillsManager = new SkillsManager();
+window.skillsManager = new SkillsManager();

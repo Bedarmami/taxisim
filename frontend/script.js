@@ -136,6 +136,8 @@ const screens = {
     casino: document.getElementById('casino-screen'),
     lootbox: document.getElementById('lootbox-screen'),
     containers: document.getElementById('containers-screen'),
+    business: document.getElementById('business-screen'),
+    skills: document.getElementById('skills-screen'),
     profile: document.getElementById('profile-modal')
 };
 
@@ -541,12 +543,16 @@ async function loadDistricts() {
 
         selector.innerHTML = districts.map(d => `
             <div class="district-card ${d.id === currentDistrict ? 'active' : ''} ${!d.unlocked ? 'locked' : ''}"
+                 data-id="${d.id}"
                  onclick="${d.unlocked ? `selectDistrict('${d.id}')` : ''}">
                 <div class="district-name">${d.name}</div>
                 <div class="district-desc">${d.description}</div>
                 ${!d.unlocked ? `<div class="district-unlock">Ур. ${d.unlockLevel || '?'}${d.unlockCost ? ` / ${d.unlockCost} PLN` : ''}</div>` : ''}
             </div>
         `).join('');
+
+        // v3.4: Add Pulse tags after rendering
+        updateDistrictTags();
     } catch (error) {
         console.error('Error loading districts:', error);
     }
@@ -1729,6 +1735,17 @@ function showAchievement(achievement) {
 
 // ============= НАВИГАЦИЯ =============
 function showScreen(screenName) {
+    console.log(`[NAV] Switching to screen: ${screenName}`);
+
+    // v3.4: Hide any active modals/overlays if returning to main or switching main screens
+    if (screenName !== 'profile') {
+        const modals = ['profile-modal', 'promo-modal', 'ann-modal', 'plates-modal', 'police-modal'];
+        modals.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+        });
+    }
+
     if (screenName === 'profile') {
         const profileModal = document.getElementById('profile-modal');
         if (profileModal) {
@@ -1743,9 +1760,14 @@ function showScreen(screenName) {
         containersManager.stopPolling();
     }
 
+    // v3.4: Thoroughly clear ALL screens (both classes and manual styles from business/skills)
     Object.entries(screens).forEach(([name, screen]) => {
-        if (screen && name !== 'profile') {
+        if (screen) {
             screen.classList.remove('active');
+            // Clear manual display styles that might have been set by old business/skills logic
+            if (name !== 'profile') {
+                screen.style.display = '';
+            }
         }
     });
 
@@ -1766,6 +1788,7 @@ function showScreen(screenName) {
         }
     }
 
+    // Load screen-specific data
     if (screenName === 'orders') {
         loadDistricts();
         loadOrders();
@@ -1773,8 +1796,10 @@ function showScreen(screenName) {
         updateFuelScreen();
     } else if (screenName === 'garage') {
         updateGarageScreen();
-    } else if (screenName === 'partners') {
-        // Список партнёров уже загружен в showPartnersList
+    } else if (screenName === 'business') {
+        if (window.businessManager) window.businessManager.loadData();
+    } else if (screenName === 'skills') {
+        if (window.skillsManager) window.skillsManager.loadData();
     }
 }
 
@@ -1878,6 +1903,16 @@ function setupEventListeners() {
         if (btn) {
             btn.addEventListener('click', () => showScreen(screenName));
         }
+    });
+
+    // v3.4: Add missing back buttons
+    const moreBackBtns = {
+        'back-from-skills': 'main',
+        'back-from-business': 'main'
+    };
+    Object.entries(moreBackBtns).forEach(([id, screenName]) => {
+        const btn = document.getElementById(id);
+        if (btn) btn.addEventListener('click', () => showScreen(screenName));
     });
 
     // Telegram BackButton
@@ -2373,28 +2408,86 @@ async function listPlateForSale(plateNumber, price) {
     } catch (e) { console.error(e); }
 }
 
-// v3.3: Global Street Feed Logic
+// v3.4: Global Social Pulse Logic
+async function updateSocialPulse() {
+    try {
+        const data = await safeFetchJson(`${API_BASE_URL}/social/pulse`);
+        if (!data || data._isError) return;
+
+        // 1. Update Community Mission
+        if (data.community) {
+            const fill = document.getElementById('community-fill');
+            const percentEl = document.getElementById('community-percent');
+            const distanceEl = document.getElementById('community-distance');
+            const goalEl = document.getElementById('community-goal');
+
+            if (fill) fill.style.width = `${data.community.percent}%`;
+            if (percentEl) percentEl.textContent = `${data.community.percent}%`;
+            if (distanceEl) distanceEl.textContent = data.community.totalDistance.toLocaleString();
+            if (goalEl) goalEl.textContent = data.community.goal.toLocaleString();
+        }
+
+        // 2. Update Street Feed
+        const content = document.getElementById('street-feed-content');
+        if (content && data.events && data.events.length > 0) {
+            const event = data.events[0]; // Show latest event
+            content.style.opacity = '0';
+            setTimeout(() => {
+                content.textContent = `⚡ ${event.message}`;
+                content.style.opacity = '1';
+            }, 500);
+        }
+
+        // 3. Update District Occupancy (Global variable for use in loadDistricts)
+        window.districtPulse = data.occupancy || {};
+        window.districtSurges = data.surges || {};
+
+        // If currently on orders screen, refresh UI to show tags
+        if (screens.orders.classList.contains('active')) {
+            updateDistrictTags();
+        }
+
+        // 4. Update Jackpot in profile/header if needed
+        if (data.jackpot !== undefined) {
+            const jackpotEl = document.getElementById('jackpot-amount');
+            if (jackpotEl) jackpotEl.textContent = data.jackpot.toFixed(2);
+        }
+
+    } catch (e) {
+        console.error('Pulse update failed:', e);
+    }
+}
+
 function initStreetFeed() {
-    const content = document.getElementById('street-feed-content');
-    if (!content) return;
+    updateSocialPulse();
+    setInterval(updateSocialPulse, 30000); // Pulse every 30s
+}
 
-    // Simulate real-time updates
-    const events = [
-        "Vlad только что выиграл Skoda Octavia в контейнере!",
-        "Artem выполнил VIP заказ на 12,000 PLN!",
-        "Система: Джекпот составляет уже 450,000 PLN!",
-        "Igor выбил легендарный номер BOSS!",
-        "Maks продал номер AA-777-AA на рынке за 2,000,000 PLN!"
-    ];
+function updateDistrictTags() {
+    document.querySelectorAll('.district-card').forEach(btn => {
+        const id = btn.dataset.id;
+        if (!id) return;
 
-    setInterval(() => {
-        const msg = events[Math.floor(Math.random() * events.length)];
-        content.style.opacity = '0';
-        setTimeout(() => {
-            content.textContent = `⚡ ${msg}`;
-            content.style.opacity = '1';
-        }, 500);
-    }, 15000);
+        // Remove old tags
+        btn.querySelector('.district-pulse')?.remove();
+        btn.querySelector('.district-surge')?.remove();
+
+        // Add occupancy
+        if (window.districtPulse && window.districtPulse[id]) {
+            const tag = document.createElement('span');
+            tag.className = 'district-pulse';
+            tag.textContent = `👥 ${window.districtPulse[id]} водителей`;
+            btn.appendChild(tag);
+        }
+
+        // Add surge
+        if (window.districtSurges && window.districtSurges[id]) {
+            const surge = document.createElement('span');
+            surge.className = 'district-surge';
+            surge.textContent = `🔥 SURGE x${window.districtSurges[id]}`;
+            btn.appendChild(surge);
+        }
+    });
 }
 
 function updatePlatesUI() {

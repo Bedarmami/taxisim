@@ -29,6 +29,7 @@ app.use(express.static(path.join(__dirname, '..', 'frontend'), {
 // v2.5: Maintenance Mode and Logging
 let MAINTENANCE_MODE = false;
 let JACKPOT_POOL = 0;
+let COMMUNITY_DISTANCE_GOAL = 50000; // 50,000 km community goal
 
 // v3.0: Container Auction State
 let AUCTION_CONFIG = {
@@ -105,6 +106,13 @@ const logActivity = async (telegramId, action, details = {}) => {
     } catch (e) {
         console.error('Activity logging error:', e);
     }
+};
+
+// v3.4: Social Pulse Activity Log
+let SOCIAL_ACTIVITY_LOG = [];
+const logSocialActivity = (message) => {
+    SOCIAL_ACTIVITY_LOG.unshift({ message, timestamp: new Date().toISOString() });
+    if (SOCIAL_ACTIVITY_LOG.length > 20) SOCIAL_ACTIVITY_LOG.pop();
 };
 
 db.dbReady.then(async () => {
@@ -1192,6 +1200,63 @@ app.post('/api/user/:telegramId/tutorial-complete', async (req, res) => {
     }
 });
 
+// v3.4: Social Pulse & Community Mission
+app.get('/api/social/pulse', async (req, res) => {
+    try {
+        // 1. Get real distance from history (Community Mission)
+        const distanceRow = await db.get('SELECT SUM(distance) as total FROM orders_history');
+        const realDistance = parseFloat(distanceRow?.total || 0);
+
+        // 2. District occupancy (Simulated with slight randomness based on real time)
+        const hour = new Date().getHours();
+        const baseOccupancy = (hour > 8 && hour < 22) ? 1.5 : 0.7; // Peak/Off-peak multiplier
+
+        const occupancy = {
+            suburbs: Math.floor((Math.random() * 10 + 5) * baseOccupancy),
+            center: Math.floor((Math.random() * 20 + 15) * baseOccupancy),
+            airport: Math.floor((Math.random() * 12 + 8) * baseOccupancy)
+        };
+
+        // 3. Simulated Street Feed events if real log is empty
+        let events = [...SOCIAL_ACTIVITY_LOG];
+        if (events.length < 5) {
+            const fakeNames = ['Alex', 'Marek', 'TaxiPro', 'VIP_Driver', 'Ghost', 'Turbo', 'NightOwl'];
+            const fakeActions = [
+                'выполнил заказ в Центре! 🚕',
+                'купил новую машину! 🚙',
+                'выбил редкий госномер! 🆔',
+                'сорвал куш в слотах! 🎰',
+                'завершил смену с чаевыми 50 PLN! 💰'
+            ];
+            for (let i = 0; i < 3; i++) {
+                const name = fakeNames[Math.floor(Math.random() * fakeNames.length)];
+                const action = fakeActions[Math.floor(Math.random() * fakeActions.length)];
+                events.push({ message: `${name} ${action}`, timestamp: new Date().toISOString() });
+            }
+        }
+
+        // 4. Surge pricing indicators (Visual only for now)
+        const surges = {};
+        if (hour >= 17 && hour <= 19) surges.center = 1.2;
+        if (Math.random() < 0.2) surges.airport = 1.3;
+
+        res.json({
+            community: {
+                totalDistance: Number(realDistance.toFixed(1)),
+                goal: COMMUNITY_DISTANCE_GOAL,
+                percent: Math.min(100, (realDistance / COMMUNITY_DISTANCE_GOAL) * 100).toFixed(1)
+            },
+            occupancy,
+            events: events.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 10),
+            surges,
+            jackpot: Number(JACKPOT_POOL.toFixed(2))
+        });
+    } catch (e) {
+        console.error('Pulse error:', e);
+        res.status(500).json({ error: 'Pulse failed' });
+    }
+});
+
 // ============= API ENDPOINTS =============
 
 app.get('/api/health', (req, res) => {
@@ -1554,6 +1619,9 @@ app.post('/api/user/:telegramId/ride', async (req, res) => {
             try {
                 await db.run('INSERT INTO jackpot_history (winner_id, amount, won_at) VALUES (?, ?, ?)',
                     [user.id, jackpotWin, new Date().toISOString()]);
+
+                // v3.4: Add to social activity
+                logSocialActivity(`${user.username || 'Игрок'} выиграл ДЖЕКПОТ ${jackpotWin} PLN! 🎰`);
             } catch (e) { console.error('Jackpot log error:', e); }
         }
         await saveJackpot();

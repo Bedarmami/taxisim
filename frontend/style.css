@@ -3784,3 +3784,74 @@ button {
     width: 100% !important;
     flex: 1;
 }
+/* ============= v3.4: SOCIAL PULSE & COMMUNITY MISSION ============= */
+.community-card {
+    background: linear-gradient(135deg, rgba(30, 30, 30, 0.9), rgba(20, 20, 20, 0.9));
+    border: 1px solid rgba(243, 160, 0, 0.2);
+    margin: 10px 0;
+    padding: 12px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.community-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.c-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #f3a000;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.c-percent {
+    font-size: 14px;
+    font-weight: 800;
+    color: #2ecc71;
+}
+
+.community-stats {
+    margin-top: 6px;
+    font-size: 11px;
+    color: #888;
+    text-align: right;
+}
+
+.community-stats span {
+    color: #eee;
+}
+
+/* District Pulse Tags */
+.district-pulse {
+    font-size: 10px;
+    background: rgba(0, 122, 255, 0.2);
+    color: #007aff;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-top: 4px;
+    display: inline-block;
+}
+
+.district-surge {
+    font-size: 10px;
+    background: rgba(255, 59, 48, 0.2);
+    color: #ff3b30;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-top: 4px;
+    display: inline-block;
+    margin-left: 5px;
+    font-weight: bold;
+    animation: pulse-red 2s infinite;
+}
+
+@keyframes pulse-red {
+    0% { opacity: 1; }
+    50% { opacity: 0.6; }
+    100% { opacity: 1; }
+}
