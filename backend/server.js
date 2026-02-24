@@ -1,11 +1,14 @@
 const express = require('express');
+const fs = require('fs');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const compression = require('compression');
-const db = require('./db'); // Import configured SQLite DB
+const db = require('./db');
 const path = require('path');
 const https = require('https');
 require('dotenv').config();
+
+console.log('🚀 Server initializing... [fs module:', typeof fs !== 'undefined' ? 'LOADED' : 'MISSING', ']');
 
 const { router: auctionRouter, initAuction, startAuction } = require('./routes/auction');
 const { initBot, sendNotification, bot } = require('./bot');
@@ -34,13 +37,17 @@ const APP_VERSION = require('./package.json').version + '-' + Date.now();
 app.get('/', (req, res) => {
     try {
         const indexPath = path.join(__dirname, '..', 'frontend', 'index.html');
+        if (!fs.existsSync(indexPath)) {
+            return res.status(404).send('Frontend not found. Build may be missing.');
+        }
+
         let html = fs.readFileSync(indexPath, 'utf8');
 
         // Replace all ?v=... with a unique version for this server session
         html = html.replace(/\?v=[^"'>\s]+/g, `?v=${APP_VERSION}`);
 
-        // Also update the version display in the splash screen if exists
-        html = html.replace(/class="splash-version">v[\d.]+</g, `class="splash-version">v${APP_VERSION.split('-')[0]}+</g`);
+        // Update version display in splash screen: e.g. v3.5 -> v3.5.0+
+        html = html.replace(/(class="splash-version">)v[\d.]+(<\/div>)/g, `$1v${APP_VERSION.split('-')[0]}+$2`);
 
         res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.set('Pragma', 'no-cache');
@@ -48,7 +55,7 @@ app.get('/', (req, res) => {
         res.send(html);
     } catch (e) {
         console.error('Error serving index.html:', e);
-        res.status(500).send('Server Error');
+        res.status(500).send(`Server Error: ${e.message}\nStack: ${e.stack}`);
     }
 });
 
