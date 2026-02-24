@@ -20,11 +20,37 @@ app.use(compression()); // Gzip all responses
 app.use(bodyParser.json());
 
 // Serve frontend with caching headers for static assets
+// Exclude index.html from static middleware to handle it dynamically
 app.use(express.static(path.join(__dirname, '..', 'frontend'), {
-    maxAge: '1h',
+    maxAge: '1d', // Cache images/css for 1 day
     etag: true,
-    lastModified: true
+    lastModified: true,
+    index: false // Don't serve index.html automatically
 }));
+
+const APP_VERSION = require('./package.json').version + '-' + Date.now();
+
+// v3.5: Dynamic index.html serving with cache busting
+app.get('/', (req, res) => {
+    try {
+        const indexPath = path.join(__dirname, '..', 'frontend', 'index.html');
+        let html = fs.readFileSync(indexPath, 'utf8');
+
+        // Replace all ?v=... with a unique version for this server session
+        html = html.replace(/\?v=[^"'>\s]+/g, `?v=${APP_VERSION}`);
+
+        // Also update the version display in the splash screen if exists
+        html = html.replace(/class="splash-version">v[\d.]+</g, `class="splash-version">v${APP_VERSION.split('-')[0]}+</g`);
+
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.set('Pragma', 'no-cache');
+        res.set('Expires', '0');
+        res.send(html);
+    } catch (e) {
+        console.error('Error serving index.html:', e);
+        res.status(500).send('Server Error');
+    }
+});
 
 // v2.5: Maintenance Mode and Logging
 let MAINTENANCE_MODE = false;
