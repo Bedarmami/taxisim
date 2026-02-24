@@ -2462,10 +2462,10 @@ function listPlatePrompt(plateNumber) {
 
 async function listPlateForSale(plateNumber, price) {
     try {
-        const data = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/plates/list`, {
+        const data = await safeFetchJson(`${API_BASE_URL}/market/list-plate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ plateNumber, price })
+            body: JSON.stringify({ telegramId: TELEGRAM_ID, plate: plateNumber, price })
         });
         if (data.success) {
             showNotification(data.message, 'success');

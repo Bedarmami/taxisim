@@ -74,7 +74,8 @@ function initDB() {
                 free_plate_rolls INTEGER DEFAULT 0,
                 username TEXT,
                 current_district TEXT DEFAULT 'suburbs',
-                uncollected_fleet_revenue REAL DEFAULT 0
+                uncollected_fleet_revenue REAL DEFAULT 0,
+                mileage REAL DEFAULT 0
             )`);
 
             // Orders history table
@@ -95,6 +96,12 @@ function initDB() {
             db.run(`ALTER TABLE users ADD COLUMN last_daily_bonus TEXT`, (err) => {
                 if (err && !err.message.includes('duplicate column name')) {
                     console.error('Migration error (last_daily_bonus):', err.message);
+                }
+            });
+
+            db.run(`ALTER TABLE users ADD COLUMN mileage REAL DEFAULT 0`, (err) => {
+                if (err && !err.message.includes('duplicate column name')) {
+                    console.error('Migration error (mileage):', err.message);
                 }
             });
 
@@ -339,6 +346,15 @@ function initDB() {
                 fuel_stock REAL DEFAULT 0,
                 uncollected_revenue REAL DEFAULT 0,
                 FOREIGN KEY(owner_id) REFERENCES users(telegram_id)
+            )`);
+
+            db.run(`CREATE TABLE IF NOT EXISTS market_listings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                type TEXT, -- 'gas_station' or 'license_plate'
+                item_id TEXT,
+                seller_id TEXT, -- telegram_id or 'SYSTEM'
+                price REAL,
+                created_at TEXT
             )`);
 
             db.run(`ALTER TABLE gas_stations ADD COLUMN price_petrol REAL DEFAULT 6.80`, (err) => { });

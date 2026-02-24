@@ -1105,6 +1105,8 @@ async function getUser(telegramId) {
     row.tire_condition = Number(row.tire_condition || 100);
     row.rides_completed = Number(row.rides_completed);
     row.total_earned = Number(row.total_earned);
+    row.mileage = Number(row.mileage || 0);
+    if (row.car) row.car.mileage = Number(row.car.mileage || 0);
 
     row.free_plate_rolls = parseInt(row.free_plate_rolls) || 0;
 
@@ -1193,7 +1195,7 @@ async function saveUser(user) {
         lootboxes_data = ?, lootboxes_given_data = ?, casino_spins_today = ?, casino_last_reset = ?, casino_stats = ?, last_login = ?,
         skills = ?, cleanliness = ?, tire_condition = ?,
         tutorial_completed = ?, pending_auction_rewards = ?, free_plate_rolls = ?, is_banned = ?,
-        current_district = ?
+        current_district = ?, mileage = ?
         WHERE telegram_id = ?`;
 
     const params = [
@@ -1224,6 +1226,7 @@ async function saveUser(user) {
         user.free_plate_rolls || 0,
         user.is_banned || 0,
         user.current_district || 'suburbs',
+        user.car?.mileage || 0,
         user.telegram_id
     ];
 
@@ -1397,8 +1400,8 @@ app.get('/api/user/:telegramId', async (req, res) => {
                 business_data, achievements_data, 
                 skills, cleanliness, tire_condition,
                 lootboxes_data, lootboxes_given_data,
-                created_at, last_login, username
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+                created_at, last_login, username, mileage
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
                 newUser.id, newUser.telegram_id, newUser.balance, newUser.total_earned,
                 newUser.car_id, JSON.stringify(newUser.car), JSON.stringify(newUser.owned_cars),
                 newUser.fuel, newUser.gas_fuel,
@@ -1411,7 +1414,7 @@ app.get('/api/user/:telegramId', async (req, res) => {
                 JSON.stringify(newUser.skills), newUser.cleanliness, newUser.tire_condition,
                 JSON.stringify({ wooden: 0, silver: 0, gold: 0, legendary: 0 }),
                 JSON.stringify({ wooden: 0, silver: 0, gold: 0, legendary: 0 }),
-                newUser.created_at, newUser.last_login, newUser.username
+                newUser.created_at, newUser.last_login, newUser.username, 0
             ]);
 
             user = newUser;
@@ -1666,6 +1669,10 @@ app.post('/api/user/:telegramId/ride', async (req, res) => {
         user.stamina = Math.max(0, user.stamina - 15);
         user.experience += Math.floor(order.distance);
         user.total_distance += order.distance;
+        if (user.car) {
+            user.car.mileage = Number((user.car.mileage || 0) + order.distance).toFixed(1);
+            user.car.mileage = Number(user.car.mileage); // Ensure it's a number
+        }
 
         if (order.is_night) {
             user.night_rides++;
@@ -1910,9 +1917,28 @@ app.post('/api/user/:telegramId/fuel', async (req, res) => {
         const station = await db.get('SELECT * FROM gas_stations WHERE district_id = ? ORDER BY RANDOM() LIMIT 1', [districtId]);
 
         if (station && station.owner_id) {
+            const owner = await getUser(station.owner_id);
             // Check fuel stock for owned stations
             if ((station.fuel_stock || 0) < actualLitersRounded) {
-                return res.status(400).json({ error: 'На заправке закончилось топливо! Владелец должен сделать закупку.' });
+                if (owner && owner.balance >= 400) {
+                    // Auto-purchase 100L for 400 PLN
+                    owner.balance = Number((owner.balance - 400).toFixed(2));
+                    station.fuel_stock = (station.fuel_stock || 0) + 100;
+                    await saveUser(owner);
+                    await db.run('UPDATE gas_stations SET fuel_stock = ? WHERE id = ?', [station.fuel_stock, station.id]);
+                    console.log(`[Auto-Stock] System bought 100L for owner ${owner.telegram_id} (${station.name})`);
+                } else if (owner && owner.balance < 40) {
+                    // Foreclosure
+                    await db.run('UPDATE gas_stations SET owner_id = NULL, fuel_stock = 0 WHERE id = ?', [station.id]);
+                    const marketPrice = Math.floor(station.purchase_price * 0.9);
+                    await db.run('INSERT INTO market_listings (type, item_id, seller_id, price, created_at) VALUES (?, ?, ?, ?, ?)',
+                        ['gas_station', station.id, 'SYSTEM', marketPrice, new Date().toISOString()]);
+
+                    logSocialActivity(`⚖️ АЗС "${station.name}" конфискована за долги и выставлена на рынок!`);
+                    return res.status(400).json({ error: 'АЗС конфискована за долги владельца. Заправка временно закрыта.' });
+                } else {
+                    return res.status(400).json({ error: 'На заправке закончилось топливо! Владелец должен сделать закупку.' });
+                }
             }
         }
 
@@ -2081,9 +2107,10 @@ app.post('/api/user/:telegramId/buy-car', async (req, res) => {
             return res.status(400).json({ error: 'Недостаточно средств' });
         }
 
+        const currentPlate = user.car?.plate;
         user.balance -= car.purchase_price;
         user.car_id = carId;
-        user.car = { ...car, is_owned: true, rent_price: 0 };
+        user.car = { ...car, is_owned: true, rent_price: 0, plate: currentPlate, mileage: 0 };
         // Ensure not duplicating car ID in array
         if (!user.owned_cars.includes(carId)) {
             user.owned_cars.push(carId);
@@ -2134,9 +2161,10 @@ app.post('/api/user/:telegramId/rent-car', async (req, res) => {
             return res.status(400).json({ error: 'Недостаточно средств для первого платежа' });
         }
 
+        const currentPlate = user.car?.plate;
         user.balance -= car.rent_price;
         user.car_id = carId;
-        user.car = { ...car, is_owned: false };
+        user.car = { ...car, is_owned: false, plate: currentPlate, mileage: 0 };
 
         // Avoid adding rented cars to owned_cars list if they shouldn't be there permanently
         // But logic says owned_cars is good for unlocked cars. Rented cars aren't "owned" per se.
@@ -2180,9 +2208,10 @@ app.post('/api/user/:telegramId/select-car', async (req, res) => {
             return res.status(404).json({ error: 'Car definition missing' });
         }
 
+        const currentPlate = user.car?.plate;
         // Switch car
         user.car_id = carId;
-        user.car = { ...car, is_owned: true, rent_price: 0 }; // When selecting from owned list, it's owned
+        user.car = { ...car, is_owned: true, rent_price: 0, plate: currentPlate, mileage: 0 }; // When selecting from owned list, it's owned
 
         // Optional: restore fuel level from some persistent storage per car? 
         // For now complex: just keep current logical fuel or reset?
@@ -2409,7 +2438,15 @@ app.get('/api/user/:telegramId/business', async (req, res) => {
                 };
             });
 
-        res.json({ success: true, drivers, fleet, currentCarId: user.car_id, balance: user.balance, uncollected_fleet_revenue: user.uncollected_fleet_revenue || 0 });
+        res.json({
+            success: true,
+            drivers,
+            fleet,
+            currentCarId: user.car_id,
+            car: user.car,
+            balance: user.balance,
+            uncollected_fleet_revenue: user.uncollected_fleet_revenue || 0
+        });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -2662,6 +2699,118 @@ app.post('/api/user/:telegramId/fleet/recall', async (req, res) => {
     }
 });
 
+
+// FLEET: Withdraw profit
+app.post('/api/user/:telegramId/withdraw-fleet', async (req, res) => {
+    try {
+        const { telegramId } = req.params;
+        const user = await getUser(telegramId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const amount = user.uncollected_fleet_revenue || 0;
+        if (amount <= 0) return res.status(400).json({ error: 'Нет прибыли для снятия' });
+
+        const tax = amount * 0.10;
+        const netAmount = amount - tax;
+
+        user.balance += netAmount;
+        user.total_earned += netAmount;
+        user.uncollected_fleet_revenue = 0;
+
+        await saveUser(user);
+
+        res.json({
+            success: true,
+            message: `Снято ${amount.toFixed(2)} PLN. Налог 10% (-${tax.toFixed(2)}). На баланс: +${netAmount.toFixed(2)} PLN`,
+            balance: user.balance
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ============= v3.5: MARKET SYSTEM =============
+app.get('/api/market', async (req, res) => {
+    try {
+        const sql = `
+            SELECT ml.*, gs.name as station_name 
+            FROM market_listings ml
+            LEFT JOIN gas_stations gs ON ml.item_id = gs.id AND ml.type = 'gas_station'
+            ORDER BY ml.created_at DESC
+        `;
+        const listings = await db.query(sql);
+        res.json(listings);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/market/buy', async (req, res) => {
+    try {
+        const { telegramId, listingId } = req.body;
+        const user = await getUser(telegramId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const listing = await db.get('SELECT * FROM market_listings WHERE id = ?', [listingId]);
+        if (!listing) return res.status(404).json({ error: 'Listing not found' });
+
+        if (user.balance < listing.price) {
+            return res.status(400).json({ error: 'Недостаточно средств' });
+        }
+
+        if (listing.type === 'gas_station') {
+            const station = await db.get('SELECT * FROM gas_stations WHERE id = ?', [listing.item_id]);
+            if (!station) return res.status(404).json({ error: 'Station not found' });
+
+            user.balance -= listing.price;
+            await db.run('UPDATE gas_stations SET owner_id = ? WHERE id = ?', [telegramId, station.id]);
+        } else if (listing.type === 'license_plate') {
+            // Transfer plate
+            const plate = await db.get('SELECT * FROM license_plates WHERE plate = ?', [listing.item_id]);
+            if (!plate) return res.status(404).json({ error: 'Plate not found' });
+
+            user.balance -= listing.price;
+            await db.run('UPDATE license_plates SET owner_id = ? WHERE plate = ?', [telegramId, listing.item_id]);
+
+            // If seller is a user (not SYSTEM), pay them
+            if (listing.seller_id !== 'SYSTEM') {
+                const seller = await getUser(listing.seller_id);
+                if (seller) {
+                    seller.balance += Math.floor(listing.price * 0.9); // 10% market tax
+                    await saveUser(seller);
+                }
+            }
+        }
+
+        await db.run('DELETE FROM market_listings WHERE id = ?', [listingId]);
+        await saveUser(user);
+
+        res.json({ success: true, message: 'Покупка успешно завершена!' });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/market/list-plate', async (req, res) => {
+    try {
+        const { telegramId, plate, price } = req.body;
+        const user = await getUser(telegramId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        // Verify ownership
+        const dbPlate = await db.get('SELECT * FROM license_plates WHERE plate = ? AND owner_id = ?', [plate, telegramId]);
+        if (!dbPlate) return res.status(403).json({ error: 'Это не ваш номер или его не существует' });
+
+        if (price < 100) return res.status(400).json({ error: 'Минимальная цена 100 PLN' });
+
+        await db.run('INSERT INTO market_listings (type, item_id, seller_id, price, created_at) VALUES (?, ?, ?, ?, ?)',
+            ['license_plate', plate, telegramId, price, new Date().toISOString()]);
+
+        res.json({ success: true, message: 'Номер выставлен на продажу!' });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 
 // ============= v3.4: GAS STATION INVESTMENTS =============
 app.get('/api/investments', async (req, res) => {

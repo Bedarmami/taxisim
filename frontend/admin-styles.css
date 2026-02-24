@@ -477,3 +477,78 @@ td .status-badge {
     right: 30px;
     font-size: 40px;
 }
+
+/* Responsive Mobile Styles */
+@media (max-width: 768px) {
+    .admin-container {
+        padding: 10px;
+    }
+
+    header {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+    }
+
+    .header-main {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    h1 {
+        font-size: 1.5rem;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+
+    .stat-card {
+        padding: 15px 10px;
+    }
+
+    .stat-value {
+        font-size: 1.2rem;
+    }
+
+    .admin-tabs {
+        padding-bottom: 5px;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .tab-link {
+        padding: 8px 12px;
+        font-size: 0.9rem;
+    }
+
+    .modal-content {
+        width: 90%;
+        margin: 20% auto;
+        padding: 20px;
+    }
+
+    .charts-container {
+        grid-template-columns: 1fr;
+    }
+
+    table {
+        font-size: 12px;
+    }
+
+    th,
+    td {
+        padding: 8px 5px;
+    }
+}
+
+@media (max-width: 480px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .tab-link {
+        padding: 6px 10px;
+        font-size: 0.8rem;
+    }
+}

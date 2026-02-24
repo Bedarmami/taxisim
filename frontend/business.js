@@ -78,9 +78,10 @@ class BusinessManager {
 
         try {
             // Load business data and available cars in parallel
-            const [bizData, carsData] = await Promise.all([
+            const [bizData, carsData, marketData] = await Promise.all([
                 safeFetchJson(`${API_BASE_URL}/user/${telegramId}/business`),
-                safeFetchJson(`${API_BASE_URL}/cars`)
+                safeFetchJson(`${API_BASE_URL}/cars`),
+                safeFetchJson(`${API_BASE_URL}/market`)
             ]);
 
             if (!bizData || bizData._isError) {
@@ -88,6 +89,12 @@ class BusinessManager {
             }
             if (!carsData || carsData._isError) {
                 throw new Error(`Cars data fetch failed: ${carsData?.error || 'Unknown error'}`);
+            }
+            if (!marketData || marketData._isError) {
+                console.warn('Market data fetch failed, skipping market rendering');
+                this.marketListings = [];
+            } else {
+                this.marketListings = marketData;
             }
 
             if (bizData.error) {
@@ -101,6 +108,7 @@ class BusinessManager {
             this.drivers = bizData.drivers || [];
             this.fleet = bizData.fleet || [];
             this.currentCarId = bizData.currentCarId;
+            this.currentCar = bizData.car;
             this.balance = bizData.balance || 0;
             this.uncollectedFleetRevenue = bizData.uncollected_fleet_revenue || 0;
             this.availableCars = (carsData.cars || []).filter(c => c.purchase_price > 0);
@@ -138,6 +146,17 @@ class BusinessManager {
             if (d.car_id) income += (d.skill * 10);
         });
         document.getElementById('income-per-hour').textContent = `${income} PLN`;
+
+        // Update active car mileage info if element exists
+        const mileageContainer = document.getElementById('biz-car-mileage');
+        if (mileageContainer && this.currentCar) {
+            mileageContainer.innerHTML = `
+                <div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:10px; font-size:0.85em; margin-bottom:15px; border:1px solid #333; display:flex; justify-content:space-between; align-items:center;">
+                    <div style="color:#aaa;">🚗 Активное авто: <span style="color:#fff; font-weight:bold;">${this.currentCar.name}</span></div>
+                    <div style="color:#aaa;">🛤️ Пробег: <span style="color:var(--accent-color); font-weight:bold;">${(this.currentCar.mileage || 0).toFixed(1)} км</span></div>
+                </div>
+            `;
+        }
 
         // Update Fleet withdrawal button if it exists
         const fleetWithdrawContainer = document.getElementById('fleet-withdraw-container');
@@ -237,6 +256,9 @@ class BusinessManager {
 
         // v3.4: Gas Station Investments
         this.renderInvestments();
+
+        // v3.5: Market System
+        this.renderMarket();
     }
 
     renderInvestments() {
@@ -535,6 +557,159 @@ class BusinessManager {
                 showNotification(data.error, 'error');
             }
         } catch (e) { console.error(e); }
+    }
+
+    async buyStock(stationId) {
+        const user = Telegram.WebApp.initDataUnsafe?.user;
+        const telegramId = user ? user.id : 'test_user';
+        const liters = parseInt(prompt('Сколько литров закупить? (1 литр = 4.0 PLN)', '50')) || 0;
+
+        if (liters <= 0) return;
+
+        try {
+            const data = await safeFetchJson(`${API_BASE_URL}/investments/buy-stock`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ telegramId, stationId, liters })
+            });
+
+            if (data.success) {
+                showNotification(data.message, 'success');
+                this.loadData();
+                if (window.updateUI) window.updateUI();
+            } else {
+                showNotification(data.error || 'Ошибка закупки', 'error');
+            }
+        } catch (e) {
+            console.error(e);
+            showNotification('Ошибка при закупке', 'error');
+        }
+    }
+
+    async withdrawStationProfit(stationId) {
+        const user = Telegram.WebApp.initDataUnsafe?.user;
+        const telegramId = user ? user.id : 'test_user';
+
+        try {
+            const data = await safeFetchJson(`${API_BASE_URL}/investments/withdraw`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ telegramId, stationId })
+            });
+
+            if (data.success) {
+                showNotification(data.message, 'success');
+                this.loadData();
+                if (window.updateUI) window.updateUI();
+            } else {
+                showNotification(data.error || 'Ошибка снятия прибыли', 'error');
+            }
+        } catch (e) {
+            console.error(e);
+            showNotification('Ошибка при снятии прибыли', 'error');
+        }
+    }
+
+    async withdrawFleetProfit() {
+        const user = Telegram.WebApp.initDataUnsafe?.user;
+        const telegramId = user ? user.id : 'test_user';
+
+        try {
+            const data = await safeFetchJson(`${API_BASE_URL}/user/${telegramId}/withdraw-fleet`, {
+                method: 'POST'
+            });
+
+            if (data.success) {
+                showNotification(data.message, 'success');
+                this.loadData();
+                if (window.updateUI) window.updateUI();
+            } else {
+                showNotification(data.error || 'Ошибка снятия прибыли', 'error');
+            }
+        } catch (e) {
+            console.error(e);
+            showNotification('Ошибка при снятии прибыли', 'error');
+        }
+    }
+
+    renderMarket() {
+        const marketList = document.getElementById('market-list');
+        if (!marketList) return;
+
+        marketList.innerHTML = '';
+
+        if (!this.marketListings || this.marketListings.length === 0) {
+            marketList.innerHTML = '<div class="empty-state" style="padding:20px; text-align:center; opacity:0.6;">На рынке пока пусто...</div>';
+            return;
+        }
+
+        this.marketListings.forEach(listing => {
+            const canAfford = this.balance >= listing.price;
+            const div = document.createElement('div');
+            div.style.cssText = 'background:#1a1a1a; margin-bottom:12px; padding:15px; border-radius:15px; border:1px solid #333;';
+
+            let title = 'Предмет';
+            let description = '';
+            let icon = '⚖️';
+
+            if (listing.type === 'gas_station') {
+                title = `АЗС "${listing.station_name || listing.item_id}"`;
+                description = 'Конфискованная заправка';
+                icon = '⛽';
+            } else if (listing.type === 'license_plate') {
+                title = `Номер "${listing.item_id}"`;
+                description = `Продавец: ${listing.seller_id === 'SYSTEM' ? 'Система' : 'Игрок'}`;
+                icon = '🆔';
+            }
+
+            div.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <span style="font-size:1.5em;">${icon}</span>
+                        <div>
+                            <div style="font-weight:bold; color:white;">${title}</div>
+                            <div style="font-size:0.8em; color:#888;">${description}</div>
+                        </div>
+                    </div>
+                    <div>
+                        <div style="font-weight:bold; color:var(--accent-color); margin-bottom:5px; text-align:right;">${listing.price.toLocaleString()} PLN</div>
+                        <button class="action-btn success small" 
+                                style="padding:4px 12px;"
+                                ${canAfford ? '' : 'disabled style="opacity:0.5;"'} 
+                                onclick="businessManager.buyFromMarket(${listing.id})">
+                            Купить
+                        </button>
+                    </div>
+                </div>
+            `;
+            marketList.appendChild(div);
+        });
+    }
+
+    async buyFromMarket(listingId) {
+        const user = Telegram.WebApp.initDataUnsafe?.user;
+        const telegramId = user ? user.id : 'test_user';
+
+        if (!confirm('Вы действительно хотите совершить покупку?')) return;
+
+        try {
+            const data = await safeFetchJson(`${API_BASE_URL}/market/buy`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ telegramId, listingId })
+            });
+
+            if (data.success) {
+                showNotification(data.message, 'success');
+                this.loadData();
+                if (window.updateUI) window.updateUI();
+            } else {
+                showNotification(data.error || 'Ошибка покупки', 'error');
+            }
+        } catch (e) {
+            console.error(e);
+            showNotification('Ошибка при покупке на рынке', 'error');
+        }
     }
 }
 
