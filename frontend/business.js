@@ -63,6 +63,12 @@ class BusinessManager {
             this.balance = bizData.balance || 0;
             this.availableCars = (carsData.cars || []).filter(c => c.purchase_price > 0);
 
+            // v3.4: Populate global CARS map for display names
+            if (!window.CARS) window.CARS = {};
+            (carsData.cars || []).forEach(c => {
+                window.CARS[c.id] = c;
+            });
+
             this.render();
         } catch (e) {
             console.error('Error loading business data:', e);

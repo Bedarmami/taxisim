@@ -10,11 +10,27 @@ async function safeFetchJson(url, options = {}, defaultResponse = null) {
         if (!response.ok) {
             console.warn(`Fetch failed: ${url} (HTTP ${response.status})`);
 
-            // Try to extract error message if available
+            // Try to extract error message if available, but safely
             try {
-                const errorData = await response.json();
+                const errorText = await response.text();
+                if (errorText) {
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        return {
+                            error: errorData.error || response.statusText,
+                            status: response.status,
+                            _isError: true
+                        };
+                    } catch (e) {
+                        return {
+                            error: errorText.substring(0, 100),
+                            status: response.status,
+                            _isError: true
+                        };
+                    }
+                }
                 return {
-                    error: errorData.error || response.statusText,
+                    error: response.statusText || `HTTP ${response.status}`,
                     status: response.status,
                     _isError: true
                 };
