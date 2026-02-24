@@ -5,36 +5,32 @@ async function playSlots(bet) {
     try {
         soundManager.play('button');
 
-        const response = await fetch(`${API_BASE_URL}/casino/slots`, {
+        const data = await safeFetchJson(`${API_BASE_URL}/casino/slots`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ telegramId: TELEGRAM_ID, bet })
         });
 
-        if (!response.ok) {
-            const error = await response.json();
-            showNotification(error.error || 'Ошибка', 'error');
-            return;
+        if (data && !data._isError && data.success) {
+            // Animate reels
+            document.getElementById('reel1').textContent = data.result.reels[0];
+            document.getElementById('reel2').textContent = data.result.reels[1];
+            document.getElementById('reel3').textContent = data.result.reels[2];
+
+            document.getElementById('slot-result').textContent = data.result.message;
+
+            if (data.result.winAmount > 0) {
+                soundManager.play('coin');
+            }
+
+            userData.balance = data.balance;
+            userData.casino_spins_today = 10 - data.spins_left;
+
+            updateCasinoUI();
+            showNotification(data.result.message, data.result.winAmount > bet ? 'success' : 'warning');
+        } else if (data && data.error) {
+            showNotification(data.error, 'error');
         }
-
-        const data = await response.json();
-
-        // Animate reels
-        document.getElementById('reel1').textContent = data.result.reels[0];
-        document.getElementById('reel2').textContent = data.result.reels[1];
-        document.getElementById('reel3').textContent = data.result.reels[2];
-
-        document.getElementById('slot-result').textContent = data.result.message;
-
-        if (data.result.winAmount > 0) {
-            soundManager.play('coin');
-        }
-
-        userData.balance = data.balance;
-        userData.casino_spins_today = 10 - data.spins_left;
-
-        updateCasinoUI();
-        showNotification(data.result.message, data.result.winAmount > bet ? 'success' : 'warning');
 
     } catch (error) {
         console.error('Error playing slots:', error);
@@ -54,38 +50,34 @@ async function playRoulette() {
 
         soundManager.play('button');
 
-        const response = await fetch(`${API_BASE_URL}/casino/roulette`, {
+        const data = await safeFetchJson(`${API_BASE_URL}/casino/roulette`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ telegramId: TELEGRAM_ID, bet })
         });
 
-        if (!response.ok) {
-            const error = await response.json();
-            showNotification(error.error || 'Ошибка', 'error');
-            return;
+        if (data && !data._isError && data.success) {
+            // Animate wheel
+            const wheel = document.querySelector('.roulette-sectors');
+            wheel.classList.add('spinning');
+
+            setTimeout(() => {
+                wheel.classList.remove('spinning');
+                document.getElementById('roulette-result').textContent = data.result.message;
+
+                if (data.result.winAmount > 0) {
+                    soundManager.play('coin');
+                }
+
+                userData.balance = data.balance;
+                userData.casino_spins_today = 10 - data.spins_left;
+
+                updateCasinoUI();
+                showNotification(data.result.message, data.result.winAmount > bet ? 'success' : 'warning');
+            }, 3000);
+        } else if (data && data.error) {
+            showNotification(data.error, 'error');
         }
-
-        const data = await response.json();
-
-        // Animate wheel
-        const wheel = document.querySelector('.roulette-sectors');
-        wheel.classList.add('spinning');
-
-        setTimeout(() => {
-            wheel.classList.remove('spinning');
-            document.getElementById('roulette-result').textContent = data.result.message;
-
-            if (data.result.winAmount > 0) {
-                soundManager.play('coin');
-            }
-
-            userData.balance = data.balance;
-            userData.casino_spins_today = 10 - data.spins_left;
-
-            updateCasinoUI();
-            showNotification(data.result.message, data.result.winAmount > bet ? 'success' : 'warning');
-        }, 3000);
 
     } catch (error) {
         console.error('Error playing roulette:', error);
@@ -144,24 +136,22 @@ async function startCrash() {
 
     try {
         soundManager.play('button');
-        const response = await fetch(`${API_BASE_URL}/casino/crash/bet`, {
+        const data = await safeFetchJson(`${API_BASE_URL}/casino/crash/bet`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ telegramId: TELEGRAM_ID, bet })
         });
 
-        const data = await response.json();
-        if (!response.ok) {
-            showNotification(data.error || 'Ошибка ставки', 'error');
-            return;
+        if (data && !data._isError && data.success) {
+            userData.balance = data.balance;
+            updateCasinoUI();
+            updateMainScreen();
+
+            showNotification('✅ Ставка принята!', 'success');
+            document.getElementById('crash-start-btn').disabled = true;
+        } else if (data && data.error) {
+            showNotification(data.error, 'error');
         }
-
-        userData.balance = data.balance;
-        updateCasinoUI();
-        updateMainScreen();
-
-        showNotification('✅ Ставка принята!', 'success');
-        document.getElementById('crash-start-btn').disabled = true;
     } catch (e) {
         console.error('Crash bet error:', e);
         showNotification('Ошибка соединения', 'error', e);
@@ -178,8 +168,8 @@ async function updateCrashStatus() {
     }
 
     try {
-        const res = await fetch(`${API_BASE_URL}/casino/crash/status`);
-        const data = await res.json();
+        const data = await safeFetchJson(`${API_BASE_URL}/casino/crash/status`);
+        if (!data || data._isError) return;
 
         const multiplierEl = document.getElementById('crash-multiplier');
         const startBtn = document.getElementById('crash-start-btn');
@@ -290,22 +280,20 @@ async function cashoutCrash() {
     cancelAnimationFrame(crashState.animationId);
 
     try {
-        const response = await fetch(`${API_BASE_URL}/casino/crash/cashout`, {
+        const data = await safeFetchJson(`${API_BASE_URL}/casino/crash/cashout`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ telegramId: TELEGRAM_ID })
         });
 
-        const data = await response.json();
-
-        if (data.success) {
+        if (data && !data._isError && data.success) {
             userData.balance = data.balance;
             updateCasinoUI();
             updateMainScreen();
             document.getElementById('crash-result').innerHTML = `<span style="color: var(--success-color)">Успех! x${data.multiplier} (+${data.winAmount} PLN)</span>`;
             soundManager.play('coin');
         } else {
-            handleCrash(data.multiplier || crashState.multiplier);
+            handleCrash((data && data.multiplier) || crashState.multiplier);
         }
     } catch (e) {
         console.error('Cashout error:', e);
@@ -328,10 +316,8 @@ function handleCrash(crashPoint) {
 // Lootbox functions
 async function loadLootboxes() {
     try {
-        const response = await fetch(`${API_BASE_URL}/lootbox/${TELEGRAM_ID}`);
-        if (!response.ok) throw new Error('Failed to load lootboxes');
-
-        const data = await response.json();
+        const data = await safeFetchJson(`${API_BASE_URL}/lootbox/${TELEGRAM_ID}`);
+        if (!data || data._isError) throw new Error('Failed to load lootboxes');
 
         userData.lootboxes = data.lootboxes;
 
@@ -364,34 +350,30 @@ async function openLootbox(boxType) {
     try {
         soundManager.play('button');
 
-        const response = await fetch(`${API_BASE_URL}/lootbox/open`, {
+        const data = await safeFetchJson(`${API_BASE_URL}/lootbox/open`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ telegramId: TELEGRAM_ID, boxType })
         });
 
-        if (!response.ok) {
-            const error = await response.json();
-            showNotification(error.error || 'Ошибка', 'error');
-            return;
+        if (data && !data._isError) {
+            // Show reward animation
+            showLootboxReward(data.reward);
+
+            // Update user data
+            userData.balance = data.balance;
+            userData.fuel = data.fuel;
+            userData.stamina = data.stamina;
+            userData.lootboxes = data.lootboxes;
+
+            // Reload lootboxes
+            await loadLootboxes();
+            updateUI();
+
+            soundManager.play('coin');
+        } else if (data && data.error) {
+            showNotification(data.error, 'error');
         }
-
-        const data = await response.json();
-
-        // Show reward animation
-        showLootboxReward(data.reward);
-
-        // Update user data
-        userData.balance = data.balance;
-        userData.fuel = data.fuel;
-        userData.stamina = data.stamina;
-        userData.lootboxes = data.lootboxes;
-
-        // Reload lootboxes
-        await loadLootboxes();
-        updateUI();
-
-        soundManager.play('coin');
 
     } catch (error) {
         console.error('Error opening lootbox:', error);
