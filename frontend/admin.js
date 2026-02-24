@@ -1035,8 +1035,9 @@ async function exportDB() {
     }
 }
 
-async function emergencyResetUser() {
-    const targetId = document.getElementById('emergency-target-id').value.trim();
+async function emergencyResetUser(inputId = 'emergency-target-id') {
+    const targetIdInput = document.getElementById(inputId);
+    const targetId = targetIdInput.value.trim();
     if (!targetId) return alert('Введите ID взломщика');
 
     if (!confirm(`⚠️ ВНИМАНИЕ! Вы собираетесь применить санкции к игроку ${targetId}.\n\n- Баланс будет обнулен\n- Все АЗС будут изъяты\n- Игрок будет ЗАБАНЕН\n\nВы уверены?`)) {
@@ -1056,7 +1057,7 @@ async function emergencyResetUser() {
         const data = await response.json();
         if (response.ok) {
             alert('✅ ' + data.message);
-            document.getElementById('emergency-target-id').value = '';
+            targetIdInput.value = '';
             if (typeof loadUsers === 'function') loadUsers();
             if (typeof loadActivities === 'function') loadActivities();
         } else {

@@ -51,7 +51,7 @@
                 <button class="tab-link" onclick="openTab(event, 'tab-settings')">⚙️ Настройки</button>
                 <button class="tab-link" onclick="openTab(event, 'tab-logs')">🚨 Ошибки</button>
                 <button class="tab-link" onclick="openTab(event, 'tab-plates')">🆔 Номера</button>
-                <button class="tab-link" onclick="openTab(event, 'tab-activities')">🛡️ Анти-чит</button>
+                <button class="tab-link" onclick="openTab(event, 'tab-activities')">🛡️ Активность</button>
                 <button class="tab-link" onclick="openTab(event, 'tab-support')">💬 Поддержка</button>
             </nav>
 
@@ -120,6 +120,19 @@
                             <!-- Пользователи будут загружены сюда -->
                         </tbody>
                     </table>
+                </div>
+
+                <!-- Быстрый бан/сброс взломщика -->
+                <div class="add-promo-card"
+                    style="margin-top: 20px; border: 1px solid #ff4444; background: rgba(255,0,0,0.05);">
+                    <h3 style="color: #ff4444;">🚨 Быстрый бан и сброс взломщика</h3>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="emergency-target-id-users"
+                            placeholder="ID взломщика (например: 1288177696)"
+                            style="flex: 2; padding: 10px; border-radius: 8px; border: 1px solid #ff4444; background: transparent; color: white;">
+                        <button onclick="emergencyResetUser('emergency-target-id-users')" class="danger-btn"
+                            style="flex: 1;">СБРОСИТЬ И ЗАБАНИТЬ</button>
+                    </div>
                 </div>
             </div>
 
