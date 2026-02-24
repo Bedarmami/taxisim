@@ -3624,6 +3624,39 @@ app.get('/api/admin/db/export', adminAuth, (req, res) => {
     }
 });
 
+// v3.5: Emergency Reset / Anti-Cheat Remediation
+app.post('/api/admin/emergency/reset-user', adminAuth, async (req, res) => {
+    try {
+        const { targetId } = req.body;
+        if (!targetId) return res.status(400).json({ error: 'Target ID required' });
+
+        const targetUser = await getUser(targetId);
+        if (!targetUser) return res.status(404).json({ error: 'User not found' });
+
+        // 1. Reclaim all gas stations owned by this user
+        await db.run('UPDATE gas_stations SET owner_id = NULL, fuel_stock = 100 WHERE owner_id = ?', [targetId]);
+
+        // 2. Reset balance, stats and ban
+        targetUser.balance = 250;
+        targetUser.total_earned = 0;
+        targetUser.is_banned = 1;
+        targetUser.total_distance = 0;
+        targetUser.rides_total = 0;
+
+        await saveUser(targetUser);
+
+        // 3. Clear any market listings for this user
+        await db.run('DELETE FROM market_listings WHERE seller_id = ?', [targetId]);
+
+        logSocialActivity(`🚨 Система применила экстренные санкции к игроку ${targetId}. Активы изъяты.`);
+
+        res.json({ success: true, message: `Пользователь ${targetId} сброшен и забанен. Активы возвращены системе.` });
+    } catch (e) {
+        console.error('Emergency Reset Error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // v3.3: Admin Jackpot View
 app.get('/api/admin/jackpot', adminAuth, async (req, res) => {
     try {

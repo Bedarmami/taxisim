@@ -1034,3 +1034,36 @@ async function exportDB() {
         alert('Ошибка при скачивании базы данных');
     }
 }
+
+async function emergencyResetUser() {
+    const targetId = document.getElementById('emergency-target-id').value.trim();
+    if (!targetId) return alert('Введите ID взломщика');
+
+    if (!confirm(`⚠️ ВНИМАНИЕ! Вы собираетесь применить санкции к игроку ${targetId}.\n\n- Баланс будет обнулен\n- Все АЗС будут изъяты\n- Игрок будет ЗАБАНЕН\n\nВы уверены?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/admin/emergency/reset-user', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-admin-password': adminPassword
+            },
+            body: JSON.stringify({ targetId })
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+            alert('✅ ' + data.message);
+            document.getElementById('emergency-target-id').value = '';
+            if (typeof loadUsers === 'function') loadUsers();
+            if (typeof loadActivities === 'function') loadActivities();
+        } else {
+            alert('❌ Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+        }
+    } catch (e) {
+        console.error(e);
+        alert('Ошибка при выполнении экстренного сброса');
+    }
+}

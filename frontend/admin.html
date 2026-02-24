@@ -372,6 +372,24 @@
                         <tbody id="activities-tbody"></tbody>
                     </table>
                 </div>
+
+                <section class="add-promo-card"
+                    style="margin-top: 30px; border: 2px solid #ff4444; background: rgba(255,68,68,0.05);">
+                    <h3 style="color: #ff4444;">🚨 Экстренный сброс взломщика</h3>
+                    <p style="font-size: 13px; opacity: 0.8; margin-bottom: 15px;">
+                        Эта функция: обнуляет баланс, сбрасывает статистику, **изымает все АЗС** обратно системе и
+                        **банит** игрока. Используйте только для подтвержденных взломщиков.
+                    </p>
+                    <div class="form-group">
+                        <label>Telegram ID взломщика:</label>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="text" id="emergency-target-id" placeholder="ID (например: 1288177696)"
+                                style="flex: 2;">
+                            <button onclick="emergencyResetUser()" class="danger-btn" style="flex: 1;">☠️ В БАН И
+                                ИЗЪЯТЬ</button>
+                        </div>
+                    </div>
+                </section>
             </div>
 
             <!-- Вкладка: Поддержка -->
