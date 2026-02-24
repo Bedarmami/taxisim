@@ -862,6 +862,17 @@ function generateOrder(user, districtId = 'suburbs') {
     const district = DISTRICTS[districtId] || DISTRICTS.suburbs;
 
     const from = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)];
+
+    // v3.4: Movement Logic. Chance to get an order to another district.
+    let targetDistrictId = districtId;
+    const districtKeys = Object.keys(DISTRICTS);
+    if (Math.random() < 0.2) { // 20% chance to go to another district
+        const others = districtKeys.filter(d => d !== districtId && isDistrictUnlocked(DISTRICTS[d], user));
+        if (others.length > 0) {
+            targetDistrictId = others[Math.floor(Math.random() * others.length)];
+        }
+    }
+
     let to;
     do { to = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)]; }
     while (to === from);
@@ -921,6 +932,7 @@ function generateOrder(user, districtId = 'suburbs') {
         is_night,
         is_vip,
         district: districtId,
+        targetDistrict: targetDistrictId,
         class: orderClass,
         passenger: {
             name: passenger.name,
@@ -1119,7 +1131,8 @@ async function saveUser(user) {
         last_stamina_update = ?, login_streak = ?, last_login_date = ?,
         lootboxes_data = ?, lootboxes_given_data = ?, casino_spins_today = ?, casino_last_reset = ?, casino_stats = ?, last_login = ?,
         skills = ?, cleanliness = ?, tire_condition = ?,
-        tutorial_completed = ?, pending_auction_rewards = ?, free_plate_rolls = ?, is_banned = ?
+        tutorial_completed = ?, pending_auction_rewards = ?, free_plate_rolls = ?, is_banned = ?,
+        current_district = ?
         WHERE telegram_id = ?`;
 
     const params = [
@@ -1149,6 +1162,7 @@ async function saveUser(user) {
         JSON.stringify(user.pending_auction_rewards || []),
         user.free_plate_rolls || 0,
         user.is_banned || 0,
+        user.current_district || 'suburbs',
         user.telegram_id
     ];
 
@@ -1399,6 +1413,7 @@ app.get('/api/user/:telegramId', async (req, res) => {
             }, {}),
             pending_auction_rewards: user.pending_auction_rewards || [],
             tutorial_completed: user.tutorial_completed || 0,
+            current_district: user.current_district || 'suburbs',
             jackpot_pool: Number(JACKPOT_POOL.toFixed(2))
         });
 
@@ -1434,7 +1449,7 @@ app.get('/api/orders/:telegramId', async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        const district = req.query.district || 'suburbs';
+        const district = req.query.district || user.current_district || 'suburbs';
         const count = parseInt(req.query.count) || 5;
 
         const orders = [];
@@ -1593,6 +1608,13 @@ app.post('/api/user/:telegramId/ride', async (req, res) => {
 
         if (order.is_night) {
             user.night_rides++;
+        }
+
+        // v3.4: Real Movement - Update user location to order destination
+        const oldDistrict = user.current_district;
+        if (order.targetDistrict) {
+            user.current_district = order.targetDistrict;
+            logSocialActivity(`🚖 ${user.username || 'Водитель'} переехал из ${DISTRICTS[oldDistrict]?.name || oldDistrict} в ${DISTRICTS[user.current_district]?.name || user.current_district}`);
         }
 
         // Проверка уровня
@@ -1828,12 +1850,29 @@ app.post('/api/user/:telegramId/fuel', async (req, res) => {
             return res.status(400).json({ error: 'Недостаточно средств' });
         }
 
+        user.balance = Number((user.balance - cost).toFixed(2));
+
         if (type === 'gas') {
             user.gas_fuel = Number((currentFuel + actualLitersRounded).toFixed(1));
         } else {
             user.fuel = Number((currentFuel + actualLitersRounded).toFixed(1));
         }
-        user.balance = Number((user.balance - cost).toFixed(2));
+
+        // v3.4: Investment Commission (5%)
+        const commission = Number((cost * 0.05).toFixed(2));
+        const districtId = user.current_district || 'suburbs';
+        // Randomly pick an owned station in the district (usually only 1 or 2 available)
+        const station = await db.get('SELECT * FROM gas_stations WHERE district_id = ? AND owner_id IS NOT NULL ORDER BY RANDOM() LIMIT 1', [districtId]);
+
+        if (station && station.owner_id !== telegramId) {
+            // Pay commission to owner
+            await db.run('UPDATE users SET balance = balance + ?, total_earned = total_earned + ? WHERE telegram_id = ?',
+                [commission, commission, station.owner_id]);
+            await db.run('UPDATE gas_stations SET revenue_total = revenue_total + ? WHERE id = ?',
+                [commission, station.id]);
+            invalidateUserCache(station.owner_id);
+            console.log(`[Investment] Paid ${commission.toFixed(2)} PLN commission to ${station.owner_id} for refueling at ${station.name}`);
+        }
 
         await saveUser(user);
 
@@ -2536,6 +2575,55 @@ app.post('/api/user/:telegramId/fleet/recall', async (req, res) => {
 
     } catch (error) {
         console.error('Error:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+
+// ============= v3.4: GAS STATION INVESTMENTS =============
+app.get('/api/investments', async (req, res) => {
+    try {
+        const stations = await db.query('SELECT * FROM gas_stations');
+        res.json(stations);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/investments/buy', async (req, res) => {
+    try {
+        const { telegramId, stationId } = req.body;
+        const user = await getUser(telegramId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const station = await db.get('SELECT * FROM gas_stations WHERE id = ?', [stationId]);
+        if (!station) return res.status(404).json({ error: 'Station not found' });
+
+        if (station.owner_id) {
+            return res.status(400).json({ error: 'Заправка уже выкуплена другим игроком' });
+        }
+
+        if (user.balance < station.purchase_price) {
+            return res.status(400).json({ error: 'Недостаточно средств для покупки заправки' });
+        }
+
+        // Deduct balance and set owner
+        user.balance -= station.purchase_price;
+        await saveUser(user);
+
+        await db.run('UPDATE gas_stations SET owner_id = ? WHERE id = ?', [telegramId, stationId]);
+
+        logSocialActivity(`🏦 ${user.username || 'Инвестор'} приобрел ${station.name}!`);
+        logActivity(telegramId, 'BUY_STATION', { stationId, price: station.purchase_price });
+
+        res.json({
+            success: true,
+            message: `🎉 Поздравляем! Вы стали владельцем ${station.name}`,
+            balance: user.balance
+        });
+
+    } catch (e) {
+        console.error('Buy station error:', e);
         res.status(500).json({ error: 'Server error' });
     }
 });

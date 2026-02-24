@@ -4,6 +4,7 @@ class BusinessManager {
         this.fleet = []; // {id, name, image}
         this.currentCarId = null;
         this.availableCars = []; // from /api/cars
+        this.gasStations = []; // v3.4: Investments
         this.balance = 0;
         this.init();
     }
@@ -65,6 +66,12 @@ class BusinessManager {
             (carsData.cars || []).forEach(c => {
                 window.CARS[c.id] = c;
             });
+
+            // v3.4: Load Investments
+            const stationsData = await safeFetchJson(`${API_BASE_URL}/investments`);
+            if (stationsData && !stationsData._isError) {
+                this.gasStations = stationsData;
+            }
 
             this.render();
         } catch (e) {
@@ -166,6 +173,100 @@ class BusinessManager {
 
         // Fleet Shop (buy new cars)
         this.renderShop();
+
+        // v3.4: Gas Station Investments
+        this.renderInvestments();
+    }
+
+    renderInvestments() {
+        let invSection = document.getElementById('investments-section');
+        if (!invSection) {
+            const businessScreen = document.getElementById('business-screen');
+            invSection = document.createElement('div');
+            invSection.id = 'investments-section';
+            invSection.innerHTML = `
+                <h3 style="color:white; margin:30px 10px 10px;">⛽ Инвестиции в АЗС</h3>
+                <div style="font-size:0.85em; color:#888; margin:0 10px 15px;">Владение заправкой приносит 5% комиссии с каждой заправки игроков в этом районе.</div>
+                <div id="investments-list"></div>
+            `;
+            businessScreen.appendChild(invSection);
+        }
+
+        const invList = document.getElementById('investments-list');
+        invList.innerHTML = '';
+
+        if (this.gasStations.length === 0) {
+            invList.innerHTML = '<div class="empty-state">Нет доступных объектов для инвестиций</div>';
+            return;
+        }
+
+        this.gasStations.forEach(station => {
+            const isOwned = !!station.owner_id;
+            const isMine = station.owner_id === Telegram.WebApp.initDataUnsafe?.user?.id.toString() || station.owner_id === 'test_user';
+            const canAfford = this.balance >= station.purchase_price;
+
+            const div = document.createElement('div');
+            div.style.cssText = 'background:#1a1a1a; margin:10px; padding:15px; border-radius:15px; border:1px solid #333; position:relative; overflow:hidden;';
+
+            if (isMine) div.style.borderColor = 'var(--accent-color)';
+
+            div.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:start;">
+                    <div>
+                        <div style="font-weight:bold; font-size:1.1em; color:white;">${station.name}</div>
+                        <div style="font-size:0.8em; color:#888;">Район: ${station.district_id}</div>
+                    </div>
+                    ${isOwned ?
+                    `<span style="background:${isMine ? '#2ecc71' : '#e74c3c'}33; color:${isMine ? '#2ecc71' : '#e74c3c'}; padding:4px 10px; border-radius:8px; font-size:0.75em; font-weight:bold;">
+                            ${isMine ? '💼 ВАША' : '🔒 ВЫКУПЛЕНО'}
+                        </span>` :
+                    `<span style="color:#f1c40f; font-weight:bold;">${station.purchase_price.toLocaleString()} PLN</span>`
+                }
+                </div>
+                
+                <div style="margin-top:15px; display:flex; justify-content:space-between; align-items:center;">
+                    <div style="font-size:0.85em; color:#aaa;">
+                        💰 Общий доход: <span style="color:#2ecc71;">${(station.revenue_total || 0).toFixed(2)} PLN</span>
+                    </div>
+                    ${!isOwned ?
+                    `<button class="action-btn success small" 
+                            style="padding:6px 15px;" 
+                            ${canAfford ? '' : 'disabled opacity:0.5'}
+                            onclick="businessManager.buyStation(${station.id})">
+                            Купить
+                        </button>` : ''
+                }
+                </div>
+            `;
+            invList.appendChild(div);
+        });
+    }
+
+    async buyStation(stationId) {
+        const user = Telegram.WebApp.initDataUnsafe?.user;
+        const telegramId = user ? user.id : 'test_user';
+
+        const station = this.gasStations.find(s => s.id === stationId);
+        if (!station) return;
+
+        if (confirm(`Вы действительно хотите купить ${station.name} за ${station.purchase_price.toLocaleString()} PLN?`)) {
+            try {
+                const data = await safeFetchJson(`${API_BASE_URL}/investments/buy`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ telegramId, stationId })
+                });
+
+                if (data.success) {
+                    showNotification(data.message, 'success');
+                    this.loadData();
+                } else {
+                    showNotification(data.error, 'error');
+                }
+            } catch (e) {
+                showNotification('Ошибка при покупке', 'error');
+            }
+        }
     }
 
     renderShop() {

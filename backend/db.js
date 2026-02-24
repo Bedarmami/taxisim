@@ -72,7 +72,8 @@ function initDB() {
                 created_at TEXT,
                 last_login TEXT,
                 free_plate_rolls INTEGER DEFAULT 0,
-                username TEXT
+                username TEXT,
+                current_district TEXT DEFAULT 'suburbs'
             )`);
 
             // Orders history table
@@ -175,6 +176,12 @@ function initDB() {
             db.run(`ALTER TABLE users ADD COLUMN username TEXT`, (err) => {
                 if (err && !err.message.includes('duplicate column name')) {
                     console.error('Migration error (username):', err.message);
+                }
+            });
+
+            db.run(`ALTER TABLE users ADD COLUMN current_district TEXT DEFAULT 'suburbs'`, (err) => {
+                if (err && !err.message.includes('duplicate column name')) {
+                    console.error('Migration error (current_district):', err.message);
                 }
             });
 
@@ -312,6 +319,17 @@ function initDB() {
                 FOREIGN KEY(owner_id) REFERENCES users(telegram_id)
             )`);
 
+            // v3.4: Gas Stations Investment
+            db.run(`CREATE TABLE IF NOT EXISTS gas_stations (
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                district_id TEXT,
+                owner_id TEXT, -- telegram_id
+                purchase_price REAL,
+                revenue_total REAL DEFAULT 0,
+                FOREIGN KEY(owner_id) REFERENCES users(telegram_id)
+            )`);
+
             // Migration: Skills and Hardcore Stats
             db.run(`ALTER TABLE users ADD COLUMN skills TEXT DEFAULT '{"charisma":0,"mechanic":0,"navigator":0}'`, (err) => {
                 if (err && !err.message.includes('duplicate column name')) console.error('Migration error (skills):', err.message);
@@ -330,7 +348,7 @@ function initDB() {
             });
 
             // Initialize Jackpot setting
-            db.run(`INSERT OR IGNORE INTO global_settings (key, value) VALUES ('jackpot_pool', '0')`, () => {
+            db.run(`INSERT OR IGNORE INTO global_settings(key, value) VALUES('jackpot_pool', '0')`, () => {
                 // Performance: Add indexes for frequent queries
                 db.run(`CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id)`, (err) => {
                     if (err && !err.message.includes('already exists')) console.error('Index error:', err.message);
@@ -374,7 +392,7 @@ async function seedDB() {
         ];
 
         for (const config of configs) {
-            await run(`INSERT OR IGNORE INTO global_configs (key, value, category, description) VALUES (?, ?, ?, ?)`,
+            await run(`INSERT OR IGNORE INTO global_configs(key, value, category, description) VALUES(?, ?, ?, ?)`,
                 [config.key, config.value, config.category, config.description]);
         }
 
@@ -393,8 +411,23 @@ async function seedDB() {
         ];
 
         for (const car of cars) {
-            await run(`INSERT OR IGNORE INTO car_definitions (id, name, model, image, description, purchase_price, rent_price, tank_capacity, fuel_consumption, has_gas, gas_tank_capacity, gas_consumption, is_premium) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            await run(`INSERT OR IGNORE INTO car_definitions(id, name, model, image, description, purchase_price, rent_price, tank_capacity, fuel_consumption, has_gas, gas_tank_capacity, gas_consumption, is_premium) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [car.id, car.name, car.model, car.image, car.description, car.purchase_price, car.rent_price, car.tank_capacity, car.fuel_consumption, car.has_gas, car.gas_tank_capacity || 0, car.gas_consumption || 0, car.is_premium || 0]);
+        }
+
+        // 3. Seed Gas Stations
+        const stations = [
+            { id: 'suburbs_gas_1', name: '🟢 Газ Зеленая Долина', district_id: 'suburbs', purchase_price: 15000 },
+            { id: 'suburbs_gas_2', name: '⛽ Быстрая Заправка (Пригород)', district_id: 'suburbs', purchase_price: 18000 },
+            { id: 'center_gas_1', name: '🏢 Городской Энергоцентр', district_id: 'center', purchase_price: 45000 },
+            { id: 'center_gas_2', name: '💎 Элитный Центр Газа', district_id: 'center', purchase_price: 55000 },
+            { id: 'airport_gas_1', name: '✈️ Заправка Азимут', district_id: 'airport', purchase_price: 85000 },
+            { id: 'airport_gas_2', name: '🚀 Реактивный Газ', district_id: 'airport', purchase_price: 95000 }
+        ];
+
+        for (const station of stations) {
+            await run(`INSERT OR IGNORE INTO gas_stations(id, name, district_id, purchase_price) VALUES(?, ?, ?, ?)`,
+                [station.id, station.name, station.district_id, station.purchase_price]);
         }
     } catch (e) {
         console.error('Error seeding database:', e);

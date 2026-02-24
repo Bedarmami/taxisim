@@ -459,6 +459,7 @@ async function loadUserData() {
 
         if (data && !data._isError) {
             userData = data;
+            if (data.current_district) currentDistrict = data.current_district;
         } else {
             // Check for maintenance specifically if status is available in data
             if (data && data.status === 503) {
@@ -534,36 +535,65 @@ async function loadOrders() {
 async function loadDistricts() {
     try {
         const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/districts`);
-        if (!response.ok) throw new Error('Failed to load districts');
-
+        if (checkMaintenance(response.status)) return;
         districts = await response.json();
-
-        const selector = document.getElementById('district-selector');
-        if (!selector) return;
-
-        selector.innerHTML = districts.map(d => `
-            <div class="district-card ${d.id === currentDistrict ? 'active' : ''} ${!d.unlocked ? 'locked' : ''}"
-                 data-id="${d.id}"
-                 onclick="${d.unlocked ? `selectDistrict('${d.id}')` : ''}">
-                <div class="district-name">${d.name}</div>
-                <div class="district-desc">${d.description}</div>
-                ${!d.unlocked ? `<div class="district-unlock">Ур. ${d.unlockLevel || '?'}${d.unlockCost ? ` / ${d.unlockCost} PLN` : ''}</div>` : ''}
-            </div>
-        `).join('');
-
-        // v3.4: Add Pulse tags after rendering
-        updateDistrictTags();
     } catch (error) {
         console.error('Error loading districts:', error);
     }
 }
 
-function selectDistrict(districtId) {
+async function selectDistrict(districtId) {
     currentDistrict = districtId;
-    loadDistricts();
     loadOrders();
-    try { soundManager.play('button'); } catch (e) { }
+    showScreen('orders');
 }
+
+async function relocate() {
+    const unlockedDistricts = districts.filter(d => d.unlocked && d.id !== currentDistrict);
+    if (unlockedDistricts.length === 0) {
+        showNotification('Нет других доступных районов', 'info');
+        return;
+    }
+
+    const price = 50; // Relocation fee
+    const names = unlockedDistricts.map((d, i) => `${i + 1}. ${d.name} (${price} PLN)`).join('\n');
+    const picked = prompt(`Выберите район для переезда (${price} PLN):\n${names}`);
+
+    const idx = parseInt(picked) - 1;
+    if (idx >= 0 && idx < unlockedDistricts.length) {
+        const target = unlockedDistricts[idx];
+        if (userData.balance < price) {
+            showNotification('Недостаточно денег для переезда!', 'error');
+            return;
+        }
+
+        if (confirm(`Переехать в ${target.name} за ${price} PLN?`)) {
+            try {
+                // In a real app we'd have a backend endpoint for this. 
+                // For simplicity we can reuse the user update logic if balance is deducted.
+                // But better to just use ride endpoint with a special "relocation" order? 
+                // Let's just update local and save.
+                userData.balance -= price;
+                currentDistrict = target.id;
+                userData.current_district = target.id;
+
+                await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/save`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(userData)
+                });
+
+                showNotification(`🚚 Вы успешно переехали в ${target.name}`, 'success');
+                loadOrders();
+                updateMainScreen();
+            } catch (e) {
+                showNotification('Ошибка при переезде', 'error');
+            }
+        }
+    }
+}
+
+window.relocate = relocate;
 
 // ============= ОТОБРАЖЕНИЕ ЗАКАЗОВ =============
 function displayOrders() {
@@ -584,11 +614,24 @@ function displayOrders() {
         return;
     }
 
+    const currentDistrictData = districts.find(d => d.id === currentDistrict) || { name: currentDistrict };
+    ordersList.innerHTML = `
+        <div class="district-header" style="background: rgba(255,160,0,0.1); padding: 10px; border-radius: 12px; margin-bottom: 20px; border: 1px solid rgba(255,160,0,0.2); display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <span style="opacity: 0.6; font-size: 0.8em; display: block;">Ваше местоположение:</span>
+                <span style="font-weight: 800; font-size: 1.1em; color: var(--accent-color);">${currentDistrictData.name || currentDistrict}</span>
+            </div>
+            <button class="action-btn small" onclick="relocate()" style="padding: 5px 12px; font-size: 0.85em; background: #333;">🗺️ Переехать</button>
+        </div>
+    `;
+
     let filteredOrders = [...orders];
     switch (currentFilter) {
         case 'cheap': filteredOrders = orders.filter(o => o.price < 30); break;
         case 'expensive': filteredOrders = orders.filter(o => o.price >= 50); break;
         case 'vip': filteredOrders = orders.filter(o => o.is_vip === true); break;
+        case 'all': // No filter needed, already copied all orders
+        default: break;
     }
 
     if (filteredOrders.length === 0) {
@@ -732,6 +775,7 @@ async function takeOrder(orderId, event) {
             userData.rating = result.rating || userData.rating;
             userData.level = result.level || userData.level;
             userData.experience = result.experience || userData.experience;
+            if (result.current_district) currentDistrict = result.current_district;
 
             // Check for level up
             if (userData.level > oldLevel) {
@@ -899,8 +943,14 @@ function updateMainScreen() {
         ridesToday: document.getElementById('rides-today'),
         ridesStreak: document.getElementById('rides-streak'),
         ridesTotal: document.getElementById('rides-total'),
-        achievementsPreview: document.getElementById('achievements-preview')
+        achievementsPreview: document.getElementById('achievements-preview'),
+        districtName: document.getElementById('current-district-name')
     };
+
+    if (elements.districtName) {
+        const d = districts.find(d => d.id === currentDistrict) || { name: currentDistrict };
+        elements.districtName.textContent = d.name || currentDistrict;
+    }
 
     if (elements.balance) elements.balance.textContent = userData.balance?.toFixed(2) || '0.00';
     if (elements.jackpotAmount && userData.jackpot_pool !== undefined) {
@@ -1734,7 +1784,7 @@ function showAchievement(achievement) {
 }
 
 // ============= НАВИГАЦИЯ =============
-function showScreen(screenName) {
+async function showScreen(screenName) {
     console.log(`[NAV] Switching to screen: ${screenName}`);
 
     // v3.4: Hide any active modals/overlays if returning to main or switching main screens
@@ -1790,8 +1840,9 @@ function showScreen(screenName) {
 
     // Load screen-specific data
     if (screenName === 'orders') {
-        loadDistricts();
-        loadOrders();
+        await loadUserData();
+        await loadDistricts();
+        await loadOrders();
     } else if (screenName === 'fuel') {
         updateFuelScreen();
     } else if (screenName === 'garage') {
