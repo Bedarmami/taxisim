@@ -381,6 +381,26 @@ td .status-badge {
     text-align: center;
 }
 
+.action-ALARM_EXPLOIT {
+    background: #ff4444 !important;
+    color: white !important;
+    animation: pulse-red 2s infinite;
+}
+
+@keyframes pulse-red {
+    0% {
+        box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.7);
+    }
+
+    70% {
+        box-shadow: 0 0 0 10px rgba(255, 68, 68, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(255, 68, 68, 0);
+    }
+}
+
 /* Chart heights */
 .chart-box canvas {
     max-height: 250px !important;

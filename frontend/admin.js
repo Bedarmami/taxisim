@@ -190,6 +190,12 @@ async function loadActivities() {
             <td><span class="status-badge action-${a.action}">${a.action}</span></td>
             <td><small>${detailStr}</small></td>
         `;
+
+        if (a.action === 'ALARM_EXPLOIT') {
+            tr.style.backgroundColor = 'rgba(255, 68, 68, 0.15)';
+            tr.style.fontWeight = 'bold';
+        }
+
         tbody.appendChild(tr);
     });
 }

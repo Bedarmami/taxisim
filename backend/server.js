@@ -141,7 +141,45 @@ const logActivity = async (telegramId, action, details = {}) => {
     }
 };
 
-// v3.4: Social Pulse Activity Log
+// v3.5 Anti-Cheat: Rate limiting and Security Sanity Checks
+const SECURITY_LIMITS = new Map(); // Store user request timestamps
+const ALARM_THRESHOLD_MS = 3000; // 3 seconds window
+const MAX_REQUESTS_PER_WINDOW = 5;
+
+const rateLimitMiddleware = (req, res, next) => {
+    const telegramId = req.params.telegramId || req.body.telegramId || req.query.telegramId;
+    if (!telegramId) return next();
+
+    const now = Date.now();
+    const userLimits = SECURITY_LIMITS.get(telegramId) || [];
+
+    // Filter out old timestamps
+    const recentRequests = userLimits.filter(ts => now - ts < ALARM_THRESHOLD_MS);
+
+    if (recentRequests.length >= MAX_REQUESTS_PER_WINDOW) {
+        logActivity(telegramId, 'ALARM_EXPLOIT', {
+            reason: 'Rate limit exceeded (Spamming)',
+            path: req.path
+        });
+        return res.status(429).json({ error: 'Слишком много запросов! Подождите немного.' });
+    }
+
+    recentRequests.push(now);
+    SECURITY_LIMITS.set(telegramId, recentRequests);
+    next();
+};
+
+// Cleanup security limits every 10 mins
+setInterval(() => {
+    const now = Date.now();
+    for (const [tid, limits] of SECURITY_LIMITS.entries()) {
+        const filtered = limits.filter(ts => now - ts < ALARM_THRESHOLD_MS);
+        if (filtered.length === 0) SECURITY_LIMITS.delete(tid);
+        else SECURITY_LIMITS.set(tid, filtered);
+    }
+}, 10 * 60 * 1000);
+
+// v3.5 Anti-Cheat: Social Pulse Activity Log
 let SOCIAL_ACTIVITY_LOG = [];
 const logSocialActivity = (message) => {
     SOCIAL_ACTIVITY_LOG.unshift({ message, timestamp: new Date().toISOString() });
@@ -1542,7 +1580,7 @@ app.get('/api/orders/:telegramId', async (req, res) => {
 });
 
 // Выполнение заказа
-app.post('/api/user/:telegramId/ride', async (req, res) => {
+app.post('/api/user/:telegramId/ride', rateLimitMiddleware, async (req, res) => {
     try {
         const { telegramId } = req.params;
         const { useGas } = req.body;
@@ -1606,6 +1644,16 @@ app.post('/api/user/:telegramId/ride', async (req, res) => {
 
         // Расчет дохода
         let earnings = order.price;
+
+        // v3.5 Sanity Check: Revenue/Distance ratio (prevent price manipulation)
+        if (earnings / order.distance > 2000) {
+            logActivity(telegramId, 'ALARM_EXPLOIT', {
+                reason: 'Impossible Ride Revenue',
+                earnings,
+                distance: order.distance
+            });
+            return res.status(400).json({ error: 'Ошибка валидации заказа. Сообщено администратору.' });
+        }
 
         if (partner) {
             earnings *= (1 - partner.revenue_split);
@@ -2745,7 +2793,7 @@ app.get('/api/market', async (req, res) => {
     }
 });
 
-app.post('/api/market/buy', async (req, res) => {
+app.post('/api/market/buy', rateLimitMiddleware, async (req, res) => {
     try {
         const { telegramId, listingId } = req.body;
         const user = await getUser(telegramId);
@@ -3196,7 +3244,7 @@ app.post('/api/user/:telegramId/plates/buy', async (req, res) => {
 });
 
 // ============= v2.4: Play Roulette
-app.post('/api/casino/roulette', async (req, res) => {
+app.post('/api/casino/roulette', rateLimitMiddleware, async (req, res) => {
     try {
         const { telegramId, bet } = req.body;
         const user = await getUser(telegramId);
@@ -3322,7 +3370,7 @@ app.get('/api/casino/crash/status', (req, res) => {
     });
 });
 
-app.post('/api/casino/crash/bet', async (req, res) => {
+app.post('/api/casino/crash/bet', rateLimitMiddleware, async (req, res) => {
     try {
         const { telegramId, bet } = req.body;
         if (CRASH_STATE.phase !== 'betting') {
@@ -3359,7 +3407,7 @@ app.post('/api/casino/crash/bet', async (req, res) => {
     }
 });
 
-app.post('/api/casino/crash/cashout', async (req, res) => {
+app.post('/api/casino/crash/cashout', rateLimitMiddleware, async (req, res) => {
     try {
         const { telegramId } = req.body;
         const player = CRASH_STATE.players.get(telegramId);
@@ -3370,6 +3418,17 @@ app.post('/api/casino/crash/cashout', async (req, res) => {
 
         const currentMultiplier = CRASH_STATE.multiplier;
         const winAmount = Math.floor(player.bet * currentMultiplier);
+
+        // v3.5 Sanity Check: Max win cap (prevent overflow/exploit)
+        if (winAmount > 500000) {
+            logActivity(telegramId, 'ALARM_EXPLOIT', {
+                reason: 'Suspiciously high Crash win',
+                winAmount,
+                bet: player.bet,
+                multiplier: currentMultiplier
+            });
+            return res.status(400).json({ error: 'Транзакция заблокирована системой безопасности.' });
+        }
 
         // v3.5 Security Fix: Mark player as cashed out BEFORE any await/DB calls
         // to prevent race conditions where player claims multiple times.
