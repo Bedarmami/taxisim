@@ -741,7 +741,11 @@ function canTakeOrder(order) {
 }
 
 // ============= ВЗЯТЬ ЗАКАЗ =============
+let isProcessingOrder = false;
+
 async function takeOrder(orderId, event) {
+    if (isProcessingOrder) return;
+
     const order = orders.find(o => o.id === orderId);
 
     if (!order) {
@@ -760,6 +764,7 @@ async function takeOrder(orderId, event) {
     }
 
     try {
+        isProcessingOrder = true;
         try { soundManager.play('engine'); } catch (e) { }
 
         // Start animation before/during API call
@@ -808,6 +813,7 @@ async function takeOrder(orderId, event) {
             if (result.event) {
                 if (result.event.type === 'police_stopped') {
                     handlePoliceEncounter(result.event.fine);
+                    isProcessingOrder = false;
                     return;
                 }
                 showNotification(`${result.event.message}`, 'info');
@@ -824,14 +830,18 @@ async function takeOrder(orderId, event) {
                 setTimeout(() => loadOrders(), 1500);
             }
 
-            showNotification(`✅ Заказ выполнен! +${result.earnings.toFixed(2)} PLN`, 'success');
-            try { soundManager.play('coin'); } catch (e) { }
+            if (result.earnings) {
+                showNotification(`✅ Заказ выполнен! +${result.earnings.toFixed(2)} PLN`, 'success');
+                try { soundManager.play('coin'); } catch (e) { }
+            }
         }
 
     } catch (error) {
         console.error('Error:', error);
         showNotification(error.message, 'error');
         if (card) card.classList.remove('in-progress');
+    } finally {
+        isProcessingOrder = false;
     }
 }
 

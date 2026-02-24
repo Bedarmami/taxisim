@@ -157,9 +157,13 @@ const rateLimitMiddleware = (req, res, next) => {
     const recentRequests = userLimits.filter(ts => now - ts < ALARM_THRESHOLD_MS);
 
     if (recentRequests.length >= MAX_REQUESTS_PER_WINDOW) {
+        const oldest = recentRequests[0];
+        const windowSec = ((now - oldest) / 1000).toFixed(1);
+
         logActivity(telegramId, 'ALARM_EXPLOIT', {
             reason: 'Rate limit exceeded (Spamming)',
-            path: req.path
+            path: req.path,
+            details: `${recentRequests.length + 1} reqs in ${windowSec}s`
         });
         return res.status(429).json({ error: 'Слишком много запросов! Подождите немного.' });
     }
