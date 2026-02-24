@@ -1153,6 +1153,14 @@ function updateFuelCost() {
 }
 
 // ============= ОБНОВЛЕНИЕ ЭКРАНА ГАРАЖА =============
+// Helper to render car icon (emoji or image)
+function renderCarImage(car, size = '40px') {
+    if (car.image && (car.image.includes('assets/') || car.image.includes('http') || car.image.includes('.png'))) {
+        return `<img src="${car.image}" class="car-asset-img" style="max-height: ${size}; vertical-align: middle; border-radius: 4px;">`;
+    }
+    return car.image || '🚗';
+}
+
 function updateGarageScreen() {
     if (!userData) return;
 
@@ -1271,7 +1279,7 @@ async function loadMyCars() {
                     return `
                 <div class="car-card ${car.is_selected ? 'selected-car' : ''}" style="${car.is_selected ? 'border: 2px solid #34C759;' : ''}">
                     <div class="car-card-header">
-                        <span class="car-icon">${car.image || '🚗'}</span>
+                        <span class="car-icon">${renderCarImage(car)}</span>
                         <div style="display: flex; flex-direction: column;">
                             <span class="car-name">${car.name}</span>
                             ${plateHtml}
@@ -1397,7 +1405,7 @@ async function loadAvailableCars() {
                 rentalList.innerHTML = rentalCars.map(car => `
                     <div class="car-card">
                         <div class="car-card-header">
-                            <span class="car-icon">${car.image || '🚗'}</span>
+                            <span class="car-icon">${renderCarImage(car)}</span>
                             <span class="car-name">${car.name || 'Неизвестно'}</span>
                         </div>
                         <div class="car-specs">
@@ -1424,7 +1432,7 @@ async function loadAvailableCars() {
                 purchaseList.innerHTML = purchaseCars.map(car => `
                     <div class="car-card">
                         <div class="car-card-header">
-                            <span class="car-icon">${car.image || '🚗'}</span>
+                            <span class="car-icon">${renderCarImage(car)}</span>
                             <span class="car-name">${car.name || 'Неизвестно'}</span>
                         </div>
                         <div class="car-specs">
