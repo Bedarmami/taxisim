@@ -212,10 +212,11 @@ window.updateMainScreen = function () {
 
 async function updateJackpotTicker() {
     try {
-        const res = await fetch(`${RETENTION_API_URL}/jackpot`);
-        const data = await res.json();
-        const ticker = document.getElementById('jackpot-amount');
-        if (ticker && data.current) ticker.textContent = data.current.toFixed(2);
+        const data = await safeFetchJson(`${RETENTION_API_URL}/jackpot`);
+        if (data && !data._isError && data.current) {
+            const ticker = document.getElementById('jackpot-amount');
+            if (ticker) ticker.textContent = data.current.toFixed(2);
+        }
     } catch (e) { console.error('Jackpot error', e); }
 }
 
@@ -230,7 +231,7 @@ setTimeout(() => {
             // We can use telegramId
             const tid = window.userData.telegram_id || (window.Telegram?.WebApp?.initDataUnsafe?.user?.id);
             if (tid) {
-                fetch(`${RETENTION_API_URL}/orders/${tid}?district=suburbs&count=5`);
+                safeFetchJson(`${RETENTION_API_URL}/orders/${tid}?district=suburbs&count=5`);
             }
         }
     }

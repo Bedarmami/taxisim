@@ -41,17 +41,17 @@ class SkillsManager {
         const telegramId = user ? user.id : 'test_user';
 
         try {
-            const response = await fetch(`${API_BASE_URL}/user/${telegramId}`);
-            const data = await response.json();
+            const data = await safeFetchJson(`${API_BASE_URL}/user/${telegramId}`);
+            if (data && !data._isError) {
+                if (data.error) {
+                    showNotification(data.error, 'error');
+                    return;
+                }
 
-            if (data.error) {
-                showNotification(data.error, 'error');
-                return;
+                this.skills = data.skills || { charisma: 0, mechanic: 0, navigator: 0 };
+                this.balance = data.balance;
+                this.render();
             }
-
-            this.skills = data.skills || { charisma: 0, mechanic: 0, navigator: 0 };
-            this.balance = data.balance;
-            this.render();
         } catch (e) {
             console.error('Error loading skills:', e);
             showNotification('Ошибка загрузки навыков', 'error');
@@ -94,18 +94,17 @@ class SkillsManager {
         const telegramId = user ? user.id : 'test_user';
 
         try {
-            const res = await fetch(`${API_BASE_URL}/user/${telegramId}/skills/upgrade`, {
+            const data = await safeFetchJson(`${API_BASE_URL}/user/${telegramId}/skills/upgrade`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ skill })
             });
-            const data = await res.json();
 
-            if (data.success) {
+            if (data && !data._isError && data.success) {
                 showNotification(data.message, 'success');
                 this.loadData(); // Refresh UI
             } else {
-                showNotification(data.error, 'error');
+                showNotification(data?.error || 'Ошибка улучшения навыка', 'error');
             }
         } catch (e) {
             console.error(e);

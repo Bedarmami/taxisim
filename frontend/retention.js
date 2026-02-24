@@ -3,13 +3,8 @@
 // Load and display current event
 async function loadCurrentEvent() {
     try {
-        const response = await fetch(`${API_BASE_URL.replace('/api', '')}/api/current-event`);
-        const data = await response.json();
-
-        const banner = document.getElementById('event-banner');
-        if (!banner) return;
-
-        if (data.active && data.event) {
+        const data = await safeFetchJson(`${API_BASE_URL.replace('/api', '')}/api/current-event`);
+        if (data && !data._isError && data.active && data.event) {
             const event = data.event;
             const minutes = Math.floor(data.event.timeLeft / 60000);
             const seconds = Math.floor((data.event.timeLeft % 60000) / 1000);
@@ -62,25 +57,21 @@ async function buyCoffee() {
     try {
         soundManager.play('button');
 
-        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/buy-coffee`, {
+        const data = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/buy-coffee`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         });
 
-        if (!response.ok) {
-            const error = await response.json();
-            showNotification(error.error || 'Ошибка покупки кофе', 'error');
-            return;
+        if (data && !data._isError) {
+            userData.balance = data.balance;
+            userData.stamina = data.stamina;
+
+            updateUI();
+            showNotification(data.message, 'success');
+            soundManager.play('coin');
+        } else {
+            showNotification(data?.error || 'Ошибка покупки кофе', 'error');
         }
-
-        const result = await response.json();
-
-        userData.balance = result.balance;
-        userData.stamina = result.stamina;
-
-        updateUI();
-        showNotification(result.message, 'success');
-        soundManager.play('coin');
     } catch (error) {
         console.error('Error buying coffee:', error);
         showNotification('Ошибка сервера', 'error');
@@ -116,29 +107,25 @@ async function claimStreakReward() {
     try {
         soundManager.play('button');
 
-        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/claim-streak`, {
+        const data = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/claim-streak`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         });
 
-        if (!response.ok) {
-            const error = await response.json();
-            showNotification(error.error || 'Ошибка получения награды', 'error');
-            return;
+        if (data && !data._isError) {
+            userData.balance = data.balance;
+            userData.fuel = data.fuel;
+            userData.stamina = data.stamina;
+            userData.last_streak_claim = new Date().toISOString();
+
+            updateUI();
+            showNotification(data.reward.message, 'success');
+            soundManager.play('coin');
+
+            document.getElementById('claim-streak-btn').style.display = 'none';
+        } else {
+            showNotification(data?.error || 'Ошибка получения награды', 'error');
         }
-
-        const result = await response.json();
-
-        userData.balance = result.balance;
-        userData.fuel = result.fuel;
-        userData.stamina = result.stamina;
-        userData.last_streak_claim = new Date().toISOString();
-
-        updateUI();
-        showNotification(result.reward.message, 'success');
-        soundManager.play('coin');
-
-        document.getElementById('claim-streak-btn').style.display = 'none';
     } catch (error) {
         console.error('Error claiming streak:', error);
         showNotification('Ошибка сервера', 'error');

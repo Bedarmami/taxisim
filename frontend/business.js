@@ -37,22 +37,17 @@ class BusinessManager {
 
         try {
             // Load business data and available cars in parallel
-            const [bizRes, carsRes] = await Promise.all([
-                fetch(`${API_BASE_URL}/user/${telegramId}/business`),
-                fetch(`${API_BASE_URL}/cars`)
+            const [bizData, carsData] = await Promise.all([
+                safeFetchJson(`${API_BASE_URL}/user/${telegramId}/business`),
+                safeFetchJson(`${API_BASE_URL}/cars`)
             ]);
 
-            if (!bizRes.ok) {
-                const errorData = await bizRes.json().catch(() => ({}));
-                throw new Error(`Business data fetch failed (HTTP ${bizRes.status}): ${errorData.error || bizRes.statusText}`);
+            if (!bizData || bizData._isError) {
+                throw new Error(`Business data fetch failed: ${bizData?.error || 'Unknown error'}`);
             }
-            if (!carsRes.ok) {
-                const errorData = await carsRes.json().catch(() => ({}));
-                throw new Error(`Cars data fetch failed (HTTP ${carsRes.status}): ${errorData.error || carsRes.statusText}`);
+            if (!carsData || carsData._isError) {
+                throw new Error(`Cars data fetch failed: ${carsData?.error || 'Unknown error'}`);
             }
-
-            const bizData = await bizRes.json();
-            const carsData = await carsRes.json();
 
             if (bizData.error) {
                 showNotification(`Ошибка бизнеса: ${bizData.error}`, 'error', {
@@ -226,12 +221,11 @@ class BusinessManager {
 
         if (confirm(`Купить машину для автопарка за ${price.toLocaleString()} PLN?`)) {
             try {
-                const res = await fetch(`${API_BASE_URL}/user/${telegramId}/fleet/buy`, {
+                const data = await safeFetchJson(`${API_BASE_URL}/user/${telegramId}/fleet/buy`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ carId })
                 });
-                const data = await res.json();
                 if (data.success) {
                     showNotification(data.message, 'success');
                     this.loadData();
@@ -251,8 +245,7 @@ class BusinessManager {
 
         if (confirm('Нанять водителя за 1000 PLN?')) {
             try {
-                const res = await fetch(`${API_BASE_URL}/user/${telegramId}/drivers/hire`, { method: 'POST' });
-                const data = await res.json();
+                const data = await safeFetchJson(`${API_BASE_URL}/user/${telegramId}/drivers/hire`, { method: 'POST' });
                 if (data.success) {
                     showNotification(data.message, 'success');
                     this.loadData();
@@ -269,12 +262,11 @@ class BusinessManager {
         const telegramId = user ? user.id : 'test_user';
 
         try {
-            const res = await fetch(`${API_BASE_URL}/user/${telegramId}/drivers/collect`, {
+            const data = await safeFetchJson(`${API_BASE_URL}/user/${telegramId}/drivers/collect`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ driverId })
             });
-            const data = await res.json();
             if (data.success) {
                 showNotification(data.message || `💰 Получено: ${data.earnings} PLN`, 'success');
                 this.loadData();
@@ -318,12 +310,11 @@ class BusinessManager {
 
     async _doAssign(telegramId, driverId, carId) {
         try {
-            const res = await fetch(`${API_BASE_URL}/user/${telegramId}/drivers/assign`, {
+            const data = await safeFetchJson(`${API_BASE_URL}/user/${telegramId}/drivers/assign`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ driverId, carId })
             });
-            const data = await res.json();
             if (data.success) {
                 showNotification(data.message, 'success');
                 this.loadData();

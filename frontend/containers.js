@@ -46,15 +46,14 @@ class ContainersManager {
 
     async sync() {
         try {
-            const res = await fetch(`${API_BASE_URL}/auction`);
-            const data = await res.json();
-
-            this.state = {
-                ...data,
-                localSyncTime: Date.now()
-            };
-
-            this.render();
+            const data = await safeFetchJson(`${API_BASE_URL}/auction`);
+            if (data && !data._isError) {
+                this.state = {
+                    ...data,
+                    localSyncTime: Date.now()
+                };
+                this.render();
+            }
         } catch (e) {
             console.error('Error syncing auction:', e);
         }
@@ -138,7 +137,7 @@ class ContainersManager {
 
         try {
             const user = typeof Telegram !== 'undefined' ? Telegram.WebApp.initDataUnsafe?.user : null;
-            const res = await fetch(`${API_BASE_URL}/auction/bid`, {
+            const data = await safeFetchJson(`${API_BASE_URL}/auction/bid`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -147,8 +146,6 @@ class ContainersManager {
                     amount: amount
                 })
             });
-
-            const data = await res.json();
             if (data.success) {
                 showNotification('Ставка принята!', 'success');
                 if (typeof soundManager !== 'undefined') soundManager.play('button');
@@ -165,10 +162,8 @@ class ContainersManager {
     // ===== PENDING REWARDS =====
     async checkPendingRewards() {
         try {
-            const res = await fetch(`${API_BASE_URL}/auction/pending/${TELEGRAM_ID}`);
-            const data = await res.json();
-
-            if (data.rewards && data.rewards.length > 0) {
+            const data = await safeFetchJson(`${API_BASE_URL}/auction/pending/${TELEGRAM_ID}`);
+            if (data && !data._isError && data.rewards && data.rewards.length > 0) {
                 this.showRewardModal(data.rewards[0], 0);
             }
         } catch (e) {
@@ -238,7 +233,7 @@ class ContainersManager {
 
                 try {
                     console.log(`📡 Claiming auction reward ${reward.id} with choice: ${choice}`);
-                    const res = await fetch(`${API_BASE_URL}/auction/claim`, {
+                    const data = await safeFetchJson(`${API_BASE_URL}/auction/claim`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -247,8 +242,6 @@ class ContainersManager {
                             choice: choice
                         })
                     });
-
-                    const data = await res.json();
                     if (data.success) {
                         showNotification(data.message, 'success');
                         modal.remove();

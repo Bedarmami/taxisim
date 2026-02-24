@@ -334,10 +334,9 @@ async function initApp() {
     // v3.0: Splash online count
     const fetchOnline = async () => {
         try {
-            const res = await fetch(`${API_BASE_URL}/online-count`);
-            const data = await res.json();
+            const data = await safeFetchJson(`${API_BASE_URL}/online-count`);
             const el = document.getElementById('splash-online-count');
-            if (el) el.textContent = data.count;
+            if (el && data && data.count !== undefined) el.textContent = data.count;
         } catch (e) { }
     };
     fetchOnline();
@@ -372,12 +371,9 @@ async function initApp() {
         // Check for pending auction rewards
         if (typeof containersManager !== 'undefined') {
             try {
-                const res = await fetch(`${API_BASE_URL}/auction/pending/${TELEGRAM_ID}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.rewards && data.rewards.length > 0) {
-                        setTimeout(() => containersManager.showRewardModal(data.rewards[0], 0), 1000);
-                    }
+                const data = await safeFetchJson(`${API_BASE_URL}/auction/pending/${TELEGRAM_ID}`);
+                if (data && !data._isError && data.rewards && data.rewards.length > 0) {
+                    setTimeout(() => containersManager.showRewardModal(data.rewards[0], 0), 1000);
                 }
             } catch (e) { console.warn('Auction rewards check failed', e); }
         }
@@ -439,10 +435,9 @@ async function initApp() {
 
 async function updateOnlineCount() {
     try {
-        const res = await fetch(`${API_BASE_URL}/online-count`);
-        const data = await res.json();
+        const data = await safeFetchJson(`${API_BASE_URL}/online-count`);
         const el = document.getElementById('online-count');
-        if (el) el.textContent = data.count;
+        if (el && data && data.count !== undefined) el.textContent = data.count;
     } catch (e) { }
 }
 
@@ -455,16 +450,21 @@ async function loadUserData() {
         const url = new URL(`${API_BASE_URL}/user/${TELEGRAM_ID}`);
         if (PLAYER_NAME) url.searchParams.append('username', PLAYER_NAME);
 
-        const response = await fetch(url, {
+        const data = await safeFetchJson(url, {
             signal: controller.signal
         });
         clearTimeout(timeoutId);
 
-        if (checkMaintenance(response.status)) return;
-        if (!response.ok) {
-            throw new Error(`Ошибка сервера: ${response.status}`);
+        if (data && !data._isError) {
+            userData = data;
+        } else {
+            // Check for maintenance specifically if status is available in data
+            if (data && data.status === 503) {
+                checkMaintenance(503);
+                return;
+            }
+            throw new Error(data?.error || 'Failed to load user data');
         }
-        userData = await response.json();
 
         localStorage.setItem('userData', JSON.stringify(userData));
 
@@ -1400,15 +1400,13 @@ async function buyCar(carId) {
     try {
         console.log('Покупка машины:', carId);
 
-        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/buy-car`, {
+        const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/buy-car`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ carId })
         });
 
-        const result = await response.json();
-
-        if (response.ok && result.success) {
+        if (result && !result._isError && result.success) {
             userData.car = result.new_car;
             userData.balance = result.new_balance;
             userData.fuel = result.new_fuel || userData.fuel;
@@ -1535,15 +1533,13 @@ function showPartnersList() {
 // ============= СМЕНА ПАРТНЁРА =============
 async function changePartner(partnerId) {
     try {
-        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/partner`, {
+        const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/partner`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ partnerId })
         });
 
-        const result = await response.json();
-
-        if (response.ok && result.success) {
+        if (result && !result._isError && result.success) {
             userData.partner_id = partnerId;
             showNotification(result.message || '✅ Партнёр изменён', 'success');
             updatePartnerInfo();
@@ -1561,14 +1557,12 @@ async function changePartner(partnerId) {
 // ============= ОТДЫХ С ПОДСЧЁТОМ ДНЕЙ =============
 async function rest() {
     try {
-        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/rest`, {
+        const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/rest`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         });
 
-        const result = await response.json();
-
-        if (response.ok && result.success) {
+        if (result && !result._isError && result.success) {
             userData.stamina = result.stamina;
             userData.rides_streak = 0;
             userData.balance = result.new_balance;
@@ -1787,24 +1781,20 @@ function showScreen(screenName) {
 // ============= v2.1: ЕЖЕДНЕВНЫЙ БОНУС =============
 async function claimDailyBonus() {
     try {
-        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/daily-bonus`, {
+        const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/daily-bonus`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         });
 
-        const result = await response.json();
-
-        if (response.ok && result.success) {
+        if (result && !result._isError && result.success) {
             await loadUserData();
             showNotification(`🎁 ${result.reward.label}`, 'success');
+        } else if (result && result.timeLeft) {
+            const hours = Math.floor(result.timeLeft / (1000 * 60 * 60));
+            const minutes = Math.floor((result.timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+            showNotification(`⏰ Бонус будет доступен через ${hours}ч ${minutes}м`, 'warning');
         } else {
-            if (result.timeLeft) {
-                const hours = Math.floor(result.timeLeft / (1000 * 60 * 60));
-                const minutes = Math.floor((result.timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-                showNotification(`⏰ Бонус будет доступен через ${hours}ч ${minutes}м`, 'warning');
-            } else {
-                showNotification(result.error || 'Ошибка', 'error');
-            }
+            showNotification(result?.error || 'Ошибка', 'error');
         }
     } catch (error) {
         console.error('Error claiming bonus:', error);
@@ -1817,14 +1807,12 @@ async function repairCar() {
     try {
         if (!confirm('Починить машину за 150 PLN?')) return;
 
-        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/repair`, {
+        const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/repair`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         });
 
-        const result = await response.json();
-
-        if (response.ok && result.success) {
+        if (result && !result._isError && result.success) {
             userData.balance = result.balance;
             userData.car = result.car;
             updateMainScreen();
@@ -2227,9 +2215,8 @@ function updatePlatePreview() {
 
 async function loadPlates() {
     try {
-        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/plates`);
-        const data = await response.json();
-        if (data.success) {
+        const data = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/plates`);
+        if (data && !data._isError && data.success) {
             displayPlates(data.plates);
         }
     } catch (e) { console.error(e); }
@@ -2268,12 +2255,11 @@ function formatBuffs(buffs) {
 
 async function equipPlate(plateNumber) {
     try {
-        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/plates/equip`, {
+        const data = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/plates/equip`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ plateNumber })
         });
-        const data = await response.json();
         if (data.success) {
             showNotification('✅ Номер успешно установлен!', 'success');
             loadUserData(); // Refresh car data
@@ -2286,8 +2272,7 @@ async function equipPlate(plateNumber) {
 
 async function rollPlate() {
     try {
-        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/plates/roll`, { method: 'POST' });
-        const data = await response.json();
+        const data = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/plates/roll`, { method: 'POST' });
         if (data.success) {
             showLevelUpWow('NEW_PLATE');
             showNotification(`🎉 Вы выбили номер: ${data.plate.plate_number}!`, 'success');
@@ -2305,12 +2290,11 @@ async function createCustomPlate() {
     if (!text) return;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/plates/create`, {
+        const data = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/plates/create`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text })
         });
-        const data = await response.json();
         if (data.success) {
             showNotification(`✨ Номер ${data.plate.plate_number} создан!`, 'success');
             userData.balance = data.balance;
@@ -2328,8 +2312,7 @@ async function loadMarketPlates() {
     list.innerHTML = '<div class="loading">Загрузка рынка...</div>';
 
     try {
-        const response = await fetch(`${API_BASE_URL}/plates/market`);
-        const data = await response.json();
+        const data = await safeFetchJson(`${API_BASE_URL}/plates/market`);
         if (data.success) {
             if (data.plates.length === 0) {
                 list.innerHTML = '<div class="text-center p-4">На рынке пока нет номеров.</div>';
@@ -2351,12 +2334,11 @@ async function loadMarketPlates() {
 
 async function buyMarketPlate(plateNumber) {
     try {
-        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/plates/buy`, {
+        const data = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/plates/buy`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ plateNumber })
         });
-        const data = await response.json();
         if (data.success) {
             showNotification(data.message, 'success');
             userData.balance = data.balance;
@@ -2377,12 +2359,11 @@ function listPlatePrompt(plateNumber) {
 
 async function listPlateForSale(plateNumber, price) {
     try {
-        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/plates/list`, {
+        const data = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/plates/list`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ plateNumber, price })
         });
-        const data = await response.json();
         if (data.success) {
             showNotification(data.message, 'success');
             loadPlates();
