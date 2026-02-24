@@ -593,6 +593,17 @@ async function relocate() {
     }
 }
 
+function forceReload() {
+    if (typeof Telegram !== 'undefined' && Telegram.WebApp && Telegram.WebApp.HapticFeedback) {
+        Telegram.WebApp.HapticFeedback.notificationOccurred('warning');
+    }
+    const v = Date.now();
+    const url = new URL(window.location.href);
+    url.searchParams.set('v', v);
+    window.location.href = url.toString();
+}
+
+window.forceReload = forceReload;
 window.relocate = relocate;
 
 // ============= ОТОБРАЖЕНИЕ ЗАКАЗОВ =============

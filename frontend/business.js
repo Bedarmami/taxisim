@@ -232,11 +232,37 @@ class BusinessManager {
                     `<button class="action-btn success small" 
                             style="padding:6px 15px;" 
                             ${canAfford ? '' : 'disabled opacity:0.5'}
-                            onclick="businessManager.buyStation(${station.id})">
+                            onclick="businessManager.buyStation('${station.id}')">
                             Купить
                         </button>` : ''
                 }
                 </div>
+
+                ${isMine ? `
+                    <div style="margin-top:15px; border-top:1px solid #333; padding-top:12px;">
+                        <div style="font-size:0.8em; color:#888; margin-bottom:8px;">Управление ценами (PLN/литр):</div>
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            <div style="flex:1;">
+                                <label style="display:block; font-size:0.7em; color:#666; margin-bottom:2px;">⛽ Бензин</label>
+                                <input type="number" id="petrol-price-${station.id}" value="${station.price_petrol || 6.80}" step="0.1" style="width:100%; background:#000; border:1px solid #444; color:white; padding:6px; border-radius:8px; font-size:0.9em;">
+                            </div>
+                            <div style="flex:1;">
+                                <label style="display:block; font-size:0.7em; color:#666; margin-bottom:2px;">🔵 Газ</label>
+                                <input type="number" id="gas-price-${station.id}" value="${station.price_gas || 3.60}" step="0.1" style="width:100%; background:#000; border:1px solid #444; color:white; padding:6px; border-radius:8px; font-size:0.9em;">
+                            </div>
+                            <button class="action-btn small" 
+                                    style="margin-top:14px; height:34px; padding:0 12px; background:#3498db;" 
+                                    onclick="businessManager.updatePrices('${station.id}')">
+                                💾
+                            </button>
+                        </div>
+                    </div>
+                ` : `
+                    <div style="margin-top:10px; display:flex; gap:15px; font-size:0.8em; color:#777;">
+                        <span>⛽ ${station.price_petrol?.toFixed(2) || '6.80'}</span>
+                        <span>🔵 ${station.price_gas?.toFixed(2) || '3.60'}</span>
+                    </div>
+                `}
             `;
             invList.appendChild(div);
         });
@@ -261,11 +287,36 @@ class BusinessManager {
                     showNotification(data.message, 'success');
                     this.loadData();
                 } else {
-                    showNotification(data.error, 'error');
+                    showNotification(data.error || 'Ошибка покупки', 'error');
                 }
             } catch (e) {
                 showNotification('Ошибка при покупке', 'error');
             }
+        }
+    }
+
+    async updatePrices(stationId) {
+        const user = Telegram.WebApp.initDataUnsafe?.user;
+        const telegramId = user ? user.id : 'test_user';
+
+        const pricePetrol = parseFloat(document.getElementById(`petrol-price-${stationId}`).value);
+        const priceGas = parseFloat(document.getElementById(`gas-price-${stationId}`).value);
+
+        try {
+            const data = await safeFetchJson(`${API_BASE_URL}/investments/update-prices`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ telegramId, stationId, pricePetrol, priceGas })
+            });
+
+            if (data.success) {
+                showNotification(data.message, 'success');
+                this.loadData();
+            } else {
+                showNotification(data.error || 'Ошибка обновления цен', 'error');
+            }
+        } catch (e) {
+            showNotification('Ошибка при обновлении цен', 'error');
         }
     }
 

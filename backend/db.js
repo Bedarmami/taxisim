@@ -327,8 +327,13 @@ function initDB() {
                 owner_id TEXT, -- telegram_id
                 purchase_price REAL,
                 revenue_total REAL DEFAULT 0,
+                price_petrol REAL DEFAULT 6.80,
+                price_gas REAL DEFAULT 3.60,
                 FOREIGN KEY(owner_id) REFERENCES users(telegram_id)
             )`);
+
+            db.run(`ALTER TABLE gas_stations ADD COLUMN price_petrol REAL DEFAULT 6.80`, (err) => { });
+            db.run(`ALTER TABLE gas_stations ADD COLUMN price_gas REAL DEFAULT 3.60`, (err) => { });
 
             // Migration: Skills and Hardcore Stats
             db.run(`ALTER TABLE users ADD COLUMN skills TEXT DEFAULT '{"charisma":0,"mechanic":0,"navigator":0}'`, (err) => {
@@ -422,7 +427,9 @@ async function seedDB() {
             { id: 'center_gas_1', name: '🏢 Городской Энергоцентр', district_id: 'center', purchase_price: 45000 },
             { id: 'center_gas_2', name: '💎 Элитный Центр Газа', district_id: 'center', purchase_price: 55000 },
             { id: 'airport_gas_1', name: '✈️ Заправка Азимут', district_id: 'airport', purchase_price: 85000 },
-            { id: 'airport_gas_2', name: '🚀 Реактивный Газ', district_id: 'airport', purchase_price: 95000 }
+            { id: 'airport_gas_2', name: '🚀 Реактивный Газ', district_id: 'airport', purchase_price: 95000 },
+            { id: 'industrial_gas_1', name: '🏗️ Дизель-Пром', district_id: 'industrial', purchase_price: 65000 },
+            { id: 'night_gas_1', name: '🌙 Полуночная Точка', district_id: 'night', purchase_price: 75000 }
         ];
 
         for (const station of stations) {

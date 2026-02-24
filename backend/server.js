@@ -421,6 +421,26 @@ const DISTRICTS = {
         priceMultiplier: 2.0,
         trafficChance: 0.1,
         vipChance: 0.4
+    },
+    industrial: {
+        id: 'industrial',
+        name: '🏭 Промзона',
+        description: 'Тяжелые грузы, суровые клиенты',
+        unlockLevel: 3,
+        distance: { min: 8, max: 15 },
+        priceMultiplier: 1.3,
+        trafficChance: 0.2,
+        vipChance: 0.02
+    },
+    night: {
+        id: 'night',
+        name: '🌃 Ночной город',
+        description: 'Вечеринки, драйв и ночные тарифы',
+        unlockLevel: 7,
+        distance: { min: 3, max: 8 },
+        priceMultiplier: 1.8,
+        trafficChance: 0.05,
+        vipChance: 0.25
     }
 };
 
@@ -787,17 +807,19 @@ const EVENTS = [
 
 // ============= ЛОКАЦИИ =============
 const LOCATIONS = [
-    { name: "Рыночная площадь", type: "center", base_price: 1.0 },
-    { name: "Железнодорожный вокзал", type: "station", base_price: 1.2 },
-    { name: "Университет", type: "education", base_price: 0.9 },
-    { name: "Торговый центр", type: "shopping", base_price: 1.1 },
-    { name: "Аэропорт", type: "airport", base_price: 1.8 },
-    { name: "Старый город", type: "tourist", base_price: 1.3 },
-    { name: "Парк культуры", type: "park", base_price: 0.8 },
-    { name: "Городская больница", type: "hospital", base_price: 1.0 },
-    { name: "Промзона", type: "industrial", base_price: 1.4 },
-    { name: "Ночной клуб", type: "night", base_price: 1.5 },
-    { name: "Бизнес центр", type: "office", base_price: 1.3 }
+    { name: "Рыночная площадь", type: "center", district: "center", base_price: 1.0 },
+    { name: "Железнодорожный вокзал", type: "station", district: "center", base_price: 1.2 },
+    { name: "Университет", type: "education", district: "center", base_price: 0.9 },
+    { name: "Торговый центр", type: "shopping", district: "center", base_price: 1.1 },
+    { name: "Аэропорт", type: "airport", district: "airport", base_price: 1.8 },
+    { name: "Старый город", type: "tourist", district: "suburbs", base_price: 1.3 },
+    { name: "Парк культуры", type: "park", district: "suburbs", base_price: 0.8 },
+    { name: "Городская больница", type: "hospital", district: "suburbs", base_price: 1.0 },
+    { name: "Промзона", type: "industrial", district: "industrial", base_price: 1.4 },
+    { name: "Заводской склад", type: "industrial", district: "industrial", base_price: 1.2 },
+    { name: "Ночной клуб", type: "night", district: "night", base_price: 1.5 },
+    { name: "Казино 'Удача'", type: "night", district: "night", base_price: 1.6 },
+    { name: "Бизнес центр", type: "office", district: "center", base_price: 1.3 }
 ];
 
 // ============= ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =============
@@ -861,24 +883,30 @@ function getAvailablePartners(user) {
 function generateOrder(user, districtId = 'suburbs') {
     const district = DISTRICTS[districtId] || DISTRICTS.suburbs;
 
-    const from = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)];
+    // v3.4: Movement Logic. Filter START location by the user's current district
+    const availableFrom = LOCATIONS.filter(l => l.district === districtId);
+    const from = availableFrom.length > 0
+        ? availableFrom[Math.floor(Math.random() * availableFrom.length)]
+        : LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)];
 
-    // v3.4: Movement Logic. Chance to get an order to another district.
     let targetDistrictId = districtId;
     const districtKeys = Object.keys(DISTRICTS);
-    if (Math.random() < 0.2) { // 20% chance to go to another district
+    if (Math.random() < 0.3) { // 30% chance to go to another district
         const others = districtKeys.filter(d => d !== districtId && isDistrictUnlocked(DISTRICTS[d], user));
         if (others.length > 0) {
             targetDistrictId = others[Math.floor(Math.random() * others.length)];
         }
     }
 
-    let to;
-    do { to = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)]; }
-    while (to === from);
+    // Filter END location by the target district
+    const availableTo = LOCATIONS.filter(l => l.district === targetDistrictId && l.name !== from.name);
+    const to = availableTo.length > 0
+        ? availableTo[Math.floor(Math.random() * availableTo.length)]
+        : LOCATIONS.filter(l => l.name !== from.name)[0];
 
     // Distance based on district
     let distance = Math.random() * (district.distance.max - district.distance.min) + district.distance.min;
+    if (targetDistrictId !== districtId) distance += 3.0; // Bonus distance for inter-district
     distance = parseFloat(distance.toFixed(1));
 
     // Base price with district multiplier
@@ -1844,33 +1872,43 @@ app.post('/api/user/:telegramId/fuel', async (req, res) => {
 
         const actualLiters = Math.min(requestedLiters, maxPossibleLiters);
         const actualLitersRounded = Number(actualLiters.toFixed(1));
-        const cost = Number((actualLitersRounded * pricePerLiter).toFixed(2));
+
+        const districtId = user.current_district || 'suburbs';
+        // Randomly pick an owned station in the district (usually only 1 or 2 available)
+        const station = await db.get('SELECT * FROM gas_stations WHERE district_id = ? AND owner_id IS NOT NULL ORDER BY RANDOM() LIMIT 1', [districtId]);
+
+        let effectivePetrolPrice = 6.80; // Default
+        let effectiveGasPrice = 3.60;
+
+        if (station) {
+            if (station.price_petrol) effectivePetrolPrice = station.price_petrol;
+            if (station.price_gas) effectiveGasPrice = station.price_gas;
+        }
+
+        const pricePerLitre = type === 'gas' ? effectiveGasPrice : effectivePetrolPrice;
+        const cost = Number((actualLitersRounded * pricePerLitre).toFixed(2));
 
         if (user.balance < cost) {
-            return res.status(400).json({ error: 'Недостаточно средств' });
+            return res.status(400).json({ error: 'Недостаточно денег' });
         }
 
         user.balance = Number((user.balance - cost).toFixed(2));
-
         if (type === 'gas') {
             user.gas_fuel = Number((currentFuel + actualLitersRounded).toFixed(1));
         } else {
             user.fuel = Number((currentFuel + actualLitersRounded).toFixed(1));
         }
 
-        // v3.4: Investment Commission (5%)
+        // Commission payout
         const commission = Number((cost * 0.05).toFixed(2));
-        const districtId = user.current_district || 'suburbs';
-        // Randomly pick an owned station in the district (usually only 1 or 2 available)
-        const station = await db.get('SELECT * FROM gas_stations WHERE district_id = ? AND owner_id IS NOT NULL ORDER BY RANDOM() LIMIT 1', [districtId]);
-
         if (station && station.owner_id !== telegramId) {
             // Pay commission to owner
-            await db.run('UPDATE users SET balance = balance + ?, total_earned = total_earned + ? WHERE telegram_id = ?',
-                [commission, commission, station.owner_id]);
-            await db.run('UPDATE gas_stations SET revenue_total = revenue_total + ? WHERE id = ?',
-                [commission, station.id]);
-            invalidateUserCache(station.owner_id);
+            await db.run('UPDATE users SET balance = balance + ?, total_earned = total_earned + ? WHERE telegram_id = ?', [commission, commission, station.owner_id]);
+            await db.run('UPDATE gas_stations SET revenue_total = revenue_total + ? WHERE id = ?', [commission, station.id]);
+
+            // Sync user cache for the owner
+            const owner = await getUserFromDB(station.owner_id);
+            if (owner) USER_CACHE.set(station.owner_id, owner);
             console.log(`[Investment] Paid ${commission.toFixed(2)} PLN commission to ${station.owner_id} for refueling at ${station.name}`);
         }
 
@@ -2586,7 +2624,8 @@ app.get('/api/investments', async (req, res) => {
         const stations = await db.query('SELECT * FROM gas_stations');
         res.json(stations);
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        console.error(e);
+        res.status(500).json({ error: 'Failed to load investments' });
     }
 });
 
@@ -2598,33 +2637,43 @@ app.post('/api/investments/buy', async (req, res) => {
 
         const station = await db.get('SELECT * FROM gas_stations WHERE id = ?', [stationId]);
         if (!station) return res.status(404).json({ error: 'Station not found' });
-
-        if (station.owner_id) {
-            return res.status(400).json({ error: 'Заправка уже выкуплена другим игроком' });
-        }
+        if (station.owner_id) return res.status(400).json({ error: 'Already owned' });
 
         if (user.balance < station.purchase_price) {
-            return res.status(400).json({ error: 'Недостаточно средств для покупки заправки' });
+            return res.status(400).json({ error: 'Insufficient funds' });
         }
 
-        // Deduct balance and set owner
         user.balance -= station.purchase_price;
         await saveUser(user);
-
         await db.run('UPDATE gas_stations SET owner_id = ? WHERE id = ?', [telegramId, stationId]);
 
-        logSocialActivity(`🏦 ${user.username || 'Инвестор'} приобрел ${station.name}!`);
-        logActivity(telegramId, 'BUY_STATION', { stationId, price: station.purchase_price });
-
-        res.json({
-            success: true,
-            message: `🎉 Поздравляем! Вы стали владельцем ${station.name}`,
-            balance: user.balance
-        });
-
+        logSocialActivity(`🏢 ${user.username || telegramId} купил АЗС "${station.name}"!`);
+        res.json({ success: true, message: 'Поздравляем с покупкой!' });
     } catch (e) {
-        console.error('Buy station error:', e);
-        res.status(500).json({ error: 'Server error' });
+        console.error(e);
+        res.status(500).json({ error: 'Purchase failed' });
+    }
+});
+
+app.post('/api/investments/update-prices', async (req, res) => {
+    try {
+        const { telegramId, stationId, pricePetrol, priceGas } = req.body;
+        const station = await db.get('SELECT * FROM gas_stations WHERE id = ?', [stationId]);
+
+        if (!station) return res.status(404).json({ error: 'Station not found' });
+        if (station.owner_id !== telegramId.toString()) {
+            return res.status(403).json({ error: 'Not your station' });
+        }
+
+        if (pricePetrol < 5 || pricePetrol > 15 || priceGas < 2 || priceGas > 10) {
+            return res.status(400).json({ error: 'Недопустимая цена' });
+        }
+
+        await db.run('UPDATE gas_stations SET price_petrol = ?, price_gas = ? WHERE id = ?', [pricePetrol, priceGas, stationId]);
+        res.json({ success: true, message: 'Цены обновлены!' });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Update failed' });
     }
 });
 
