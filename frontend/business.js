@@ -34,25 +34,37 @@ class BusinessManager {
     }
 
     switchTab(tabName) {
+        console.log('Switching to tab:', tabName);
         this.currentTab = tabName;
 
         // Update tab buttons
-        document.querySelectorAll('.biz-tab').forEach(btn => {
-            btn.classList.toggle('active', btn.getAttribute('data-tab') === tabName);
+        const tabs = document.querySelectorAll('.biz-tab');
+        tabs.forEach(btn => {
+            if (btn.getAttribute('data-tab') === tabName) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
         });
 
         // Update content containers
-        document.querySelectorAll('.tab-content').forEach(content => {
-            content.classList.toggle('active', content.id === `tab-${tabName}`);
+        const contents = document.querySelectorAll('.tab-content');
+        contents.forEach(content => {
+            if (content.id === `tab-${tabName}`) {
+                content.classList.add('active');
+            } else {
+                content.classList.remove('active');
+            }
         });
 
         if (window.Telegram?.WebApp?.HapticFeedback) {
-            window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+            window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
         }
     }
 
     openScreen() {
         showScreen('business');
+        this.switchTab(this.currentTab || 'drivers');
     }
 
     closeScreen() {
