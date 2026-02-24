@@ -3371,6 +3371,11 @@ app.post('/api/casino/crash/cashout', async (req, res) => {
         const currentMultiplier = CRASH_STATE.multiplier;
         const winAmount = Math.floor(player.bet * currentMultiplier);
 
+        // v3.5 Security Fix: Mark player as cashed out BEFORE any await/DB calls
+        // to prevent race conditions where player claims multiple times.
+        player.multiplier = currentMultiplier;
+        player.win = winAmount;
+
         const user = await getUser(telegramId);
         if (!user) return res.status(404).json({ error: 'User not found' });
 
@@ -3379,9 +3384,6 @@ app.post('/api/casino/crash/cashout', async (req, res) => {
         user.casino_stats.total_lost -= player.bet;
 
         await saveUser(user);
-
-        player.multiplier = currentMultiplier;
-        player.win = winAmount;
 
         res.json({
             success: true,
