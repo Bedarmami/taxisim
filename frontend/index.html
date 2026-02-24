@@ -451,51 +451,69 @@
                 <h2>💼 Бизнес</h2>
             </div>
 
+            <div class="business-tabs">
+                <div class="biz-tab active" data-tab="drivers">👨‍✈️ Водители</div>
+                <div class="biz-tab" data-tab="fleet">🚗 Автопарк</div>
+                <div class="biz-tab" data-tab="investments">⛽ АЗС</div>
+                <div class="biz-tab" data-tab="shop">🏪 Магазин</div>
+            </div>
+
             <div class="business-content">
-                <div class="business-stats">
-                    <div class="stat-box">
-                        <span class="label">Водителей</span>
-                        <span class="value" id="drivers-count">0</span>
+                <!-- Tab: Drivers -->
+                <div id="tab-drivers" class="tab-content active">
+                    <div class="business-stats">
+                        <div class="stat-box">
+                            <span class="label">Водителей</span>
+                            <span class="value" id="drivers-count">0</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="label">Авто в работе</span>
+                            <span class="value" id="rented-cars-count">0</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="label">Доход/ч</span>
+                            <span class="value" id="income-per-hour">0 PLN</span>
+                        </div>
                     </div>
-                    <div class="stat-box">
-                        <span class="label">Авто в работе</span>
-                        <span class="value" id="rented-cars-count">0</span>
-                    </div>
-                    <div class="stat-box">
-                        <span class="label">Доход/ч</span>
-                        <span class="value" id="income-per-hour">0 PLN</span>
+
+                    <div class="drivers-section">
+                        <h3>👨‍✈️ Мои Водители</h3>
+                        <button id="hire-driver-btn" class="action-btn small">➕ Нанять (1000 PLN)</button>
+                        <div id="drivers-list" class="drivers-list">
+                            <!-- Drivers rendered via JS -->
+                        </div>
                     </div>
                 </div>
 
-                <div class="drivers-section">
-                    <h3>👨‍✈️ Мои Водители</h3>
-                    <button id="hire-driver-btn" class="action-btn small">➕ Нанять (1000 PLN)</button>
-                    <div id="drivers-list" class="drivers-list">
-                        <!-- Drivers rendered via JS -->
+                <!-- Tab: Fleet -->
+                <div id="tab-fleet" class="tab-content">
+                    <div class="fleet-section">
+                        <h3>🚗 Мой Автопарк</h3>
+                        <div id="fleet-list" class="fleet-list">
+                            <!-- Cars available to rent out -->
+                        </div>
                     </div>
                 </div>
 
-                <div class="fleet-section">
-                    <h3>🚗 Мой Автопарк</h3>
-                    <div id="fleet-list" class="fleet-list">
-                        <!-- Cars available to rent out -->
+                <!-- Tab: Investments -->
+                <div id="tab-investments" class="tab-content">
+                    <div id="investments-section" class="investments-section">
+                        <h3 style="color:white; margin:10px 0;">⛽ Инвестиции в АЗС</h3>
+                        <div style="font-size:0.85em; color:#888; margin-bottom:15px;">
+                            Владение заправкой приносит комиссию с каждой заправки игроков в этом районе.
+                        </div>
+                        <div id="investments-list"></div>
                     </div>
                 </div>
 
-                <!-- v3.4: Gas Station Investments -->
-                <div id="investments-section" class="investments-section">
-                    <h3 style="color:white; margin:20px 0 10px;">⛽ Инвестиции в АЗС</h3>
-                    <div style="font-size:0.85em; color:#888; margin-bottom:15px;">
-                        Владение заправкой приносит комиссию с каждой заправки игроков в этом районе.
+                <!-- Tab: Shop -->
+                <div id="tab-shop" class="tab-content">
+                    <div id="fleet-shop-section" class="fleet-shop-section">
+                        <h3 style="color:white; margin:10px 0;">🏪 Магазин автопарка</h3>
+                        <div style="font-size:0.85em; color:#888; margin-bottom:10px;">Покупайте машины для сдачи
+                            водителям</div>
+                        <div id="fleet-shop"></div>
                     </div>
-                    <div id="investments-list"></div>
-                </div>
-
-                <div id="fleet-shop-section" class="fleet-shop-section">
-                    <h3 style="color:white; margin:20px 0 10px;">🏪 Магазин автопарка</h3>
-                    <div style="font-size:0.85em; color:#888; margin-bottom:10px;">Покупайте машины для сдачи водителям
-                    </div>
-                    <div id="fleet-shop"></div>
                 </div>
             </div>
         </div>

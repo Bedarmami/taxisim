@@ -6,6 +6,7 @@ class BusinessManager {
         this.availableCars = []; // from /api/cars
         this.gasStations = []; // v3.4: Investments
         this.balance = 0;
+        this.currentTab = 'drivers'; // Default tab
         this.init();
     }
 
@@ -18,6 +19,36 @@ class BusinessManager {
 
         const hireBtn = document.getElementById('hire-driver-btn');
         if (hireBtn) hireBtn.addEventListener('click', () => this.hireDriver());
+
+        this.setupTabs();
+    }
+
+    setupTabs() {
+        const tabs = document.querySelectorAll('.biz-tab');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const target = tab.getAttribute('data-tab');
+                this.switchTab(target);
+            });
+        });
+    }
+
+    switchTab(tabName) {
+        this.currentTab = tabName;
+
+        // Update tab buttons
+        document.querySelectorAll('.biz-tab').forEach(btn => {
+            btn.classList.toggle('active', btn.getAttribute('data-tab') === tabName);
+        });
+
+        // Update content containers
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.toggle('active', content.id === `tab-${tabName}`);
+        });
+
+        if (window.Telegram?.WebApp?.HapticFeedback) {
+            window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+        }
     }
 
     openScreen() {
