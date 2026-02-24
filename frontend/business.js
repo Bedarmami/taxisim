@@ -179,20 +179,9 @@ class BusinessManager {
     }
 
     renderInvestments() {
-        let invSection = document.getElementById('investments-section');
-        if (!invSection) {
-            const businessScreen = document.getElementById('business-screen');
-            invSection = document.createElement('div');
-            invSection.id = 'investments-section';
-            invSection.innerHTML = `
-                <h3 style="color:white; margin:30px 10px 10px;">⛽ Инвестиции в АЗС</h3>
-                <div style="font-size:0.85em; color:#888; margin:0 10px 15px;">Владение заправкой приносит 5% комиссии с каждой заправки игроков в этом районе.</div>
-                <div id="investments-list"></div>
-            `;
-            businessScreen.appendChild(invSection);
-        }
-
         const invList = document.getElementById('investments-list');
+        if (!invList) return; // Should exist in index.html now
+
         invList.innerHTML = '';
 
         if (this.gasStations.length === 0) {
@@ -321,19 +310,8 @@ class BusinessManager {
     }
 
     renderShop() {
-        let shop = document.getElementById('fleet-shop');
-        if (!shop) {
-            // Create shop section dynamically
-            const businessScreen = document.getElementById('business-screen');
-            const shopSection = document.createElement('div');
-            shopSection.innerHTML = `
-                <h3 style="color:white; margin:20px 10px 10px;">🏪 Магазин автопарка</h3>
-                <div style="font-size:0.85em; color:#888; margin:0 10px 10px; ">Покупайте машины для сдачи водителям</div>
-                <div id="fleet-shop"></div>
-            `;
-            businessScreen.appendChild(shopSection);
-            shop = document.getElementById('fleet-shop');
-        }
+        const shop = document.getElementById('fleet-shop');
+        if (!shop) return;
         shop.innerHTML = '';
 
         this.availableCars.forEach(car => {
