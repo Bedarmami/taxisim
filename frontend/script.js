@@ -595,8 +595,9 @@ async function relocate() {
 
 // v3.5: Automatic Cache Busting on startup
 (function () {
-    if (!sessionStorage.getItem('app_freshened')) {
-        sessionStorage.setItem('app_freshened', 'true');
+    const versionKey = 'app_freshened_v342';
+    if (!sessionStorage.getItem(versionKey)) {
+        sessionStorage.setItem(versionKey, 'true');
         const url = new URL(window.location.href);
         url.searchParams.set('v', Date.now());
         window.location.href = url.toString();
