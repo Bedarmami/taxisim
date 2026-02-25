@@ -128,8 +128,8 @@ async function loadAdminGasStations() {
                 <td>${s.revenue_total.toFixed(2)}</td>
                 <td>${s.price_petrol} / ${s.price_gas}</td>
                 <td>
-                    ${s.owner_id ? `<button onclick="takeAwayStation(${s.id})" class="danger-btn" style="padding:4px 8px; font-size:0.8em;">Забрать</button>` : ''}
-                    <button onclick="giveStationStock(${s.id})" class="edit-btn" style="padding:4px 8px; font-size:0.8em;">+ Топливо</button>
+                    ${s.owner_id ? `<button onclick="takeAwayStation('${s.id}')" class="danger-btn" style="padding:4px 8px; font-size:0.8em;">Забрать</button>` : ''}
+                    <button onclick="giveStationStock('${s.id}')" class="edit-btn" style="padding:4px 8px; font-size:0.8em;">+ Топливо</button>
                 </td>
             `;
             table.appendChild(tr);
