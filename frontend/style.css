@@ -3213,6 +3213,16 @@ button {
     gap: 15px;
 }
 
+.feature-button.utility-premium {
+    background: linear-gradient(135deg, #FF9500, #FF5E00);
+    box-shadow: 0 4px 15px rgba(255, 149, 0, 0.3);
+}
+
+.feature-button.utility-premium .f-icon {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+
 .feature-card.jackpot .feature-icon {
     font-size: 32px;
 }

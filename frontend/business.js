@@ -411,8 +411,8 @@ class BusinessManager {
         const user = Telegram.WebApp.initDataUnsafe?.user;
         const telegramId = user ? user.id : 'test_user';
 
-        const pricePetrol = parseFloat(document.getElementById(`petrol - price - ${stationId}`).value);
-        const priceGas = parseFloat(document.getElementById(`gas - price - ${stationId}`).value);
+        const pricePetrol = parseFloat(document.getElementById(`petrol-price-${stationId}`).value);
+        const priceGas = parseFloat(document.getElementById(`gas-price-${stationId}`).value);
 
         try {
             const data = await safeFetchJson(`${API_BASE_URL}/investments/update-prices`, {
@@ -477,7 +477,7 @@ class BusinessManager {
 
         if (confirm(`Купить машину для автопарка за ${price.toLocaleString()} PLN ? `)) {
             try {
-                const data = await safeFetchJson(`${API_BASE_URL} / user / ${telegramId} / fleet / buy`, {
+                const data = await safeFetchJson(`${API_BASE_URL}/user/${telegramId}/fleet/buy`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ carId })
@@ -550,7 +550,7 @@ class BusinessManager {
         if (idleDrivers.length === 1) {
             const driver = idleDrivers[0];
             const carName = this.getCarName(modelId);
-            if (confirm(`Назначить ${driver.name} на ${carName} ? `)) {
+            if (confirm(`Назначить ${driver.name} на ${carName}?`)) {
                 await this._doAssign(telegramId, driver.id, instanceId);
             }
         } else {

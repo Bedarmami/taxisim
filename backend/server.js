@@ -1672,7 +1672,10 @@ app.post('/api/user/:telegramId/ride', rateLimitMiddleware, async (req, res) => 
         // Remove from cache immediately to prevent double-claim
         delete userOrders.orders[orderId];
 
-        if (user.stamina <= 0) {
+        // Atomically Deduct Stamina (prevent race)
+        const isAutopilotActive = autopilot && user.car.has_autopilot;
+
+        if (user.stamina <= 0 && !isAutopilotActive) {
             return res.status(400).json({ error: 'Слишком устали! Отдохните.' });
         }
 
@@ -1697,20 +1700,15 @@ app.post('/api/user/:telegramId/ride', rateLimitMiddleware, async (req, res) => 
         const partner = PARTNERS.find(p => p.id === user.partner_id);
         const fuelProvidedByPartner = partner && partner.fuel_provided;
 
-        // Atomically Deduct Stamina (prevent race)
-        const isAutopilotActive = autopilot && user.car.has_autopilot;
-        if (!isAutopilotActive) {
-            const staminaDeducted = await updateStaminaAtomic(telegramId, -15);
-            if (!staminaDeducted) {
-                return res.status(400).json({ error: 'Недостаточно выносливости или ошибка синхронизации' });
-            }
+        // v6.0.2: Stamina deduction moved to the end of processing to unify with Autopilot logic
+        if (!isAutopilotActive && user.stamina < 15) {
+            return res.status(400).json({ error: 'Недостаточно выносливости' });
         }
 
         if (!fuelProvidedByPartner) {
             const fuelDeducted = await updateFuelAtomic(telegramId, fuelType === 'petrol' ? -fuelNeeded : 0, fuelType === 'gas' ? -fuelNeeded : 0);
             if (!fuelDeducted) {
-                // Refund stamina if fuel deduction failed
-                if (!isAutopilotActive) await updateStaminaAtomic(telegramId, 15);
+                // Fuel deduction failed
                 return res.status(400).json({ error: 'Недостаточно топлива' });
             }
         }
@@ -1795,7 +1793,9 @@ app.post('/api/user/:telegramId/ride', rateLimitMiddleware, async (req, res) => 
         user.rides_today++;
         user.rides_streak++;
         user.rating += Math.floor(order.distance);
-        user.stamina = Math.max(0, user.stamina - 15);
+        if (!isAutopilotActive) {
+            user.stamina = Math.max(0, user.stamina - 15);
+        }
         user.experience += Math.floor(order.distance);
         user.total_distance += order.distance;
         if (user.car) {
@@ -2015,10 +2015,93 @@ app.post('/api/user/:telegramId/rest', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Error in rest:', error);
         res.status(500).json({ error: 'Server error' });
     }
 });
+
+// v6.0.2: Skip Week Feature
+app.post('/api/user/:telegramId/skip-week', async (req, res) => {
+    try {
+        const { telegramId } = req.params;
+        const user = await getUser(telegramId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const SKIP_COST = 1500;
+        if (user.balance < SKIP_COST) {
+            return res.status(400).json({ error: 'Недостаточно средств. Нужно 1500 PLN' });
+        }
+
+        user.balance -= SKIP_COST;
+
+        // Progress 7 days
+        user.days_passed = (user.days_passed || 0) + 7;
+        user.weeks_passed = (user.weeks_passed || 0) + 1;
+        user.week_days = 0; // Reset week progress
+
+        // Complete week logic (Rent/Drivers)
+        let message = `🚀 Вы пропустили неделю! (-${SKIP_COST} PLN)\n📅 День: ${user.days_passed}`;
+        let rent_amount = 0;
+
+        // Partner fee
+        const partner = PARTNERS.find(p => p.id === user.partner_id);
+        if (partner && partner.weekly_cost > 0) {
+            if (user.balance >= partner.weekly_cost) {
+                user.balance -= partner.weekly_cost;
+                rent_amount = partner.weekly_cost;
+            }
+        }
+
+        // Car rent
+        if (user.car && user.car.rent_price && user.car.rent_price > 0 && !user.car.is_owned) {
+            if (user.balance >= user.car.rent_price) {
+                user.balance -= user.car.rent_price;
+                rent_amount += user.car.rent_price;
+            } else {
+                user.car_id = 'fabia_blue_rent';
+                user.car = { ...CARS.fabia_blue_rent };
+                message += '\n⚠️ Машина возвращена за долги';
+            }
+        }
+
+        if (rent_amount > 0) message += `\n💳 Аренда: ${rent_amount} PLN`;
+
+        // Fleet Income
+        let fleetIncome = 0;
+        const business = user.business || { fleet: [] };
+        const fleet = business.fleet || [];
+        for (const car of fleet) {
+            const carDef = CARS[car.modelId];
+            if (carDef && carDef.purchase_price) {
+                fleetIncome += Math.floor(carDef.purchase_price * 0.05);
+            }
+        }
+
+        if (fleetIncome > 0) {
+            user.uncollected_fleet_revenue = (user.uncollected_fleet_revenue || 0) + fleetIncome;
+            message += `\n💼 Доход автопарка: +${fleetIncome} PLN`;
+        }
+
+        user.stamina = 100;
+        user.rides_today = 0;
+
+        await saveUser(user);
+
+        res.json({
+            success: true,
+            balance: user.balance,
+            stamina: user.stamina,
+            days_passed: user.days_passed,
+            weeks_passed: user.weeks_passed,
+            message: message
+        });
+
+    } catch (e) {
+        console.error('Skip week error:', e);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
 
 // Заправка топлива
 app.post('/api/user/:telegramId/fuel', async (req, res) => {
@@ -2747,8 +2830,17 @@ app.post('/api/user/:telegramId/drivers/collect', async (req, res) => {
         await saveUser(user);
 
         // v3.6: Record driver revenue for Profitability Matrix
+        let modelId = driver.car_id;
+        if (modelId && modelId.startsWith('fleet_')) {
+            const biz = user.business || { fleet: [] };
+            const fleetCar = (biz.fleet || []).find(f => f.id === modelId);
+            if (fleetCar) modelId = fleetCar.modelId;
+        } else if (modelId && modelId.startsWith('personal_')) {
+            modelId = modelId.replace('personal_', '');
+        }
+
         await db.run(`INSERT INTO orders_history (user_id, car_id, price, distance, fuel_used, fuel_type, completed_at, district_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [user.id, driver.car_id, earnings, 0, 0, 'driver', new Date().toISOString(), 'fleet']);
+            [user.id, modelId, earnings, 0, 0, 'driver', new Date().toISOString(), 'fleet']);
 
         await db.run('UPDATE drivers SET last_collection = ? WHERE id = ?', [now.toISOString(), driver.id]);
 
