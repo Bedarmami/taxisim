@@ -272,6 +272,7 @@ class BusinessManager {
         }
 
         this.gasStations.forEach(station => {
+            const isOwned = !!station.owner_id;
             const currentUserId = Telegram.WebApp.initDataUnsafe?.user?.id?.toString() || 'test_user';
             const isMine = station.owner_id?.toString() === currentUserId;
             const canAfford = this.balance >= station.purchase_price;
