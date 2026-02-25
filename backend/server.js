@@ -2514,7 +2514,7 @@ app.post('/api/user/:telegramId/car-wash', async (req, res) => {
         const user = await getUser(telegramId);
         if (!user) return res.status(404).json({ error: 'User not found' });
 
-        const cost = parseFloat(await getConfig('car_wash_cost', '50'));
+        const cost = 50;
         if (user.balance < cost) return res.status(400).json({ error: 'Недостаточно денег' });
 
         user.balance -= cost;
@@ -2548,7 +2548,7 @@ app.get('/api/user/:telegramId/business', async (req, res) => {
 
         // Map fleet entries to full car info
         const business = user.business || { fleet: [] };
-        const fleet = (business.fleet || [])
+        let fleet = (business.fleet || [])
             .filter(item => item !== null)
             .map(item => {
                 const modelId = typeof item === 'string' ? item : item.modelId;
@@ -2558,9 +2558,25 @@ app.get('/api/user/:telegramId/business', async (req, res) => {
                     id: instanceId,
                     modelId: modelId,
                     name: car ? car.name : (modelId || 'Unknown'),
-                    image: car ? car.image : '🚗'
+                    image: car ? car.image : '🚗',
+                    type: 'rented'
                 };
             });
+
+        // v5.6: Unify Garage - Add personal owned cars to fleet list
+        const ownedCars = user.owned_cars || [];
+        ownedCars.forEach(modelId => {
+            const car = CARS[modelId];
+            if (car) {
+                fleet.push({
+                    id: `personal_${modelId}`,
+                    modelId: modelId,
+                    name: car.name,
+                    image: car.image,
+                    type: 'personal'
+                });
+            }
+        });
 
         res.json({
             success: true,
@@ -2609,6 +2625,24 @@ app.post('/api/user/:telegramId/fleet/buy', async (req, res) => {
         console.error('Error buying fleet car:', error);
         res.status(500).json({ error: 'Server error' });
     }
+});
+
+// v5.6: Select car to drive from fleet (Personal or Rented)
+app.post('/api/user/:telegramId/select-car', async (req, res) => {
+    try {
+        const user = await getUser(req.params.telegramId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const { modelId } = req.body;
+        if (!modelId || !CARS[modelId]) return res.status(400).json({ error: 'Неверная модель авто' });
+
+        // Update user's active car
+        user.car_id = modelId;
+        user.car = { ...CARS[modelId] };
+
+        await saveUser(user);
+        res.json({ success: true, car: user.car });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/user/:telegramId/drivers/hire', async (req, res) => {

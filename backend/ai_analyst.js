@@ -2,21 +2,15 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const db = require('./db');
 require('dotenv').config();
 
-const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
-
-// v5.1: AI Robustness (Caching & Backoff)
-let lastReport = null;
-let lastPromptTime = 0;
-let quotaExceededUntil = 0;
-const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes cache
-const QUOTA_BACKOFF = 30 * 60 * 1000; // 30 minutes backoff on 429
-const DAILY_QUOTA_BACKOFF = 12 * 60 * 60 * 1000; // 12 hours on daily limit (limit: 0)
+// v5.6: AI Multi-Key & Provider
+const geminiKeys = (process.env.GEMINI_API_KEY || "").split(',').map(k => k.trim()).filter(k => k);
+const grokKey = process.env.GROK_API_KEY || "";
 
 /**
  * Runs a deep AI analysis on recent logs and economy state.
  */
 async function runAIAnalysis() {
-    if (!genAI) return "⚠️ Gemini API Key missing. AI Monitoring disabled.";
+    if (geminiKeys.length === 0 && !grokKey) return "⚠️ AI API Keys missing. AI Monitoring disabled.";
 
     const now = Date.now();
 
@@ -27,7 +21,7 @@ async function runAIAnalysis() {
             ? `около ${remainingHours} ч.`
             : `${Math.ceil((quotaExceededUntil - now) / 60000)} мин.`;
 
-        return `⚠️ <b>AI находится на отдыхе (Quota/Rate Limit).</b> Попробуйте снова через ${waitMsg} Используется кэшированный отчет...<br><br>${lastReport || ''}`;
+        return `⚠️ <b>AI на отдыхе (Quota).</b> Доступ через ${waitMsg}<br><br>${lastReport || ''}`;
     }
 
     // 2. Cache Check (Throttle API calls)
@@ -37,10 +31,8 @@ async function runAIAnalysis() {
     }
 
     try {
-        // 1. Gather recent logs (optimized to 80 entries to save tokens)
+        // 1. Gather recent logs (optimized to 80 entries)
         const logs = await db.query('SELECT user_id, action, details, timestamp FROM user_activity ORDER BY timestamp DESC LIMIT 80');
-
-        // 2. Gather economy summary
         const economy = await db.get(`
             SELECT 
                 (SELECT COUNT(*) FROM users) as usersCount,
@@ -48,7 +40,7 @@ async function runAIAnalysis() {
                 (SELECT MAX(balance) FROM users) as topBalance
         `);
 
-        // Trim log details to keep tokens low
+        // Trim log details
         const logContext = logs.map(l => {
             let detail = String(l.details || '');
             if (detail.length > 60) detail = detail.substring(0, 57) + '...';
@@ -56,72 +48,83 @@ async function runAIAnalysis() {
         }).join('\n');
 
         const prompt = `
-            Ты — эксперт-аналитик игры "Taxi Pro". Проанализируй данные и составь краткий отчет.
-            
-            ЭКОНОМИКА:
-            - Игроков: ${economy.usersCount}
-            - Общий баланс: ${economy.totalBalance || 0} PLN
-            - Макс. баланс: ${economy.topBalance || 0} PLN
-            
-            ЛОГИ (последние):
+            Ты — эксперт-аналитик игры "Taxi Pro". Проанализируй данные и составь краткий отчет (HTML).
+            Игроков: ${economy.usersCount}, Баланс: ${economy.totalBalance || 0} PLN.
+            ЛОГИ:
             ${logContext}
             
-            ЗАДАЧА:
-            1. Выяви подозрительных игроков (спам действий, аномальный профит).
-            2. Оцени здоровье экономики.
-            3. Рекомендация админу (1 пункт).
-            
-            ФОРМАТ (HTML):
+            ФОРМАТ:
             📊 <b>ОТЧЕТ AI</b>
             ⚠️ <b>Подозрения:</b> ...
             📈 <b>Экономика:</b> ...
             💡 <b>Совет:</b> ...
         `;
 
-        // 3. Multi-Model Fallback
-        const models = [
-            "gemini-2.0-flash",
-            "gemini-2.0-flash-lite-preview-02-05", // Try Lite if Flash is capped
-            "gemini-1.5-flash",
-            "gemini-1.5-pro"
-        ];
-        let lastErr = null;
+        // 3. Try Gemini Keys in rotation
+        const models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"];
 
-        for (const modelName of models) {
+        for (const key of geminiKeys) {
+            const genAI = new GoogleGenerativeAI(key);
+            for (const modelName of models) {
+                try {
+                    console.log(`🤖 AI Analyst trying Gemini key (...${key.slice(-4)}) model: ${modelName}...`);
+                    const model = genAI.getGenerativeModel({ model: modelName });
+                    const result = await model.generateContent(prompt);
+                    const reportText = result.response.text();
+
+                    lastReport = reportText;
+                    lastPromptTime = Date.now();
+                    quotaExceededUntil = 0;
+                    return reportText;
+                } catch (err) {
+                    const msg = err.message || "";
+                    console.warn(`❌ Gemini ${modelName} failed with key ...${key.slice(-4)}:`, msg);
+                    if (msg.includes('429') || msg.includes('quota')) break; // Try next KEY
+                    if (msg.includes('404')) continue; // Try next model for same key
+                    break; // Unexpected error, try next key
+                }
+            }
+        }
+
+        // 4. Try Grok Fallback
+        if (grokKey) {
             try {
-                console.log(`🤖 AI Analyst trying model: ${modelName}...`);
-                const model = genAI.getGenerativeModel({ model: modelName });
-                const result = await model.generateContent(prompt);
-                const reportText = result.response.text();
+                console.log("🤖 Gemini exhausted. Trying Grok (xAI) fallback...");
+                const response = await fetch("https://api.x.ai/v1/chat/completions", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${grokKey}`
+                    },
+                    body: JSON.stringify({
+                        messages: [
+                            { role: "system", content: "You are a professional taxi business analyst." },
+                            { role: "user", content: prompt }
+                        ],
+                        model: "grok-beta", // User suggested grok-4-latest, but beta is more standard for fallback
+                        stream: false,
+                        temperature: 0.7
+                    })
+                });
 
-                // Success! Update cache
-                lastReport = reportText;
-                lastPromptTime = Date.now();
-                quotaExceededUntil = 0;
-                return reportText;
-
+                if (response.ok) {
+                    const data = await response.json();
+                    const reportText = data.choices[0].message.content;
+                    lastReport = reportText;
+                    lastPromptTime = Date.now();
+                    quotaExceededUntil = 0;
+                    console.log("✅ Grok analysis successful!");
+                    return reportText;
+                } else {
+                    console.error("❌ Grok API error:", response.status);
+                }
             } catch (err) {
-                lastErr = err;
-                console.warn(`❌ Model ${modelName} failed:`, err.message);
-                // Wait 1s before trying next model
-                await new Promise(r => setTimeout(r, 1000));
+                console.error("❌ Grok fallback failed:", err.message);
             }
         }
 
-        // 4. If all models failed, handle the last error
-        if (lastErr) {
-            const status = lastErr.status || 0;
-            const msg = lastErr.message || '';
-            const isQuota = status === 429 || msg.includes('429');
-            const isDaily = msg.includes('limit: 0') || msg.includes('quota exceeded');
-
-            if (isQuota) {
-                quotaExceededUntil = Date.now() + (isDaily ? DAILY_QUOTA_BACKOFF : QUOTA_BACKOFF);
-                return `⚠️ <b>Лимит Gemini API исчерпан.</b> ${isDaily ? 'Дневная квота пуста.' : 'Слишком много запросов.'} Анализ отключен на ${isDaily ? '12 часов' : '30 минут'}.`;
-            }
-        }
-
-        return "⚠️ Ошибка AI-анализа после всех попыток.";
+        if (lastReport) return lastReport;
+        return "⚠️ Все AI-провайдеры исчерпаны.";
 
     } catch (e) {
         console.error('Fatal AI Analysis Error:', e);

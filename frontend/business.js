@@ -210,7 +210,7 @@ class BusinessManager {
             });
         }
 
-        // Fleet List (existing cars in fleet)
+        // Fleet List (unified: personal + rented)
         const fleetList = document.getElementById('fleet-list');
         fleetList.innerHTML = '';
 
@@ -221,30 +221,41 @@ class BusinessManager {
             fleetList.innerHTML = `
                 <div class="empty-state" style="text-align:center; color:#777; padding:20px;">
                     <div style="font-size:3em; margin-bottom:10px;">🚗</div>
-                    <div>Нет машин в автопарке</div>
-                    <div style="font-size:0.85em; color:#555; margin-top:5px;">Купите машину в магазине ниже</div>
+                    <div>Автопарк пуст</div>
+                    <div style="font-size:0.85em; color:#555; margin-top:5px;">Купите машину в магазине или имейте личную</div>
                 </div>`;
         } else {
-            this.fleet.forEach((carInstance, idx) => {
-                // carInstance is now {id: "fleet_...", modelId: "...", acquiredAt: "..."}
-                // We need to get car definition for name/image
+            this.fleet.forEach((carInstance) => {
                 const carDef = CARS[carInstance.modelId] || { name: carInstance.modelId, image: '🚗' };
                 const isTaken = takenInstanceIds.has(carInstance.id);
+                const isActive = this.currentCarId === carInstance.modelId;
+                const isPersonal = carInstance.type === 'personal';
 
                 const div = document.createElement('div');
-                div.className = 'fleet-car-card'; // Assuming there's a style or use inline
-                div.style.cssText = 'background:#252525; margin-bottom:10px; padding:12px 15px; border-radius:10px; display:flex; justify-content:space-between; align-items:center; border:1px solid #333;';
+                div.className = 'fleet-car-card';
+                div.style.cssText = 'background:#252525; margin-bottom:10px; padding:12px 15px; border-radius:12px; display:flex; justify-content:space-between; align-items:center; border:1px solid #333;';
 
                 div.innerHTML = `
-                    <div>
-                        <span style="font-size:1.2em; margin-right:8px;">${carDef.image}</span>
-                        <span style="font-weight:bold; color:#e0e0e0;">${carDef.name}</span>
-                        <div style="font-size:0.7em; color:#666;">ID: ${carInstance.id.split('_').pop()}</div>
+                    <div style="display:flex; align-items:center;">
+                        <span style="font-size:1.8em; margin-right:12px;">${carDef.image}</span>
+                        <div>
+                            <div style="font-weight:bold; color:#fff;">${carDef.name}</div>
+                            <div style="font-size:0.75em; color:#777;">
+                                ${isPersonal ? '<span style="color:var(--accent-color);">⭐ Личная</span>' : '🏢 Аренда'} | 
+                                ID: ${carInstance.id.split('_').pop()}
+                            </div>
+                        </div>
                     </div>
-                    ${isTaken ?
-                        '<span style="background:#444; color:#888; padding:4px 10px; border-radius:6px; font-size:0.8em;">Занята</span>' :
-                        `<button style="background:var(--accent-color, #f39c12); color:white; border:none; padding:6px 14px; border-radius:8px; font-weight:bold; cursor:pointer;" onclick="businessManager.assignCar('${carInstance.id}', '${carInstance.modelId}')">🔑 Назначить</button>`
+                    <div style="display:flex; gap:8px;">
+                        ${isActive ?
+                        '<span style="background:rgba(46, 204, 113, 0.2); color:#2ecc71; padding:6px 12px; border-radius:10px; font-size:0.8em; font-weight:bold; border:1px solid #2ecc7144;">🔋 Активна</span>' :
+                        `<button class="action-btn small" style="background:#555; color:white;" onclick="businessManager.selectCar('${carInstance.modelId}')">🚗 Ехать</button>`
                     }
+                        ${isTaken ?
+                        '<span style="background:#444; color:#888; padding:6px 12px; border-radius:10px; font-size:0.8em; border:1px solid #555;">Занята</span>' :
+                        `<button class="action-btn success small" onclick="businessManager.assignCar('${carInstance.id}', '${carInstance.modelId}')">🔑 Нанять</button>`
+                    }
+                    </div>
                 `;
                 fleetList.appendChild(div);
             });
@@ -555,7 +566,7 @@ class BusinessManager {
 
     async _doAssign(telegramId, driverId, carId) {
         try {
-            const data = await safeFetchJson(`${API_BASE_URL} /user/${telegramId} /drivers/assign`, {
+            const data = await safeFetchJson(`${API_BASE_URL}/user/${telegramId}/drivers/assign`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ driverId, carId })
@@ -567,6 +578,29 @@ class BusinessManager {
                 showNotification(data.error, 'error');
             }
         } catch (e) { console.error(e); }
+    }
+
+    async selectCar(modelId) {
+        const user = Telegram.WebApp.initDataUnsafe?.user;
+        const telegramId = user ? user.id : 'test_user';
+        try {
+            const data = await safeFetchJson(`${API_BASE_URL}/user/${telegramId}/select-car`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ modelId })
+            });
+
+            if (data && data.success) {
+                showNotification(`Вы выбрали ${data.car.name}!`, 'success');
+                this.loadData();
+                if (window.updateMainScreen) window.updateMainScreen();
+            } else {
+                showNotification(`Ошибка: ${data?.error || 'Unknown'}`, 'error');
+            }
+        } catch (e) {
+            console.error('Error selecting car:', e);
+            showNotification('Ошибка при выборе машины', 'error');
+        }
     }
 
     async sellStationToState(stationId) {
