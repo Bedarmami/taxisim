@@ -82,13 +82,22 @@ function initDB() {
             db.run(`CREATE TABLE IF NOT EXISTS orders_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id TEXT,
+                car_id TEXT,
                 price REAL,
                 distance REAL,
                 fuel_used REAL,
                 fuel_type TEXT,
                 completed_at TEXT,
+                district_id TEXT,
                 FOREIGN KEY(user_id) REFERENCES users(id)
             )`);
+
+            // v3.6: Car Profitability Matrix - Add car_id to orders_history
+            db.run(`ALTER TABLE orders_history ADD COLUMN car_id TEXT`, (err) => {
+                if (err && !err.message.includes('duplicate column name')) {
+                    console.error('Migration error (orders_history car_id):', err.message);
+                }
+            });
 
             console.log('Database tables initialized.');
 

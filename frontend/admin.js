@@ -25,6 +25,7 @@ function openTab(evt, tabName) {
     if (tabName === 'tab-gas-stations') loadAdminGasStations();
     if (tabName === 'tab-plates') loadAdminPlates();
     if (tabName === 'tab-live-config') loadConfigs();
+    if (tabName === 'tab-car-profit') loadCarProfitability();
 }
 
 async function checkAuth() {
@@ -1424,4 +1425,34 @@ function renderUserWealthChart(history) {
             }
         }
     });
+}
+
+async function loadCarProfitability() {
+    const tbody = document.getElementById('profitability-tbody');
+    tbody.innerHTML = '<tr><td colspan="4">Загрузка данных...</td></tr>';
+
+    const data = await safeFetchJson('/api/admin/car-profitability', {
+        headers: { 'x-admin-password': adminPassword }
+    });
+
+    if (data && !data._isError) {
+        tbody.innerHTML = '';
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4">Нет данных о поездках</td></tr>';
+            return;
+        }
+
+        data.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><b>${item.name}</b> <br><small style="color:#666">${item.modelId}</small></td>
+                <td>${item.totalRides}</td>
+                <td><span style="color:#2ecc71; font-weight:bold;">${item.totalRevenue.toFixed(2)} PLN</span></td>
+                <td><span style="color:var(--accent-color);">${item.efficiency.toFixed(2)} PLN</span></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } else {
+        tbody.innerHTML = '<tr><td colspan="4" style="color:#e74c3c;">Ошибка загрузки данных</td></tr>';
+    }
 }

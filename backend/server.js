@@ -1147,6 +1147,34 @@ async function getUser(telegramId) {
         row.owned_cars = row.owned_cars_data ? JSON.parse(row.owned_cars_data) : [];
         row.achievements = row.achievements_data ? JSON.parse(row.achievements_data) : {};
         row.business = row.business_data ? JSON.parse(row.business_data) : { rented_cars: {}, fleet: [] };
+
+        // v3.6: Fleet revenue accumulation logic
+        if (row.business.fleet && row.business.fleet.length > 0) {
+            const now = Date.now();
+            const lastCollection = row.business.last_fleet_update || now;
+            const hoursPassed = (now - lastCollection) / (1000 * 60 * 60);
+
+            if (hoursPassed > 0) {
+                let hourlyFleetIncome = 0;
+                row.business.fleet.forEach(item => {
+                    const modelId = typeof item === 'string' ? item : item.modelId;
+                    const car = item.modelId ? CARS[item.modelId] : CARS[item];
+                    if (car && car.purchase_price > 0) {
+                        // 5% weekly = 5% / 168 hours
+                        hourlyFleetIncome += (car.purchase_price * 0.05) / 168;
+                    }
+                });
+
+                if (hourlyFleetIncome > 0) {
+                    const newRevenue = hoursPassed * hourlyFleetIncome;
+                    row.uncollected_fleet_revenue = (Number(row.uncollected_fleet_revenue) || 0) + newRevenue;
+                }
+                row.business.last_fleet_update = now;
+            }
+        } else {
+            row.business.last_fleet_update = Date.now();
+        }
+
         row.lootboxes = row.lootboxes_data ? JSON.parse(row.lootboxes_data) : { wooden: 0, silver: 0, gold: 0, legendary: 0 };
         row.lootboxes_given = row.lootboxes_given_data ? JSON.parse(row.lootboxes_given_data) : {};
         row.casino_stats = row.casino_stats ? JSON.parse(row.casino_stats) : { total_won: 0, total_lost: 0, spins: 0 };
@@ -1273,7 +1301,7 @@ async function saveUser(user) {
         lootboxes_data = ?, lootboxes_given_data = ?, casino_spins_today = ?, casino_last_reset = ?, casino_stats = ?, last_login = ?,
         skills = ?, cleanliness = ?, tire_condition = ?,
         tutorial_completed = ?, pending_auction_rewards = ?, free_plate_rolls = ?, is_banned = ?,
-        current_district = ?, mileage = ?
+        current_district = ?, mileage = ?, uncollected_fleet_revenue = ?
         WHERE telegram_id = ?`;
 
     const params = [
@@ -1305,6 +1333,7 @@ async function saveUser(user) {
         user.is_banned || 0,
         user.current_district || 'suburbs',
         user.car?.mileage || 0,
+        user.uncollected_fleet_revenue || 0,
         user.telegram_id
     ];
 
@@ -1813,8 +1842,8 @@ app.post('/api/user/:telegramId/ride', rateLimitMiddleware, async (req, res) => 
         await saveJackpot();
 
         // Сохраняем в историю и обновляем юзера
-        await db.run(`INSERT INTO orders_history (user_id, price, distance, fuel_used, fuel_type, completed_at, district_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [user.id, earnings, order.distance, fuelNeeded, fuelType, new Date().toISOString(), order.district]);
+        await db.run(`INSERT INTO orders_history (user_id, car_id, price, distance, fuel_used, fuel_type, completed_at, district_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [user.id, user.car_id, earnings, order.distance, fuelNeeded, fuelType, new Date().toISOString(), order.district]);
 
         await saveUser(user);
 
@@ -2645,6 +2674,31 @@ app.post('/api/user/:telegramId/select-car', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// v5.6: Withdraw fleet revenue
+app.post('/api/user/:telegramId/withdraw-fleet', async (req, res) => {
+    try {
+        const user = await getUser(req.params.telegramId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const revenue = user.uncollected_fleet_revenue || 0;
+        if (revenue <= 0) return res.status(400).json({ error: 'Нет прибыли для снятия' });
+
+        // 10% fee for management
+        const fee = Math.floor(revenue * 0.1);
+        const net = revenue - fee;
+
+        user.balance += net;
+        user.uncollected_fleet_revenue = 0;
+
+        await saveUser(user);
+        res.json({
+            success: true,
+            message: `💰 Вы сняли ${net} PLN! (Удержано ${fee} PLN на обслуживание)`,
+            balance: user.balance
+        });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/api/user/:telegramId/drivers/hire', async (req, res) => {
     try {
         const user = await getUser(req.params.telegramId);
@@ -2687,6 +2741,10 @@ app.post('/api/user/:telegramId/drivers/collect', async (req, res) => {
         user.balance += earnings;
         user.total_earned += earnings;
         await saveUser(user);
+
+        // v3.6: Record driver revenue for Profitability Matrix
+        await db.run(`INSERT INTO orders_history (user_id, car_id, price, distance, fuel_used, fuel_type, completed_at, district_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [user.id, driver.car_id, earnings, 0, 0, 'driver', new Date().toISOString(), 'fleet']);
 
         await db.run('UPDATE drivers SET last_collection = ? WHERE id = ?', [now.toISOString(), driver.id]);
 
@@ -4287,6 +4345,35 @@ setInterval(async () => {
 }, 6 * 60 * 60 * 1000); // Every 6 hours
 
 // Redundant auction endpoints removed. Using auction.js routes.
+
+app.get('/api/admin/car-profitability', adminAuth, async (req, res) => {
+    try {
+        const stats = await db.query(`
+            SELECT 
+                car_id, 
+                COUNT(*) as total_rides, 
+                SUM(price) as total_revenue
+            FROM orders_history 
+            WHERE car_id IS NOT NULL
+            GROUP BY car_id
+            ORDER BY total_revenue DESC
+        `);
+
+        // Map model IDs to real names from CARS
+        const report = stats.map(s => {
+            const car = CARS[s.car_id];
+            return {
+                modelId: s.car_id,
+                name: car ? car.name : s.car_id,
+                totalRides: s.total_rides,
+                totalRevenue: Number(s.total_revenue.toFixed(2)),
+                efficiency: s.total_rides > 0 ? Number((s.total_revenue / s.total_rides).toFixed(2)) : 0
+            };
+        });
+
+        res.json(report);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 app.get('/api/admin/stats', adminAuth, async (req, res) => {
     try {

@@ -389,7 +389,7 @@ class BusinessManager {
 
         if (confirm(`Вы действительно хотите купить ${station.name} за ${station.purchase_price.toLocaleString()} PLN ? `)) {
             try {
-                const data = await safeFetchJson(`${API_BASE_URL} / investments / buy`, {
+                const data = await safeFetchJson(`${API_BASE_URL}/investments/buy`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ telegramId, stationId })
@@ -415,7 +415,7 @@ class BusinessManager {
         const priceGas = parseFloat(document.getElementById(`gas - price - ${stationId}`).value);
 
         try {
-            const data = await safeFetchJson(`${API_BASE_URL} / investments / update - prices`, {
+            const data = await safeFetchJson(`${API_BASE_URL}/investments/update-prices`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ telegramId, stationId, pricePetrol, priceGas })
@@ -443,7 +443,7 @@ class BusinessManager {
             div.style.cssText = 'background:#1e1e2e; margin:8px 10px; padding:14px; border-radius:12px; border:1px solid #333; display:flex; justify-content:space-between; align-items:center;';
 
             div.innerHTML = `
-        < div style = "flex:1;" >
+                <div style="flex:1;">
                     <div style="font-weight:bold; color:#e0e0e0;">
                         <span style="font-size:1.2em; margin-right:6px;">${car.image}</span>
                         ${car.name}
@@ -501,7 +501,7 @@ class BusinessManager {
 
         if (confirm('Нанять водителя за 1000 PLN?')) {
             try {
-                const data = await safeFetchJson(`${API_BASE_URL} / user / ${telegramId} / drivers / hire`, { method: 'POST' });
+                const data = await safeFetchJson(`${API_BASE_URL}/user/${telegramId}/drivers/hire`, { method: 'POST' });
                 if (data.success) {
                     showNotification(data.message, 'success');
                     this.loadData();
@@ -518,7 +518,7 @@ class BusinessManager {
         const telegramId = user ? user.id : 'test_user';
 
         try {
-            const data = await safeFetchJson(`${API_BASE_URL} / user / ${telegramId} / drivers / collect`, {
+            const data = await safeFetchJson(`${API_BASE_URL}/user/${telegramId}/drivers/collect`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ driverId })
@@ -613,7 +613,7 @@ class BusinessManager {
         const refund = Math.floor(station.purchase_price * 0.7);
         if (confirm(`Вы действительно хотите продать ${station.name} государству за ${refund.toLocaleString()} PLN ? (Это вернет 70 % стоимости)`)) {
             try {
-                const data = await safeFetchJson(`${API_BASE_URL} /investments/sell - to - state`, {
+                const data = await safeFetchJson(`${API_BASE_URL}/investments/sell-to-state`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ telegramId, stationId })
@@ -639,7 +639,7 @@ class BusinessManager {
         if (liters <= 0) return;
 
         try {
-            const data = await safeFetchJson(`${API_BASE_URL} /investments/buy - stock`, {
+            const data = await safeFetchJson(`${API_BASE_URL}/investments/buy-stock`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ telegramId, stationId, liters })
@@ -663,7 +663,7 @@ class BusinessManager {
         const telegramId = user ? user.id : 'test_user';
 
         try {
-            const data = await safeFetchJson(`${API_BASE_URL} /investments/withdraw`, {
+            const data = await safeFetchJson(`${API_BASE_URL}/investments/withdraw`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ telegramId, stationId })
@@ -687,7 +687,7 @@ class BusinessManager {
         const telegramId = user ? user.id : 'test_user';
 
         try {
-            const data = await safeFetchJson(`${API_BASE_URL} /user/${telegramId}/withdraw-fleet`, {
+            const data = await safeFetchJson(`${API_BASE_URL}/user/${telegramId}/withdraw-fleet`, {
                 method: 'POST'
             });
 
