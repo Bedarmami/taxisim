@@ -79,7 +79,12 @@ async function runAIAnalysis() {
         `;
 
         // 3. Multi-Model Fallback
-        const models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-pro"];
+        const models = [
+            "gemini-2.0-flash",
+            "gemini-2.0-flash-lite-preview-02-05", // Try Lite if Flash is capped
+            "gemini-1.5-flash",
+            "gemini-1.5-pro"
+        ];
         let lastErr = null;
 
         for (const modelName of models) {
@@ -98,7 +103,7 @@ async function runAIAnalysis() {
             } catch (err) {
                 lastErr = err;
                 console.warn(`❌ Model ${modelName} failed:`, err.message);
-                // Wait 1s before trying next model to avoid overlapping rate limit logic
+                // Wait 1s before trying next model
                 await new Promise(r => setTimeout(r, 1000));
             }
         }
