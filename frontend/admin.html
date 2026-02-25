@@ -80,22 +80,42 @@
                         <h3>DAU / WAU</h3>
                         <div id="stats-retention" class="stat-value">0 / 0</div>
                     </div>
+                    <div class="stat-card" style="border: 1px solid #34b545;">
+                        <h3>Приток PLN (7д)</h3>
+                        <div id="economy-inflow" class="stat-value" style="color: #34b545;">-</div>
+                    </div>
                 </section>
 
-                <section class="charts-container">
-                    <div class="chart-box">
-                        <h3>Регистрации (14 дней)</h3>
-                        <canvas id="regChart"></canvas>
-                    </div>
-                    <div class="chart-box">
-                        <h3>Активность (Поездки)</h3>
-                        <canvas id="ridesChart"></canvas>
-                    </div>
-                    <div class="chart-box">
-                        <h3>Популярность районов</h3>
-                        <canvas id="districtChart"></canvas>
-                    </div>
-                </section>
+                <div class="dashboard-grid"
+                    style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+                    <section class="charts-container" style="flex: 1;">
+                        <div class="chart-box">
+                            <h3>Регистрации (14 дней)</h3>
+                            <canvas id="regChart"></canvas>
+                        </div>
+                        <div class="chart-box">
+                            <h3>Активность (Поездки)</h3>
+                            <canvas id="ridesChart"></canvas>
+                        </div>
+                    </section>
+
+                    <section class="wealth-list-card"
+                        style="background: rgba(40,40,40,0.8); border-radius: 12px; padding: 20px;">
+                        <h3 style="margin-bottom: 15px;">💰 Топ-10 богачей (Баланс)</h3>
+                        <div class="table-container small">
+                            <table id="wealth-table" style="font-size: 0.9em;">
+                                <thead>
+                                    <tr>
+                                        <th>Игрок</th>
+                                        <th>Баланс</th>
+                                        <th>Lvl</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="wealth-tbody"></tbody>
+                            </table>
+                        </div>
+                    </section>
+                </div>
             </div>
 
             <!-- Вкладка: Игроки -->
@@ -252,9 +272,11 @@
                             в
                             Telegram всем пользователям бота.</p>
                         <form id="broadcast-form">
-                            <textarea id="broadcast-message" placeholder="Текст сообщения для всех игроков..." required
-                                rows="4"
-                                style="width: 100%; margin-bottom: 15px; border-radius: 8px; padding: 10px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); font-family: inherit; font-size: 14px;"></textarea>
+                            <textarea id="broadcast-message" placeholder="Текст сообщения (HTML поддерживается)..."
+                                required rows="4"
+                                style="width: 100%; margin-bottom: 10px; border-radius: 8px; padding: 10px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); font-family: inherit; font-size: 14px;"></textarea>
+                            <input type="text" id="broadcast-image" placeholder="URL картинки (необязательно)"
+                                style="width: 100%; margin-bottom: 15px; border-radius: 8px; padding: 10px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2);">
                             <button type="submit" class="danger-btn"
                                 style="width: 100%; background: #fff; color: #0088cc;">🚀 Отправить всем
                                 (Telegram)</button>
@@ -402,7 +424,20 @@
             <div id="tab-activities" class="tab-content">
                 <div class="section-header">
                     <h2>Логи активности (Анти-чит)</h2>
-                    <button onclick="loadActivities()">🔄 Обновить</button>
+                    <div class="filters" style="display: flex; gap: 10px;">
+                        <input type="text" id="filter-user-id" placeholder="Telegram ID"
+                            style="width: 150px; padding: 5px;">
+                        <select id="filter-action"
+                            style="padding: 5px; background: #333; color: white; border: 1px solid #555;">
+                            <option value="">Все действия</option>
+                            <option value="COMPLETE_RIDE">🏆 Поездки</option>
+                            <option value="REFUEL">⛽ Заправка</option>
+                            <option value="CASINO_SPIN">🎰 Казино</option>
+                            <option value="ALARM_EXPLOIT">🚨 Угрозы</option>
+                            <option value="LOGIN">🔑 Вход</option>
+                        </select>
+                        <button onclick="loadActivities()">🔍 Найти</button>
+                    </div>
                 </div>
                 <div class="table-container">
                     <table>

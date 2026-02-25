@@ -3883,8 +3883,48 @@ app.get('/api/admin/cars', adminAuth, async (req, res) => {
 // v3.1: Activities Log
 app.get('/api/admin/activities', adminAuth, async (req, res) => {
     try {
-        const activities = await db.query('SELECT * FROM user_activity ORDER BY timestamp DESC LIMIT 100');
-        res.json(activities);
+        const { userId, action } = req.query;
+        let sql = 'SELECT * FROM user_activity';
+        let params = [];
+        let where = [];
+
+        if (userId) {
+            where.push('user_id = ?');
+            params.push(userId);
+        }
+        if (action) {
+            where.push('action = ?');
+            params.push(action);
+        }
+
+        if (where.length > 0) {
+            sql += ' WHERE ' + where.join(' AND ');
+        }
+
+        sql += ' ORDER BY timestamp DESC LIMIT 200';
+        const activities = await db.query(sql, params);
+
+        // Add suspicious flags
+        const flaggedActivities = activities.map(a => {
+            let details = {};
+            try { details = JSON.parse(a.details); } catch (e) { }
+
+            let isSuspicious = false;
+            let reason = '';
+
+            if (a.action === 'COMPLETE_RIDE' && details.reward > 1000) {
+                isSuspicious = true;
+                reason = 'High reward';
+            }
+            if (a.action === 'ALARM_EXPLOIT') {
+                isSuspicious = true;
+                reason = 'Exploit detected';
+            }
+
+            return { ...a, is_suspicious: isSuspicious, reason };
+        });
+
+        res.json(flaggedActivities);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -4014,17 +4054,62 @@ app.get('/api/admin/analytics', adminAuth, async (req, res) => {
             LIMIT 5
         `);
 
+        // Economy Flow (Last 7 days)
+        // Inflow: Rides
+        const inflow = await db.get(`
+            SELECT SUM(reward) as total 
+            FROM orders_history 
+            WHERE completed_at >= ?
+        `, [sevenDaysAgo]);
+
+        // Outflow: We can use activity logs if they contain cost, but simpler is to track totals
+        // For accurate outflow, we need to sum up various spending actions from user_activity
+        // Since sqlite might not have JSON functions enabled by default in all environments, 
+        // we will fetch recent logs and process in JS or use approximate metrics.
+
         res.json({
             registrations,
             rides,
             dau: dau.total || 0,
             wau: wau.total || 0,
             districtPopularity: districts,
+            economy: {
+                inflow7d: (inflow.total || 0).toFixed(2),
+                healthScore: 85 // Placeholder for now
+            },
             summary: {
                 totalEarned: (await db.get('SELECT SUM(total_earned) as total FROM users')).total || 0,
                 totalRides: (await db.get('SELECT COUNT(*) as total FROM orders_history')).total || 0,
                 activeUsers: dau.total || 0
             }
+        });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/admin/wealthiest', adminAuth, async (req, res) => {
+    try {
+        const topWealthy = await db.query('SELECT telegram_id, username, balance, total_earned, level FROM users ORDER BY balance DESC LIMIT 10');
+        res.json(topWealthy);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/admin/bot-status', adminAuth, async (req, res) => {
+    try {
+        const https = require('https');
+        const checkTelegram = () => new Promise((resolve) => {
+            https.get('https://api.telegram.org', (apiRes) => {
+                resolve({ status: apiRes.statusCode, ok: apiRes.statusCode === 200 || apiRes.statusCode === 302 });
+            }).on('error', e => resolve({ ok: false, error: e.message }));
+        });
+
+        const tgStatus = await checkTelegram();
+        const dbStatus = { ok: true }; // If we are here, DB is working
+
+        res.json({
+            telegram: tgStatus,
+            database: dbStatus,
+            uptime: Math.floor(process.uptime()),
+            memory: process.memoryUsage()
         });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -4404,7 +4489,7 @@ app.post('/api/promo/redeem', async (req, res) => {
 // v3.3: Admin Broadcast Message
 app.post('/api/admin/broadcast', adminAuth, async (req, res) => {
     try {
-        const { message } = req.body;
+        const { message, imageUrl } = req.body;
         if (!message) return res.status(400).json({ error: 'Message required' });
 
         // Log the start of the process immediately
@@ -4417,21 +4502,13 @@ app.post('/api/admin/broadcast', adminAuth, async (req, res) => {
             let failCount = 0;
 
             console.log(`📣 Starting broadcast to ${users.length} users...`);
-            await db.run('INSERT INTO logs (level, message, timestamp) VALUES (?, ?, ?)',
-                ['INFO', `User query returned ${users.length} users`, new Date().toISOString()]);
-            await db.run('INSERT INTO logs (level, message, timestamp) VALUES (?, ?, ?)',
-                ['INFO', `Starting broadcast to ${users.length} users`, new Date().toISOString()]);
 
-            if (users.length === 0) {
-                await db.run('INSERT INTO logs (level, message, timestamp) VALUES (?, ?, ?)',
-                    ['WARNING', 'Broadcast aborted: No users found in database', new Date().toISOString()]);
-                return;
-            }
+            if (users.length === 0) return;
 
             for (const user of users) {
                 if (user.telegram_id) {
                     try {
-                        const sent = await sendNotification(user.telegram_id, 'BROADCAST', { text: message });
+                        const sent = await sendNotification(user.telegram_id, 'BROADCAST', { text: message, imageUrl });
                         if (sent) successCount++;
                         else failCount++;
                     } catch (e) {

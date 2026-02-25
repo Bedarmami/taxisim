@@ -53,13 +53,14 @@ async function checkAuth() {
             document.getElementById('broadcast-form')?.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const msg = document.getElementById('broadcast-message').value;
+                const imageUrl = document.getElementById('broadcast-image').value;
                 if (!confirm('Вы уверены, что хотите отправить это сообщение ВСЕМ пользователям?')) return;
 
                 try {
                     const data = await safeFetchJson(`/api/admin/broadcast`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
-                        body: JSON.stringify({ message: msg })
+                        body: JSON.stringify({ message: msg, imageUrl: imageUrl })
                     });
                     if (data && !data._isError) {
                         alert(data.message || 'Рассылка завершена');
@@ -198,10 +199,42 @@ async function loadAnalytics() {
     const statsRet = document.getElementById('stats-retention');
     if (statsRet) statsRet.textContent = `${data.dau} / ${data.wau}`;
 
-    // District chart
-    if (data.districtPopularity) {
-        initBarChart('districtChart', 'Заказы по районам', data.districtPopularity);
+    // Economy Inflow
+    const economyInflowEl = document.getElementById('economy-inflow');
+    if (economyInflowEl && data.economy) {
+        economyInflowEl.textContent = data.economy.inflow7d + ' PLN';
     }
+
+    // Load Wealthiest for the table
+    loadWealthiest();
+    loadBotStatus();
+}
+
+async function loadBotStatus() {
+    const data = await safeFetchJson('/api/admin/bot-status', { headers: { 'x-admin-password': adminPassword } });
+    if (!data || data._isError) return;
+
+    // For now we just console log or update a small status if we had one
+    // Let's add it to the console for debug and eventually to UI
+    console.log('Bot Status:', data);
+}
+
+async function loadWealthiest() {
+    const data = await safeFetchJson('/api/admin/wealthiest', { headers: { 'x-admin-password': adminPassword } });
+    if (!data || data._isError) return;
+
+    const tbody = document.getElementById('wealth-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    data.forEach(p => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${p.username || p.telegram_id}</td>
+            <td style="color: #34b545; font-weight: bold;">${p.balance.toFixed(2)}</td>
+            <td>${p.level}</td>
+        `;
+        tbody.appendChild(tr);
+    });
 }
 
 function initBarChart(id, label, data) {
@@ -229,13 +262,26 @@ function initBarChart(id, label, data) {
 }
 
 async function loadActivities() {
-    const activities = await safeFetchJson('/api/admin/activities', { headers: { 'x-admin-password': adminPassword } });
+    const userId = document.getElementById('filter-user-id')?.value || '';
+    const action = document.getElementById('filter-action')?.value || '';
+    let url = '/api/admin/activities';
+    const params = [];
+    if (userId) params.push(`userId=${userId}`);
+    if (action) params.push(`action=${action}`);
+    if (params.length > 0) url += '?' + params.join('&');
+
+    const activities = await safeFetchJson(url, { headers: { 'x-admin-password': adminPassword } });
     if (!activities || activities._isError) return;
 
     const tbody = document.getElementById('activities-tbody');
     tbody.innerHTML = '';
     activities.forEach(a => {
         const tr = document.createElement('tr');
+        if (a.is_suspicious) {
+            tr.style.background = 'rgba(255, 0, 0, 0.15)';
+            tr.title = 'Suspicious: ' + (a.reason || 'Logic check');
+        }
+
         let details = {};
         try {
             details = typeof a.details === 'string' ? JSON.parse(a.details) : a.details;

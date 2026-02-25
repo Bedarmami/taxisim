@@ -102,7 +102,16 @@ const sendNotification = async (telegramId, type, data) => {
                 message = data.text || 'Уведомление от системы.';
         }
 
-        await bot.telegram.sendMessage(telegramId, message);
+        if (data.imageUrl) {
+            await bot.telegram.sendPhoto(telegramId, data.imageUrl, {
+                caption: message,
+                parse_mode: 'HTML'
+            });
+        } else {
+            await bot.telegram.sendMessage(telegramId, message, {
+                parse_mode: 'HTML'
+            });
+        }
 
         // Log to support history
         const senderType = type === 'SUPPORT_REPLY' ? 'admin' : 'system';
