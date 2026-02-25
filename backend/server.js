@@ -4107,19 +4107,19 @@ app.get('/api/admin/wealthiest', adminAuth, async (req, res) => {
 app.get('/api/admin/users/:telegramId/timeline', adminAuth, async (req, res) => {
     try {
         const { telegramId } = req.params;
-        const user = await db.get('SELECT id, telegram_id, username, balance, created_at FROM users WHERE telegram_id = ?', [telegramId]);
+        const user = await db.get('SELECT id, telegram_id, username, balance, rides_total, created_at FROM users WHERE telegram_id = ?', [telegramId]);
         if (!user) return res.status(404).json({ error: 'User not found' });
 
         // Wealth Growth (Orders history)
-        const history = await db.query('SELECT completed_at, price FROM orders_history WHERE user_id = ? ORDER BY completed_at ASC', [user.id]);
+        const orders = await db.query('SELECT completed_at, price FROM orders_history WHERE user_id = ? ORDER BY completed_at ASC', [user.id]);
 
         // Activity (Last 50 significant actions)
         const activities = await db.query('SELECT action, details, timestamp FROM user_activity WHERE user_id = ? ORDER BY timestamp DESC LIMIT 50', [telegramId]);
 
         res.json({
             user,
-            wealthHistory: history,
-            activities: activities
+            wealthHistory: orders,
+            history: activities // Mapping to frontend 'history' key
         });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
