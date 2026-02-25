@@ -10,6 +10,7 @@ let lastPromptTime = 0;
 let quotaExceededUntil = 0;
 const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes cache
 const QUOTA_BACKOFF = 30 * 60 * 1000; // 30 minutes backoff on 429
+const DAILY_QUOTA_BACKOFF = 12 * 60 * 60 * 1000; // 12 hours on daily limit (limit: 0)
 
 /**
  * Runs a deep AI analysis on recent logs and economy state.
@@ -21,8 +22,12 @@ async function runAIAnalysis() {
 
     // 1. Quota Backoff Check
     if (now < quotaExceededUntil) {
-        const remaining = Math.ceil((quotaExceededUntil - now) / 60000);
-        return `⚠️ <b>AI находится на отдыхе (Quota 429).</b> Попробуйте снова через ${remaining} мин. Используется кэшированный отчет...<br><br>${lastReport || ''}`;
+        const remainingHours = Math.ceil((quotaExceededUntil - now) / 3600000);
+        const waitMsg = remainingHours > 1
+            ? `около ${remainingHours} ч.`
+            : `${Math.ceil((quotaExceededUntil - now) / 60000)} мин.`;
+
+        return `⚠️ <b>AI находится на отдыхе (Quota/Rate Limit).</b> Попробуйте снова через ${waitMsg} Используется кэшированный отчет...<br><br>${lastReport || ''}`;
     }
 
     // 2. Cache Check (Throttle API calls)
@@ -32,66 +37,88 @@ async function runAIAnalysis() {
     }
 
     try {
-        // 1. Gather recent logs (last 200 activity logs)
-        const logs = await db.query('SELECT user_id, action, details, timestamp FROM user_activity ORDER BY timestamp DESC LIMIT 200');
+        // 1. Gather recent logs (optimized to 80 entries to save tokens)
+        const logs = await db.query('SELECT user_id, action, details, timestamp FROM user_activity ORDER BY timestamp DESC LIMIT 80');
 
         // 2. Gather economy summary
-        const usersCount = (await db.get('SELECT COUNT(*) as c FROM users')).c;
-        const totalBalance = (await db.get('SELECT SUM(balance) as s FROM users')).s || 0;
-        const topBalance = (await db.get('SELECT balance FROM users ORDER BY balance DESC LIMIT 1')).balance || 0;
+        const economy = await db.get(`
+            SELECT 
+                (SELECT COUNT(*) FROM users) as usersCount,
+                (SELECT SUM(balance) FROM users) as totalBalance,
+                (SELECT MAX(balance) FROM users) as topBalance
+        `);
 
-        const logContext = logs.map(l => `[${l.timestamp}] User ${l.user_id}: ${l.action} (${l.details})`).join('\n');
+        // Trim log details to keep tokens low
+        const logContext = logs.map(l => {
+            let detail = String(l.details || '');
+            if (detail.length > 60) detail = detail.substring(0, 57) + '...';
+            return `[${l.timestamp}] ID:${l.user_id}: ${l.action} (${detail})`;
+        }).join('\n');
 
         const prompt = `
-            Ты — эксперт-аналитик игры "Taxi Simulator". Проанализируй данные за последний час и составь отчет для администратора.
+            Ты — эксперт-аналитик игры "Taxi Pro". Проанализируй данные и составь краткий отчет.
             
-            СОСТОЯНИЕ ЭКОНОМИКИ:
-            - Всего игроков: ${usersCount}
-            - Общий баланс всех игроков: ${totalBalance} PLN
-            - Максимальный баланс у одного игрока: ${topBalance} PLN
+            ЭКОНОМИКА:
+            - Игроков: ${economy.usersCount}
+            - Общий баланс: ${economy.totalBalance || 0} PLN
+            - Макс. баланс: ${economy.topBalance || 0} PLN
             
-            ПОСЛЕДНИЕ ЛОГИ АКТИВНОСТИ (выборка):
+            ЛОГИ (последние):
             ${logContext}
             
             ЗАДАЧА:
-            1. Выяви подозрительных игроков (резкие скачки баланса, много действий за короткое время).
-            2. Оцени здоровье экономики (нет ли признаков гиперинфляции или аномального накопления).
-            3. Дай краткие рекомендации администратору.
+            1. Выяви подозрительных игроков (спам действий, аномальный профит).
+            2. Оцени здоровье экономики.
+            3. Рекомендация админу (1 пункт).
             
-            ФОРМАТ ОТВЕТА (кратко, в HTML разметке для Telegram):
-            📊 <b>ОТЧЕТ АНАЛИТИКА (AI)</b>
-            
-            ⚠️ <b>Подозрения:</b>
-            - [Список игроков и причин]
-            
-            📈 <b>Экономика:</b>
-            - [Вывод о здоровье]
-            
-            💡 <b>Рекомендация:</b>
-            - [Что сделать]
+            ФОРМАТ (HTML):
+            📊 <b>ОТЧЕТ AI</b>
+            ⚠️ <b>Подозрения:</b> ...
+            📈 <b>Экономика:</b> ...
+            💡 <b>Совет:</b> ...
         `;
 
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-        const result = await model.generateContent(prompt);
-        const reportText = result.response.text();
+        // 3. Multi-Model Fallback
+        const models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-8b"];
+        let lastErr = null;
 
-        // Update cache
-        lastReport = reportText;
-        lastPromptTime = Date.now();
-        quotaExceededUntil = 0;
+        for (const modelName of models) {
+            try {
+                console.log(`🤖 AI Analyst trying model: ${modelName}...`);
+                const model = genAI.getGenerativeModel({ model: modelName });
+                const result = await model.generateContent(prompt);
+                const reportText = result.response.text();
 
-        return reportText;
+                // Success! Update cache
+                lastReport = reportText;
+                lastPromptTime = Date.now();
+                quotaExceededUntil = 0;
+                return reportText;
 
-    } catch (e) {
-        console.error('AI Analysis Error:', e);
-
-        // Handle 429 specifically
-        if (e.status === 429 || (e.message && e.message.includes('429'))) {
-            quotaExceededUntil = Date.now() + QUOTA_BACKOFF;
-            return `⚠️ <b>Лимит API исчерпан (Quota 429).</b> Перехожу в режим ожидания на 30 минут.`;
+            } catch (err) {
+                lastErr = err;
+                console.warn(`❌ Model ${modelName} failed:`, err.message);
+            }
         }
 
-        return "⚠️ Ошибка при формировании AI отчета.";
+        // 4. If all models failed, handle the last error
+        if (lastErr) {
+            const status = lastErr.status || 0;
+            const msg = lastErr.message || '';
+            const isQuota = status === 429 || msg.includes('429');
+            const isDaily = msg.includes('limit: 0') || msg.includes('quota exceeded');
+
+            if (isQuota) {
+                quotaExceededUntil = Date.now() + (isDaily ? DAILY_QUOTA_BACKOFF : QUOTA_BACKOFF);
+                return `⚠️ <b>Лимит Gemini API исчерпан.</b> ${isDaily ? 'Дневная квота пуста.' : 'Слишком много запросов.'} Анализ отключен на ${isDaily ? '12 часов' : '30 минут'}.`;
+            }
+        }
+
+        return "⚠️ Ошибка AI-анализа после всех попыток.";
+
+    } catch (e) {
+        console.error('Fatal AI Analysis Error:', e);
+        return "⚠️ Критическая ошибка при формировании AI отчета.";
     }
 }
 
