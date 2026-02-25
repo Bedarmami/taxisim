@@ -3893,9 +3893,42 @@ app.get('/api/admin/plates', adminAuth, async (req, res) => {
             LEFT JOIN users u ON lp.owner_id = u.telegram_id
             ORDER BY lp.created_at DESC
         `;
-        const plates = await db.query(sql);
-        res.json(plates);
+        const platesData = await db.query(sql);
+        res.json(platesData);
     } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/plates/refund-all', adminAuth, async (req, res) => {
+    try {
+        const ownedPlates = await db.query('SELECT * FROM license_plates WHERE owner_id IS NOT NULL');
+        let totalRefunded = 0;
+        let count = 0;
+
+        for (const plate of ownedPlates) {
+            const price = plates.calculatePlatePrice(plate.plate_number);
+            const user = await getUser(plate.owner_id);
+            if (user) {
+                user.balance += price;
+                // Important: remove from car if equipped
+                if (user.car && user.car.plate === plate.plate_number) {
+                    user.car.plate = null;
+                }
+                // Save user updates balance and car_data (which includes car.plate)
+                await saveUser(user);
+
+                // Reset plate ownership
+                await db.run('UPDATE license_plates SET owner_id = NULL, is_equipped = 0, car_id = NULL WHERE plate_number = ?', [plate.plate_number]);
+
+                totalRefunded += price;
+                count++;
+            }
+        }
+
+        res.json({ success: true, count, total_refunded: totalRefunded });
+    } catch (e) {
+        console.error('Refund All Plates Error:', e);
+        res.status(500).json({ error: e.message });
+    }
 });
 
 // v3.5: Database Export (Urgent)
@@ -4414,7 +4447,7 @@ app.get('/api/admin/users', adminAuth, async (req, res) => {
 app.get('/api/admin/gas-stations', adminAuth, async (req, res) => {
     try {
         const sql = `
-            SELECT gs.*, u.username as owner_name 
+            SELECT gs.*, u.username as owner_name, u.balance as owner_balance
             FROM gas_stations gs 
             LEFT JOIN users u ON gs.owner_id = u.telegram_id
         `;
@@ -4427,6 +4460,31 @@ app.post('/api/admin/gas-stations/take-away', adminAuth, async (req, res) => {
     try {
         const { stationId } = req.body;
         await db.run('UPDATE gas_stations SET owner_id = NULL, uncollected_revenue = 0, fuel_stock = 0 WHERE id = ?', [stationId]);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/gas-stations/bankrupt', adminAuth, async (req, res) => {
+    try {
+        const { stationId } = req.body;
+        const station = await db.get('SELECT * FROM gas_stations WHERE id = ?', [stationId]);
+        if (!station) return res.status(404).json({ error: 'Station not found' });
+
+        // Force bankruptcy (similar to logic at line 2075)
+        await db.run('UPDATE gas_stations SET owner_id = NULL, fuel_stock = 0 WHERE id = ?', [stationId]);
+        const marketPrice = Math.floor(station.purchase_price * 0.9);
+        await db.run('INSERT INTO market_listings (type, item_id, seller_id, price, created_at) VALUES (?, ?, ?, ?, ?)',
+            ['gas_station', stationId, 'SYSTEM', marketPrice, new Date().toISOString()]);
+
+        logSocialActivity(`⚖️ АЗС "${station.name}" конфискована администратором и выставлена на рынок!`);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/gas-stations/set-stock', adminAuth, async (req, res) => {
+    try {
+        const { stationId, liters } = req.body;
+        await db.run('UPDATE gas_stations SET fuel_stock = ? WHERE id = ?', [liters, stationId]);
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });

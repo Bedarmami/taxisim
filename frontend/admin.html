@@ -226,6 +226,7 @@
                                 <th>ID</th>
                                 <th>Название</th>
                                 <th>Владелец</th>
+                                <th>Баланс владельца</th>
                                 <th>Запас (л)</th>
                                 <th>В кассе (PLN)</th>
                                 <th>Всего доход (PLN)</th>
@@ -529,7 +530,12 @@
             <div id="tab-plates" class="tab-content">
                 <div class="section-header">
                     <h2>Управление номерными знаками</h2>
-                    <button onclick="loadAdminPlates()">🔄 Обновить</button>
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="refundAllPlates()" class="danger-btn"
+                            style="background:#e74c3c; border:none; padding:8px 15px; border-radius:8px; cursor:pointer; color:white; font-weight:bold;">💰
+                            Вернуть деньги всем</button>
+                        <button onclick="loadAdminPlates()">🔄 Обновить</button>
+                    </div>
                 </div>
                 <div class="table-container">
                     <table id="plates-table">

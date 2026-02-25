@@ -111,7 +111,7 @@ async function loadData() {
 async function loadAdminGasStations() {
     const table = document.getElementById('admin-gas-stations-tbody');
     if (!table) return;
-    table.innerHTML = '<tr><td colspan="8">Загрузка...</td></tr>';
+    table.innerHTML = '<tr><td colspan="10">Загрузка...</td></tr>';
 
     try {
         const stations = await safeFetchJson('/api/admin/gas-stations', {
@@ -122,25 +122,69 @@ async function loadAdminGasStations() {
         table.innerHTML = '';
         stations.forEach(s => {
             const tr = document.createElement('tr');
+
+            // Foreclosure highlighting
+            let balanceColor = '#fff';
+            let rowStyle = '';
+            if (s.owner_id) {
+                if (s.owner_balance < 40) {
+                    balanceColor = '#ff4d4d'; // Red alert
+                    rowStyle = 'background: rgba(255, 77, 77, 0.1);';
+                } else if (s.owner_balance < 100) {
+                    balanceColor = '#f39c12'; // Warning orange
+                }
+            }
+
+            tr.style.cssText = rowStyle;
             tr.innerHTML = `
                 <td>${s.id}</td>
                 <td>${s.name}</td>
-                <td>${s.owner_name ? `<b>${s.owner_name}</b> (${s.owner_id})` : '<i style="color:#888;">Нет владельца</i>'}</td>
+                <td>${s.owner_name ? `<b>${s.owner_name}</b> (<code style="font-size:0.8em;">${s.owner_id}</code>)` : '<i style="color:#888;">Нет владельца</i>'}</td>
+                <td style="color:${balanceColor}; font-weight:bold;">${s.owner_id ? (s.owner_balance || 0).toFixed(2) + ' PLN' : '-'}</td>
                 <td>${s.fuel_stock.toFixed(1)}</td>
                 <td>${s.uncollected_revenue.toFixed(2)}</td>
                 <td>${s.revenue_total.toFixed(2)}</td>
                 <td>${s.price_petrol} / ${s.price_gas}</td>
                 <td>
-                    ${s.owner_id ? `<button onclick="takeAwayStation('${s.id}')" class="danger-btn" style="padding:4px 8px; font-size:0.8em;">Забрать</button>` : ''}
-                    <button onclick="giveStationStock('${s.id}')" class="edit-btn" style="padding:4px 8px; font-size:0.8em;">+ Топливо</button>
+                    <div style="display:flex; gap:5px; flex-wrap:wrap;">
+                        ${s.owner_id ? `<button onclick="takeAwayStation('${s.id}')" class="danger-btn" style="padding:4px 8px; font-size:0.8em;">Забрать</button>` : ''}
+                        ${s.owner_id ? `<button onclick="bankruptStation('${s.id}')" class="danger-btn" style="padding:4px 8px; font-size:0.8em; background:#d35400;">Банкрот</button>` : ''}
+                        <button onclick="giveStationStock('${s.id}')" class="edit-btn" style="padding:4px 8px; font-size:0.8em;">+100л</button>
+                        <button onclick="setStationStock('${s.id}')" class="edit-btn" style="padding:4px 8px; font-size:0.8em; background:#3498db;">Уст. Запас</button>
+                    </div>
                 </td>
             `;
             table.appendChild(tr);
         });
     } catch (e) {
-        console.error(e);
-        table.innerHTML = '<tr><td colspan="8">Ошибка загрузки</td></tr>';
+        console.error('Error loading stations:', e);
+        table.innerHTML = '<tr><td colspan="10">Ошибка загрузки</td></tr>';
     }
+}
+
+async function bankruptStation(stationId) {
+    if (!confirm('ВЫ УВЕРЕНЫ? АЗС будет немедленно конфискована и выставлена на рынок.')) return;
+    try {
+        const res = await safeFetchJson('/api/admin/gas-stations/bankrupt', {
+            method: 'POST',
+            headers: { 'x-admin-password': adminPassword, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ stationId })
+        });
+        if (res.success) loadAdminGasStations();
+    } catch (e) { alert('Ошибка'); }
+}
+
+async function setStationStock(stationId) {
+    const liters = prompt('Укажите точный запас топлива (л):');
+    if (liters === null || isNaN(liters)) return;
+    try {
+        const res = await safeFetchJson('/api/admin/gas-stations/set-stock', {
+            method: 'POST',
+            headers: { 'x-admin-password': adminPassword, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ stationId, liters: parseFloat(liters) })
+        });
+        if (res.success) loadAdminGasStations();
+    } catch (e) { alert('Ошибка'); }
 }
 
 async function takeAwayStation(stationId) {
@@ -1153,7 +1197,7 @@ async function loadAdminPlates() {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td><span class="license-plate ${p.rarity?.toLowerCase() || 'standard'}">${p.plate_number}</span></td>
-                <td>${p.owner_name || '---'} (${p.owner_id})</td>
+                <td>${p.owner_name ? `<b>${p.owner_name}</b> (<code style="font-size:0.8em;">${p.owner_id}</code>)` : '---'}</td>
                 <td>${p.rarity || 'Common'}</td>
                 <td>${p.is_equipped ? '✅ Экипирован' : '📦 В запасе'}</td>
                 <td>${p.market_price ? `💰 ${p.market_price} PLN` : '---'}</td>
@@ -1163,6 +1207,20 @@ async function loadAdminPlates() {
     } catch (error) {
         console.error('Error loading admin plates:', error);
     }
+}
+
+async function refundAllPlates() {
+    if (!confirm('🚨 ВНИМАНИЕ! Это действие ВЕРНЕТ ДЕНЬГИ всем владельцам номеров и СНИМЕТ их с машин. Продолжить?')) return;
+    try {
+        const res = await safeFetchJson('/api/admin/plates/refund-all', {
+            method: 'POST',
+            headers: { 'x-admin-password': adminPassword }
+        });
+        if (res.success) {
+            alert(`Успех! Возвращено средств за ${res.count} номеров на сумму ${res.total_refunded.toFixed(2)} PLN.`);
+            loadAdminPlates();
+        }
+    } catch (e) { alert('Ошибка'); }
 }
 
 async function exportDB() {
