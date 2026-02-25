@@ -22,7 +22,8 @@ function openTab(evt, tabName) {
     if (tabName === 'tab-settings') loadGlobalSettings();
     if (tabName === 'tab-activities') loadActivities();
     if (tabName === 'tab-support') loadSupportMessages();
-    if (tabName === 'tab-logs') loadLogs();
+    if (tabName === 'tab-gas-stations') loadAdminGasStations();
+    if (tabName === 'tab-plates') loadAdminPlates();
 }
 
 async function checkAuth() {

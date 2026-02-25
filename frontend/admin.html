@@ -176,327 +176,328 @@
                         </table>
                     </div>
                 </div>
-                <!-- Вкладка: АЗС -->
-                <div id="tab-gas-stations" class="tab-content" style="display: none;">
-                    <div class="section-header">
-                        <h2>Управление АЗС</h2>
-                        <button onclick="loadAdminGasStations()">🔄 Обновить</button>
-                    </div>
-                    <div class="table-container">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Название</th>
-                                    <th>Владелец</th>
-                                    <th>Запас (л)</th>
-                                    <th>В кассе (PLN)</th>
-                                    <th>Всего доход (PLN)</th>
-                                    <th>Цены (П/Г)</th>
-                                    <th>Действия</th>
-                                </tr>
-                            </thead>
-                            <tbody id="admin-gas-stations-tbody">
-                                <!-- АЗС будут загружены сюда -->
-                            </tbody>
-                        </table>
-                    </div>
+            </div>
+
+            <!-- Вкладка: АЗС -->
+            <div id="tab-gas-stations" class="tab-content" style="display: none;">
+                <div class="section-header">
+                    <h2>Управление АЗС</h2>
+                    <button onclick="loadAdminGasStations()">🔄 Обновить</button>
                 </div>
-
-                <!-- Вкладка: Объявления -->
-                <div id="tab-announcement" class="tab-content">
-                    <div class="promo-actions">
-                        <section class="add-promo-card">
-                            <h3>Создать объявление</h3>
-                            <form id="announcement-form">
-                                <input type="text" id="ann-title" placeholder="Заголовок (например: Бонус!)" required>
-                                <textarea id="ann-message" placeholder="Текст объявления..." required rows="4"
-                                    style="width: 100%; margin-bottom: 15px; border-radius: 8px; padding: 10px; background: rgba(255,255,255,0.05); color: white; border: 1px solid rgba(255,255,255,0.1); font-family: inherit; font-size: 14px;"></textarea>
-                                <select id="ann-type"
-                                    style="width: 100%; margin-bottom: 15px; border-radius: 8px; padding: 10px; background: rgba(255,255,255,0.05); color: white; border: 1px solid rgba(255,255,255,0.1);">
-                                    <option value="info">🔵 Информация</option>
-                                    <option value="success">🟢 Успех / Бонус</option>
-                                    <option value="warning">🟡 Предупреждение</option>
-                                    <option value="error">🔴 Важное / Срочное</option>
-                                </select>
-                                <div style="display: flex; gap: 10px;">
-                                    <button type="submit" style="flex: 2;">Опубликовать</button>
-                                    <button type="button" onclick="clearAnnouncement()" class="danger-btn"
-                                        style="flex: 1;">Удалить</button>
-                                </div>
-                            </form>
-                        </section>
-                    </div>
-
-                    <div class="promo-list">
-                        <h3>Предпросмотр (как увидит игрок)</h3>
-                        <div id="ann-preview"
-                            style="padding: 20px; border-radius: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);">
-                            <div id="preview-box"
-                                style="padding: 15px; border-radius: 10px; border-left: 5px solid #0088cc; background: rgba(0,0,0,0.2);">
-                                <h4 id="preview-title" style="margin: 0 0 5px 0; color: #fff;">Заголовок</h4>
-                                <p id="preview-message" style="margin: 0; opacity: 0.8; line-height: 1.4;">Текст
-                                    сообщения
-                                    появится здесь...</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="promo-actions" style="margin-top: 20px;">
-                        <section class="add-promo-card"
-                            style="background: linear-gradient(135deg, #0088cc 0%, #005588 100%);">
-                            <h3>📤 Telegram Рассылка (Broadcast)</h3>
-                            <p style="font-size: 12px; opacity: 0.8; margin-bottom: 15px;">Это сообщение придет напрямую
-                                в
-                                Telegram всем пользователям бота.</p>
-                            <form id="broadcast-form">
-                                <textarea id="broadcast-message" placeholder="Текст сообщения для всех игроков..."
-                                    required rows="4"
-                                    style="width: 100%; margin-bottom: 15px; border-radius: 8px; padding: 10px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); font-family: inherit; font-size: 14px;"></textarea>
-                                <button type="submit" class="danger-btn"
-                                    style="width: 100%; background: #fff; color: #0088cc;">🚀 Отправить всем
-                                    (Telegram)</button>
-                            </form>
-                        </section>
-                    </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Название</th>
+                                <th>Владелец</th>
+                                <th>Запас (л)</th>
+                                <th>В кассе (PLN)</th>
+                                <th>Всего доход (PLN)</th>
+                                <th>Цены (П/Г)</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-gas-stations-tbody">
+                            <!-- АЗС будут загружены сюда -->
+                        </tbody>
+                    </table>
                 </div>
+            </div>
 
-                <!-- Вкладка: Джекпот и Автопарк -->
-                <div id="tab-jackpot" class="tab-content">
-                    <div class="promo-actions">
-                        <section class="add-promo-card">
-                            <h3>🎰 Управление джекпотом</h3>
-                            <div class="stats-grid" style="margin-bottom: 20px;">
-                                <div class="stat-card">
-                                    <h3>Текущий пул</h3>
-                                    <div id="jackpot-pool" class="stat-value" style="color: #f39c12;">0 PLN</div>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label>Установить сумму пула:</label>
-                                <div style="display: flex; gap: 10px;">
-                                    <input type="number" id="jackpot-amount" placeholder="Сумма PLN" step="0.01"
-                                        style="flex:2;">
-                                    <button onclick="setJackpotPool()" style="flex:1;">💰 Установить</button>
-                                </div>
-                            </div>
-                            <div class="form-group" style="margin-top: 15px;">
-                                <label>Принудительный запуск джекпота:</label>
-                                <div style="display: flex; gap: 10px;">
-                                    <input type="text" id="jackpot-user-id" placeholder="Telegram ID победителя"
-                                        style="flex:2;">
-                                    <button onclick="forceJackpot()" class="danger-btn" style="flex:1;">🎰
-                                        Выдать!</button>
-                                </div>
-                            </div>
-                            <div id="jackpot-history" style="margin-top: 15px;"></div>
-                        </section>
-
-                        <section class="add-promo-card">
-                            <h3>🚗 Добавить авто в автопарк</h3>
-                            <div class="form-group">
-                                <label>Telegram ID игрока:</label>
-                                <input type="text" id="fleet-user-id" placeholder="Telegram ID">
-                            </div>
-                            <div class="form-group">
-                                <label>Машина:</label>
-                                <select id="fleet-car-id"
-                                    style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.05); color: white; border: 1px solid rgba(255,255,255,0.1);"></select>
-                            </div>
-                            <div class="form-group">
-                                <label>Количество:</label>
-                                <input type="number" id="fleet-car-count" value="1" min="1" max="100">
-                            </div>
-                            <button onclick="addFleetCar()">➕ Добавить в автопарк</button>
-                        </section>
-                    </div>
-                </div>
-
-                <!-- Вкладка: Контейнеры -->
-                <div id="tab-containers" class="tab-content">
-                    <div class="promo-actions">
-                        <section class="add-promo-card">
-                            <h3>📦 Управление аукционом контейнеров</h3>
-                            <form id="container-admin-form">
-                                <div class="form-group">
-                                    <label>Награда следующего контейнера:</label>
-                                    <select id="admin-container-reward"
-                                        style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.05); color: white; border: 1px solid rgba(255,255,255,0.1);">
-                                        <option value="">🎲 Случайное авто (Random)</option>
-                                        <!-- Машины загрузятся из JS -->
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label>Начальная ставка (PLN):</label>
-                                    <input type="number" id="admin-container-start-bid" value="5000">
-                                </div>
-                                <div class="form-group">
-                                    <label>Длительность (мин):</label>
-                                    <input type="number" id="admin-container-duration" value="5">
-                                </div>
-                                <div class="form-group">
-                                    <label>Интервал (мин):</label>
-                                    <input type="number" id="admin-container-interval" value="10">
-                                </div>
-                                <button type="submit">💾 Сохранить настройки</button>
-                            </form>
-                        </section>
-
-                        <section class="add-promo-card">
-                            <h3>📊 Текущий статус</h3>
-                            <div id="admin-container-status-info" style="font-size: 14px; line-height: 1.6;">
-                                <!-- Загружается из JS -->
-                            </div>
-                        </section>
-                    </div>
-                </div>
-
-                <!-- Вкладка: Машины Editor -->
-                <div id="tab-cars-editor" class="tab-content">
-                    <div class="section-header">
-                        <h2>Управление машинами (Определения)</h2>
-                        <button onclick="loadCarDefinitions()">➕ Добавить новую</button>
-                    </div>
-                    <div class="table-container">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Название</th>
-                                    <th>Цена (PLN)</th>
-                                    <th>Расход</th>
-                                    <th>Тип</th>
-                                    <th>Действия</th>
-                                </tr>
-                            </thead>
-                            <tbody id="cars-tbody"></tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Вкладка: Настройки Экономики -->
-                <div id="tab-settings" class="tab-content">
-                    <div class="section-header">
-                        <h2>Настройки экономики и цен</h2>
-                    </div>
-                    <div id="settings-list" class="stats-grid">
-                        <!-- Загружается из JS -->
-                    </div>
-
-                    <section class="add-promo-card" style="margin-top: 20px;">
-                        <h3>🌐 Отображение On-line</h3>
-                        <div class="form-group">
-                            <label>Дополнительный онлайн (смещение):</label>
+            <!-- Вкладка: Объявления -->
+            <div id="tab-announcement" class="tab-content">
+                <div class="promo-actions">
+                    <section class="add-promo-card">
+                        <h3>Создать объявление</h3>
+                        <form id="announcement-form">
+                            <input type="text" id="ann-title" placeholder="Заголовок (например: Бонус!)" required>
+                            <textarea id="ann-message" placeholder="Текст объявления..." required rows="4"
+                                style="width: 100%; margin-bottom: 15px; border-radius: 8px; padding: 10px; background: rgba(255,255,255,0.05); color: white; border: 1px solid rgba(255,255,255,0.1); font-family: inherit; font-size: 14px;"></textarea>
+                            <select id="ann-type"
+                                style="width: 100%; margin-bottom: 15px; border-radius: 8px; padding: 10px; background: rgba(255,255,255,0.05); color: white; border: 1px solid rgba(255,255,255,0.1);">
+                                <option value="info">🔵 Информация</option>
+                                <option value="success">🟢 Успех / Бонус</option>
+                                <option value="warning">🟡 Предупреждение</option>
+                                <option value="error">🔴 Важное / Срочное</option>
+                            </select>
                             <div style="display: flex; gap: 10px;">
-                                <input type="number" id="online-offset-input" placeholder="Например: 50"
-                                    style="flex: 2;">
-                                <button onclick="saveOnlineOffset()" style="flex: 1;">💾 Сохранить</button>
+                                <button type="submit" style="flex: 2;">Опубликовать</button>
+                                <button type="button" onclick="clearAnnouncement()" class="danger-btn"
+                                    style="flex: 1;">Удалить</button>
                             </div>
-                            <p style="font-size: 12px; opacity: 0.6; margin-top: 10px;">Это число будет прибавлено к
-                                реальному/случайному онлайну на главном экране.</p>
-                        </div>
+                        </form>
                     </section>
                 </div>
-                <!-- Вкладка: Активность -->
-                <div id="tab-activities" class="tab-content">
-                    <div class="section-header">
-                        <h2>Логи активности (Анти-чит)</h2>
-                        <button onclick="loadActivities()">🔄 Обновить</button>
-                    </div>
-                    <div class="table-container">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Время</th>
-                                    <th>Игрок</th>
-                                    <th>Действие</th>
-                                    <th>Детали</th>
-                                </tr>
-                            </thead>
-                            <tbody id="activities-tbody"></tbody>
-                        </table>
-                    </div>
 
+                <div class="promo-list">
+                    <h3>Предпросмотр (как увидит игрок)</h3>
+                    <div id="ann-preview"
+                        style="padding: 20px; border-radius: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);">
+                        <div id="preview-box"
+                            style="padding: 15px; border-radius: 10px; border-left: 5px solid #0088cc; background: rgba(0,0,0,0.2);">
+                            <h4 id="preview-title" style="margin: 0 0 5px 0; color: #fff;">Заголовок</h4>
+                            <p id="preview-message" style="margin: 0; opacity: 0.8; line-height: 1.4;">Текст
+                                сообщения
+                                появится здесь...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="promo-actions" style="margin-top: 20px;">
                     <section class="add-promo-card"
-                        style="margin-top: 30px; border: 2px solid #ff4444; background: rgba(255,68,68,0.05);">
-                        <h3 style="color: #ff4444;">🚨 Экстренный сброс взломщика</h3>
-                        <p style="font-size: 13px; opacity: 0.8; margin-bottom: 15px;">
-                            Эта функция: обнуляет баланс, сбрасывает статистику, **изымает все АЗС** обратно системе и
-                            **банит** игрока. Используйте только для подтвержденных взломщиков.
-                        </p>
-                        <div class="form-group">
-                            <label>Telegram ID взломщика:</label>
-                            <div style="display: flex; gap: 10px;">
-                                <input type="text" id="emergency-target-id" placeholder="ID (например: 1288177696)"
-                                    style="flex: 2;">
-                                <button onclick="emergencyResetUser()" class="danger-btn" style="flex: 1;">☠️ В БАН И
-                                    ИЗЪЯТЬ</button>
+                        style="background: linear-gradient(135deg, #0088cc 0%, #005588 100%);">
+                        <h3>📤 Telegram Рассылка (Broadcast)</h3>
+                        <p style="font-size: 12px; opacity: 0.8; margin-bottom: 15px;">Это сообщение придет напрямую
+                            в
+                            Telegram всем пользователям бота.</p>
+                        <form id="broadcast-form">
+                            <textarea id="broadcast-message" placeholder="Текст сообщения для всех игроков..." required
+                                rows="4"
+                                style="width: 100%; margin-bottom: 15px; border-radius: 8px; padding: 10px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); font-family: inherit; font-size: 14px;"></textarea>
+                            <button type="submit" class="danger-btn"
+                                style="width: 100%; background: #fff; color: #0088cc;">🚀 Отправить всем
+                                (Telegram)</button>
+                        </form>
+                    </section>
+                </div>
+            </div>
+
+            <!-- Вкладка: Джекпот и Автопарк -->
+            <div id="tab-jackpot" class="tab-content">
+                <div class="promo-actions">
+                    <section class="add-promo-card">
+                        <h3>🎰 Управление джекпотом</h3>
+                        <div class="stats-grid" style="margin-bottom: 20px;">
+                            <div class="stat-card">
+                                <h3>Текущий пул</h3>
+                                <div id="jackpot-pool" class="stat-value" style="color: #f39c12;">0 PLN</div>
                             </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Установить сумму пула:</label>
+                            <div style="display: flex; gap: 10px;">
+                                <input type="number" id="jackpot-amount" placeholder="Сумма PLN" step="0.01"
+                                    style="flex:2;">
+                                <button onclick="setJackpotPool()" style="flex:1;">💰 Установить</button>
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-top: 15px;">
+                            <label>Принудительный запуск джекпота:</label>
+                            <div style="display: flex; gap: 10px;">
+                                <input type="text" id="jackpot-user-id" placeholder="Telegram ID победителя"
+                                    style="flex:2;">
+                                <button onclick="forceJackpot()" class="danger-btn" style="flex:1;">🎰
+                                    Выдать!</button>
+                            </div>
+                        </div>
+                        <div id="jackpot-history" style="margin-top: 15px;"></div>
+                    </section>
+
+                    <section class="add-promo-card">
+                        <h3>🚗 Добавить авто в автопарк</h3>
+                        <div class="form-group">
+                            <label>Telegram ID игрока:</label>
+                            <input type="text" id="fleet-user-id" placeholder="Telegram ID">
+                        </div>
+                        <div class="form-group">
+                            <label>Машина:</label>
+                            <select id="fleet-car-id"
+                                style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.05); color: white; border: 1px solid rgba(255,255,255,0.1);"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Количество:</label>
+                            <input type="number" id="fleet-car-count" value="1" min="1" max="100">
+                        </div>
+                        <button onclick="addFleetCar()">➕ Добавить в автопарк</button>
+                    </section>
+                </div>
+            </div>
+
+            <!-- Вкладка: Контейнеры -->
+            <div id="tab-containers" class="tab-content">
+                <div class="promo-actions">
+                    <section class="add-promo-card">
+                        <h3>📦 Управление аукционом контейнеров</h3>
+                        <form id="container-admin-form">
+                            <div class="form-group">
+                                <label>Награда следующего контейнера:</label>
+                                <select id="admin-container-reward"
+                                    style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.05); color: white; border: 1px solid rgba(255,255,255,0.1);">
+                                    <option value="">🎲 Случайное авто (Random)</option>
+                                    <!-- Машины загрузятся из JS -->
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Начальная ставка (PLN):</label>
+                                <input type="number" id="admin-container-start-bid" value="5000">
+                            </div>
+                            <div class="form-group">
+                                <label>Длительность (мин):</label>
+                                <input type="number" id="admin-container-duration" value="5">
+                            </div>
+                            <div class="form-group">
+                                <label>Интервал (мин):</label>
+                                <input type="number" id="admin-container-interval" value="10">
+                            </div>
+                            <button type="submit">💾 Сохранить настройки</button>
+                        </form>
+                    </section>
+
+                    <section class="add-promo-card">
+                        <h3>📊 Текущий статус</h3>
+                        <div id="admin-container-status-info" style="font-size: 14px; line-height: 1.6;">
+                            <!-- Загружается из JS -->
                         </div>
                     </section>
                 </div>
+            </div>
 
-                <!-- Вкладка: Поддержка -->
-                <div id="tab-support" class="tab-content">
-                    <div class="section-header">
-                        <h2>📨 Сообщения в поддержку</h2>
-                        <button onclick="loadSupportMessages()">🔄 Обновить</button>
-                    </div>
-                    <div class="table-container">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Время</th>
-                                    <th>Игрок (ID)</th>
-                                    <th>Сообщение</th>
-                                    <th>Медиа</th>
-                                    <th>Действия</th>
-                                </tr>
-                            </thead>
-                            <tbody id="support-tbody">
-                                <!-- Сообщения будут здесь -->
-                            </tbody>
-                        </table>
-                    </div>
+            <!-- Вкладка: Машины Editor -->
+            <div id="tab-cars-editor" class="tab-content">
+                <div class="section-header">
+                    <h2>Управление машинами (Определения)</h2>
+                    <button onclick="loadCarDefinitions()">➕ Добавить новую</button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Название</th>
+                                <th>Цена (PLN)</th>
+                                <th>Расход</th>
+                                <th>Тип</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cars-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Вкладка: Настройки Экономики -->
+            <div id="tab-settings" class="tab-content">
+                <div class="section-header">
+                    <h2>Настройки экономики и цен</h2>
+                </div>
+                <div id="settings-list" class="stats-grid">
+                    <!-- Загружается из JS -->
                 </div>
 
-                <div id="tab-logs" class="tab-content">
-                    <div class="section-header">
-                        <h2>Логи ошибок</h2>
-                        <div>
-                            <button onclick="loadLogs()">🔄 Обновить</button>
-                            <button onclick="testLog()" style="background: #6a11cb;">🧪 Тест логов</button>
-                            <button class="danger-btn" onclick="clearLogs()">🗑️ Очистить</button>
+                <section class="add-promo-card" style="margin-top: 20px;">
+                    <h3>🌐 Отображение On-line</h3>
+                    <div class="form-group">
+                        <label>Дополнительный онлайн (смещение):</label>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="number" id="online-offset-input" placeholder="Например: 50" style="flex: 2;">
+                            <button onclick="saveOnlineOffset()" style="flex: 1;">💾 Сохранить</button>
+                        </div>
+                        <p style="font-size: 12px; opacity: 0.6; margin-top: 10px;">Это число будет прибавлено к
+                            реальному/случайному онлайну на главном экране.</p>
+                    </div>
+                </section>
+            </div>
+            <!-- Вкладка: Активность -->
+            <div id="tab-activities" class="tab-content">
+                <div class="section-header">
+                    <h2>Логи активности (Анти-чит)</h2>
+                    <button onclick="loadActivities()">🔄 Обновить</button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Время</th>
+                                <th>Игрок</th>
+                                <th>Действие</th>
+                                <th>Детали</th>
+                            </tr>
+                        </thead>
+                        <tbody id="activities-tbody"></tbody>
+                    </table>
+                </div>
+
+                <section class="add-promo-card"
+                    style="margin-top: 30px; border: 2px solid #ff4444; background: rgba(255,68,68,0.05);">
+                    <h3 style="color: #ff4444;">🚨 Экстренный сброс взломщика</h3>
+                    <p style="font-size: 13px; opacity: 0.8; margin-bottom: 15px;">
+                        Эта функция: обнуляет баланс, сбрасывает статистику, **изымает все АЗС** обратно системе и
+                        **банит** игрока. Используйте только для подтвержденных взломщиков.
+                    </p>
+                    <div class="form-group">
+                        <label>Telegram ID взломщика:</label>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="text" id="emergency-target-id" placeholder="ID (например: 1288177696)"
+                                style="flex: 2;">
+                            <button onclick="emergencyResetUser()" class="danger-btn" style="flex: 1;">☠️ В БАН И
+                                ИЗЪЯТЬ</button>
                         </div>
                     </div>
-                    <div class="logs-container" id="logs-container">
-                        <!-- Логи будут здесь -->
-                    </div>
-                </div>
+                </section>
+            </div>
 
-                <!-- Вкладка: Номера -->
-                <div id="tab-plates" class="tab-content">
-                    <div class="section-header">
-                        <h2>Управление номерными знаками</h2>
-                        <button onclick="loadAdminPlates()">🔄 Обновить</button>
-                    </div>
-                    <div class="table-container">
-                        <table id="plates-table">
-                            <thead>
-                                <tr>
-                                    <th>Номер</th>
-                                    <th>Владелец</th>
-                                    <th>Редкость</th>
-                                    <th>Статус</th>
-                                    <th>Рынок</th>
-                                </tr>
-                            </thead>
-                            <tbody id="plates-tbody">
-                                <!-- Номера загрузятся сюда -->
-                            </tbody>
-                        </table>
+            <!-- Вкладка: Поддержка -->
+            <div id="tab-support" class="tab-content">
+                <div class="section-header">
+                    <h2>📨 Сообщения в поддержку</h2>
+                    <button onclick="loadSupportMessages()">🔄 Обновить</button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Время</th>
+                                <th>Игрок (ID)</th>
+                                <th>Сообщение</th>
+                                <th>Медиа</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody id="support-tbody">
+                            <!-- Сообщения будут здесь -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="tab-logs" class="tab-content">
+                <div class="section-header">
+                    <h2>Логи ошибок</h2>
+                    <div>
+                        <button onclick="loadLogs()">🔄 Обновить</button>
+                        <button onclick="testLog()" style="background: #6a11cb;">🧪 Тест логов</button>
+                        <button class="danger-btn" onclick="clearLogs()">🗑️ Очистить</button>
                     </div>
                 </div>
+                <div class="logs-container" id="logs-container">
+                    <!-- Логи будут здесь -->
+                </div>
+            </div>
+
+            <!-- Вкладка: Номера -->
+            <div id="tab-plates" class="tab-content">
+                <div class="section-header">
+                    <h2>Управление номерными знаками</h2>
+                    <button onclick="loadAdminPlates()">🔄 Обновить</button>
+                </div>
+                <div class="table-container">
+                    <table id="plates-table">
+                        <thead>
+                            <tr>
+                                <th>Номер</th>
+                                <th>Владелец</th>
+                                <th>Редкость</th>
+                                <th>Статус</th>
+                                <th>Рынок</th>
+                            </tr>
+                        </thead>
+                        <tbody id="plates-tbody">
+                            <!-- Номера загрузятся сюда -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </main>
     </div>
 
