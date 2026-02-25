@@ -1657,7 +1657,8 @@ async function rest() {
             showDayStatistic(result.days_passed, result.week_days, result.weeks_passed, result.week_completed);
 
         } else {
-            showNotification('❌ Ошибка отдыха', 'error');
+            const errorMsg = result?.error || 'Ошибка отдыха';
+            showNotification(`❌ ${errorMsg}`, 'error');
         }
 
     } catch (error) {
