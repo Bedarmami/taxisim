@@ -65,6 +65,7 @@ class BusinessManager {
     openScreen() {
         showScreen('business');
         this.switchTab(this.currentTab || 'drivers');
+        this.loadData();
     }
 
     closeScreen() {
@@ -161,19 +162,17 @@ class BusinessManager {
         // Update Fleet withdrawal button if it exists
         const fleetWithdrawContainer = document.getElementById('fleet-withdraw-container');
         if (fleetWithdrawContainer) {
-            if (this.uncollectedFleetRevenue > 0) {
-                fleetWithdrawContainer.innerHTML = `
-                    <div style="background:rgba(46, 204, 113, 0.1); border:1px solid #2ecc71; border-radius:12px; padding:12px; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;">
-                        <div>
-                            <div style="font-size:0.75em; color:#888; text-transform:uppercase;">Касса автопарка</div>
-                            <div style="font-size:1.1em; font-weight:bold; color:#2ecc71;">${this.uncollectedFleetRevenue.toFixed(2)} PLN</div>
-                        </div>
-                        <button class="action-btn success small" onclick="businessManager.withdrawFleetProfit()">💰 Снять (-10%)</button>
+            fleetWithdrawContainer.innerHTML = `
+                <div style="background:rgba(46, 204, 113, 0.05); border:1px solid #2ecc7133; border-radius:12px; padding:12px; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <div style="font-size:0.75em; color:#888; text-transform:uppercase;">Касса автопарка</div>
+                        <div style="font-size:1.1em; font-weight:bold; color:#2ecc71;">${(this.uncollectedFleetRevenue || 0).toFixed(2)} PLN</div>
                     </div>
-                `;
-            } else {
-                fleetWithdrawContainer.innerHTML = '';
-            }
+                    <button class="action-btn success small" 
+                            ${this.uncollectedFleetRevenue > 0 ? '' : 'disabled style="opacity:0.5"'}
+                            onclick="businessManager.withdrawFleetProfit()">💰 Снять (-10%)</button>
+                </div>
+            `;
         }
         // Drivers List
         const driversList = document.getElementById('drivers-list');
@@ -273,8 +272,8 @@ class BusinessManager {
         }
 
         this.gasStations.forEach(station => {
-            const isOwned = !!station.owner_id;
-            const isMine = station.owner_id === Telegram.WebApp.initDataUnsafe?.user?.id.toString() || station.owner_id === 'test_user';
+            const currentUserId = Telegram.WebApp.initDataUnsafe?.user?.id?.toString() || 'test_user';
+            const isMine = station.owner_id?.toString() === currentUserId;
             const canAfford = this.balance >= station.purchase_price;
 
             const div = document.createElement('div');
@@ -302,8 +301,8 @@ class BusinessManager {
                     </div>
                     ${!isOwned ?
                     `<button class="action-btn success small" 
-                            style="padding:6px 15px;" 
-                            ${canAfford ? '' : 'disabled opacity:0.5'}
+                            style="padding:6px 15px; ${canAfford ? '' : 'opacity:0.5'}" 
+                            ${canAfford ? '' : 'disabled'}
                             onclick="businessManager.buyStation('${station.id}')">
                             Купить
                         </button>` : ''
