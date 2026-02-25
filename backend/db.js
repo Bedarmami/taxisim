@@ -294,7 +294,8 @@ function initDB() {
                 gas_tank_capacity REAL,
                 gas_consumption REAL,
                 is_premium INTEGER DEFAULT 0,
-                is_container_exclusive INTEGER DEFAULT 0
+                is_container_exclusive INTEGER DEFAULT 0,
+                has_autopilot INTEGER DEFAULT 0
             )`);
 
             // v2.6 Retention Features
@@ -447,13 +448,14 @@ async function seedDB() {
             { id: 'corolla_sedan', name: '🚘 Toyota Corolla Sedan', model: 'Toyota Corolla', image: '🚘', description: 'Надёжный седан', purchase_price: 85000, rent_price: 500, tank_capacity: 50, fuel_consumption: 6.5, has_gas: 0 },
             { id: 'camry', name: '🚙 Toyota Camry', model: 'Toyota Camry', image: '/assets/cars/camry.png', description: 'Премиум автомобиль', purchase_price: 120000, rent_price: 1000, tank_capacity: 60, fuel_consumption: 7.0, has_gas: 0 },
             // New Cars
-            { id: 'tesla_3', name: '🔋 Tesla Model 3', model: 'Tesla Model 3', image: '/assets/cars/tesla.png', description: 'Полностью электрический седан будущего', purchase_price: 180000, rent_price: 2500, tank_capacity: 100, fuel_consumption: 0.1, has_gas: 0, is_premium: 1 },
-            { id: 'mercedes_s', name: '🤵 Mercedes S-Class', model: 'Mercedes-Benz W223', image: '🤵', description: 'Максимальный комфорт и статус', purchase_price: 450000, rent_price: 5000, tank_capacity: 80, fuel_consumption: 12.0, has_gas: 0, is_premium: 1 }
+            { id: 'tesla_3', name: '🔋 Tesla Model 3', model: 'Tesla Model 3', image: '/assets/cars/tesla.png', description: 'Полностью электрический седан будущего', purchase_price: 180000, rent_price: 2500, tank_capacity: 100, fuel_consumption: 0.1, has_gas: 0, is_premium: 1, has_autopilot: 0 },
+            { id: 'tesla_s_plaid', name: '🚀 Tesla Model S Plaid', model: 'Tesla Model S Plaid', image: '/assets/cars/tesla_plaid.png', description: 'Самый быстрый седан в мире с автопилотом', purchase_price: 2500000, rent_price: 15000, tank_capacity: 120, fuel_consumption: 0.1, has_gas: 0, is_premium: 1, has_autopilot: 1 },
+            { id: 'mercedes_s', name: '🤵 Mercedes S-Class', model: 'Mercedes-Benz W223', image: '🤵', description: 'Максимальный комфорт и статус', purchase_price: 450000, rent_price: 5000, tank_capacity: 80, fuel_consumption: 12.0, has_gas: 0, is_premium: 1, has_autopilot: 0 }
         ];
 
         for (const car of cars) {
-            await run(`INSERT OR IGNORE INTO car_definitions(id, name, model, image, description, purchase_price, rent_price, tank_capacity, fuel_consumption, has_gas, gas_tank_capacity, gas_consumption, is_premium) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [car.id, car.name, car.model, car.image, car.description, car.purchase_price, car.rent_price, car.tank_capacity, car.fuel_consumption, car.has_gas, car.gas_tank_capacity || 0, car.gas_consumption || 0, car.is_premium || 0]);
+            await run(`INSERT OR IGNORE INTO car_definitions(id, name, model, image, description, purchase_price, rent_price, tank_capacity, fuel_consumption, has_gas, gas_tank_capacity, gas_consumption, is_premium, has_autopilot) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [car.id, car.name, car.model, car.image, car.description, car.purchase_price, car.rent_price, car.tank_capacity, car.fuel_consumption, car.has_gas, car.gas_tank_capacity || 0, car.gas_consumption || 0, car.is_premium || 0, car.has_autopilot || 0]);
         }
 
         // 3. Seed Gas Stations

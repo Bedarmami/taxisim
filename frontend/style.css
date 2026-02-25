@@ -408,6 +408,39 @@ body {
     }
 }
 
+/* Autopilot Button */
+.btn-autopilot {
+    background: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%);
+    color: white;
+    border: none;
+    padding: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    margin-top: 5px;
+    width: 100%;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: 0 4px 15px rgba(0, 210, 255, 0.3);
+}
+
+.btn-autopilot:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 210, 255, 0.4);
+}
+
+.btn-autopilot:active {
+    transform: translateY(1px);
+}
+
+.btn-autopilot i,
+.btn-autopilot span.icon {
+    font-size: 1.2em;
+}
+
 @keyframes slideIn {
     from {
         opacity: 0;

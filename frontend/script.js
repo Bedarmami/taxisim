@@ -730,6 +730,12 @@ function displayOrders() {
                         ${canTake ? '' : 'disabled'}>
                     ${canTake ? '✅ Принять заказ' : '❌ Нет ресурсов'}
                 </button>
+                ${userData.car && userData.car.has_autopilot ? `
+                <button class="btn-autopilot" 
+                        onclick="takeOrder('${order.id}', event, true)"
+                        ${userData.fuel >= ((userData.fuel_consumption / 100) * order.distance) ? '' : 'disabled'}>
+                    <span class="icon">🤖</span> К автопилоту
+                </button>` : ''}
             </div>
         `;
     }).join('');
@@ -738,9 +744,9 @@ function displayOrders() {
 }
 
 // ============= ПРОВЕРКА ВОЗМОЖНОСТИ ВЗЯТЬ ЗАКАЗ =============
-function canTakeOrder(order) {
+function canTakeOrder(order, useAutopilot = false) {
     if (!userData) return false;
-    if (userData.stamina <= 0) return false;
+    if (!useAutopilot && userData.stamina <= 0) return false;
     if (!userData.fuel_consumption) return false;
 
     const fuelNeeded = (userData.fuel_consumption / 100) * order.distance;
@@ -750,7 +756,7 @@ function canTakeOrder(order) {
 // ============= ВЗЯТЬ ЗАКАЗ =============
 let isProcessingOrder = false;
 
-async function takeOrder(orderId, event) {
+async function takeOrder(orderId, event, useAutopilot = false) {
     if (isProcessingOrder) return;
 
     const order = orders.find(o => o.id === orderId);
@@ -760,7 +766,7 @@ async function takeOrder(orderId, event) {
         return;
     }
 
-    if (!canTakeOrder(order)) {
+    if (!canTakeOrder(order, useAutopilot)) {
         showNotification('❌ Недостаточно топлива или выносливости!', 'error');
         return;
     }
@@ -781,7 +787,7 @@ async function takeOrder(orderId, event) {
         const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/ride`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ order: orderId, useGas: false })
+            body: JSON.stringify({ order: orderId, useGas: false, autopilot: useAutopilot })
         });
 
         if (result && result._isError) {

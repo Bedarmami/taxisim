@@ -300,7 +300,8 @@ async function syncCarsFromDB() {
                 description: row.description || '',
                 type: row.has_gas ? 'dual' : 'petrol',
                 condition: 100,
-                is_premium: !!row.is_premium
+                is_premium: !!row.is_premium,
+                has_autopilot: !!row.has_autopilot
             };
         });
 
@@ -1652,7 +1653,7 @@ app.get('/api/orders/:telegramId', async (req, res) => {
 app.post('/api/user/:telegramId/ride', rateLimitMiddleware, async (req, res) => {
     try {
         const { telegramId } = req.params;
-        const { useGas } = req.body;
+        const { useGas, autopilot } = req.body;
 
         const user = await getUser(telegramId);
         if (!user) {
@@ -1697,16 +1698,19 @@ app.post('/api/user/:telegramId/ride', rateLimitMiddleware, async (req, res) => 
         const fuelProvidedByPartner = partner && partner.fuel_provided;
 
         // Atomically Deduct Stamina (prevent race)
-        const staminaDeducted = await updateStaminaAtomic(telegramId, -15);
-        if (!staminaDeducted) {
-            return res.status(400).json({ error: 'Недостаточно выносливости или ошибка синхронизации' });
+        const isAutopilotActive = autopilot && user.car.has_autopilot;
+        if (!isAutopilotActive) {
+            const staminaDeducted = await updateStaminaAtomic(telegramId, -15);
+            if (!staminaDeducted) {
+                return res.status(400).json({ error: 'Недостаточно выносливости или ошибка синхронизации' });
+            }
         }
 
         if (!fuelProvidedByPartner) {
             const fuelDeducted = await updateFuelAtomic(telegramId, fuelType === 'petrol' ? -fuelNeeded : 0, fuelType === 'gas' ? -fuelNeeded : 0);
             if (!fuelDeducted) {
                 // Refund stamina if fuel deduction failed
-                await updateStaminaAtomic(telegramId, 15);
+                if (!isAutopilotActive) await updateStaminaAtomic(telegramId, 15);
                 return res.status(400).json({ error: 'Недостаточно топлива' });
             }
         }
