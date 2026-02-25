@@ -1259,13 +1259,14 @@ async function loadMyCars() {
                         </button>
                     `;
                     } else {
+                        // v3.5: Moved to Fleet instead of Renting out from garage
                         actionButton = `
                         <button class="action-btn" onclick="selectCar('${car.id}')" style="margin-bottom: 5px; width: 100%;">
-                            Севсть за руль
+                            Сесть за руль
                         </button>
                         ${car.purchase_price > 0 ? `
-                        <button class="action-btn" onclick="rentOutCar('${car.id}')" style="background: #007AFF; width: 100%;">
-                            Сдать в аренду (+${income}/нед)
+                        <button class="action-btn" onclick="moveToFleet(${myCars.indexOf(car)})" style="background: #5856D6; width: 100%;">
+                            Отправить в автопарк
                         </button>` : ''}
                     `;
                     }
@@ -1304,20 +1305,22 @@ async function loadMyCars() {
 }
 
 // ============= ФУНКЦИИ АВТОПАРКА =============
-async function rentOutCar(carId) {
+async function moveToFleet(carIdx) {
     try {
-        if (!confirm('Сдать машину в аренду? Вы будете получать доход каждую неделю, но не сможете ездить на ней.')) return;
+        if (!confirm('Перегнать эту машину в бизнес-автопарк? Вы сможете нанимать водителей для неё в меню Бизнес.')) return;
 
-        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/fleet/rent-out`, {
+        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/fleet/move-from-garage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ carId })
+            body: JSON.stringify({ carIdx })
         });
 
         const result = await response.json();
         if (result.success) {
-            userData.business = result.business;
             showNotification(result.message, 'success');
+            // Refresh local data
+            const userRes = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}`);
+            userData = await userRes.json();
             updateGarageScreen();
         } else {
             showNotification(result.error || 'Ошибка', 'error');

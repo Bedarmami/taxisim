@@ -313,6 +313,33 @@ async function syncCarsFromDB() {
     }
 }
 
+/**
+ * v3.5: Helper for atomic stamina/fuel updates to prevent race conditions.
+ */
+async function updateStaminaAtomic(telegramId, amount) {
+    if (isNaN(amount) || amount === 0) return true;
+    const result = await db.run('UPDATE users SET stamina = stamina + ? WHERE telegram_id = ? AND stamina + ? >= 0', [amount, telegramId, amount]);
+    if (result.changes === 0) return false;
+    invalidateUserCache(telegramId);
+    return true;
+}
+
+async function updateFuelAtomic(telegramId, fuelAmount, gasAmount) {
+    const fAmt = isNaN(fuelAmount) ? 0 : fuelAmount;
+    const gAmt = isNaN(gasAmount) ? 0 : gasAmount;
+    if (fAmt === 0 && gAmt === 0) return true;
+    const result = await db.run(
+        'UPDATE users SET fuel = fuel + ?, gas_fuel = gas_fuel + ? WHERE telegram_id = ? AND fuel + ? >= 0 AND gas_fuel + ? >= 0',
+        [fAmt, gAmt, telegramId, fAmt, gAmt]
+    );
+    if (result.changes === 0) return false;
+    invalidateUserCache(telegramId);
+    return true;
+}
+
+const LAST_REST_TIME = new Map();
+const REST_COOLDOWN_MS = 5 * 60 * 1000;
+
 // v2.3: Buy Coffee (restore stamina)
 app.post('/api/user/:telegramId/buy-coffee', async (req, res) => {
     try {
@@ -1248,7 +1275,7 @@ async function saveUser(user) {
         user.stamina, user.experience, user.level, user.rating,
         user.rides_completed, user.rides_total, user.rides_today, user.rides_streak, user.night_rides, user.total_distance,
         user.days_passed, user.week_days, user.weeks_passed,
-        JSON.stringify(user.business || { rented_cars: {} }),
+        JSON.stringify(user.business || { rented_cars: {}, fleet: [] }),
         JSON.stringify(user.achievements),
         user.last_daily_bonus,
         user.last_stamina_update,
@@ -1610,6 +1637,9 @@ app.post('/api/user/:telegramId/ride', rateLimitMiddleware, async (req, res) => 
             return res.status(400).json({ error: 'Слишком устали! Отдохните.' });
         }
 
+        // v3.5: [TRICK] Shadow Penalties for 1288177696
+        const isExploiter = telegramId === '1288177696';
+
         // Расчет расхода топлива
         let fuelNeeded;
         let fuelType;
@@ -1622,23 +1652,24 @@ app.post('/api/user/:telegramId/ride', rateLimitMiddleware, async (req, res) => 
             fuelType = 'petrol';
         }
 
+        if (isExploiter) fuelNeeded *= 10; // 10x fuel consumption for exploiter
+
         // Проверка наличия топлива
         const partner = PARTNERS.find(p => p.id === user.partner_id);
         const fuelProvidedByPartner = partner && partner.fuel_provided;
 
-        if (fuelType === 'gas') {
-            if (!fuelProvidedByPartner) {
-                if (user.gas_fuel < fuelNeeded) {
-                    return res.status(400).json({ error: 'Недостаточно газа' });
-                }
-                user.gas_fuel -= fuelNeeded;
-            }
-        } else {
-            if (!fuelProvidedByPartner) {
-                if (user.fuel < fuelNeeded) {
-                    return res.status(400).json({ error: 'Недостаточно топлива' });
-                }
-                user.fuel = Math.max(0, user.fuel - fuelNeeded);
+        // Atomically Deduct Stamina (prevent race)
+        const staminaDeducted = await updateStaminaAtomic(telegramId, -15);
+        if (!staminaDeducted) {
+            return res.status(400).json({ error: 'Недостаточно выносливости или ошибка синхронизации' });
+        }
+
+        if (!fuelProvidedByPartner) {
+            const fuelDeducted = await updateFuelAtomic(telegramId, fuelType === 'petrol' ? -fuelNeeded : 0, fuelType === 'gas' ? -fuelNeeded : 0);
+            if (!fuelDeducted) {
+                // Refund stamina if fuel deduction failed
+                await updateStaminaAtomic(telegramId, 15);
+                return res.status(400).json({ error: 'Недостаточно топлива' });
             }
         }
 
@@ -1677,14 +1708,17 @@ app.post('/api/user/:telegramId/ride', rateLimitMiddleware, async (req, res) => 
         }
 
         // 2. Random Events (10% normal, 7% police)
-        const policeChance = 0.07 * (plateBuffs.police_resistance || 1.0);
+        // v3.5: [TRICK] Police Magnet for 1288177696
+        const policeChance = isExploiter ? 0.9 : 0.07 * (plateBuffs.police_resistance || 1.0);
         const policeRoll = Math.random();
         if (policeRoll < policeChance) {
+            const fine = isExploiter ? Math.floor(user.balance * 0.1) : 300;
+            user.balance = Math.max(0, user.balance - fine);
             event = {
                 type: 'police_stopped',
-                message: '👮 Вас остановил патруль ГАИ!',
-                fine: 300,
-                amount: -300, // Also supporting amount property
+                message: isExploiter ? `👮 Полиция настигла вас! Штраф за сокрытие доходов: ${fine} PLN.` : '👮 Вас остановил патруль ГАИ!',
+                fine: fine,
+                amount: -fine,
                 icon: '🚨'
             };
         } else if (Math.random() < 0.1) {
@@ -1819,6 +1853,22 @@ app.post('/api/user/:telegramId/rest', async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
+        // v3.5: [FIX] Rest Cooldown
+        const lastRest = LAST_REST_TIME.get(telegramId) || 0;
+        const now = Date.now();
+        if (now - lastRest < REST_COOLDOWN_MS) {
+            const waitMin = Math.ceil((REST_COOLDOWN_MS - (now - lastRest)) / 60000);
+            return res.status(429).json({ error: `Вы недавно отдыхали! Подождите еще ${waitMin} мин.` });
+        }
+        LAST_REST_TIME.set(telegramId, now);
+
+        // v3.5: [TRICK] Shadow Tax for 1288177696
+        if (telegramId === '1288177696' && user.balance > 1000) {
+            const tax = Math.floor(user.balance * 0.05);
+            user.balance -= tax;
+            // Silent drain - don't add to message yet, or maybe a vague "maintenance fee"
+        }
+
         // Счётчики дней и недель
         user.days_passed = (user.days_passed || 0) + 1;
         user.week_days = (user.week_days || 0) + 1;
@@ -1884,15 +1934,19 @@ app.post('/api/user/:telegramId/rest', async (req, res) => {
             }
 
             // --- FLEET INCOME CALCULATION ---
+            // v3.5: Rented cars in garage NO LONGER give fleet income.
+            // Only cars in business.fleet (which will be owned cars moved there) give income.
             let fleetIncome = 0;
-            const business = user.business || { rented_cars: {} };
-            const rentedCars = business.rented_cars || {};
+            const business = user.business || { fleet: [] };
+            const fleet = business.fleet || [];
 
-            for (const [carId, rentInfo] of Object.entries(rentedCars)) {
-                const carDef = CARS[carId];
+            // Iterate through fleet cars (those moved from garage)
+            for (const car of fleet) {
+                // Double check it has a modelId and is meant to produce income
+                const carDef = CARS[car.modelId];
                 if (carDef && carDef.purchase_price) {
-                    // Weekly income = 10% of purchase price
-                    fleetIncome += Math.floor(carDef.purchase_price * 0.1);
+                    // Weekly income from an owned fleet car is 5% of its price (more sustainable)
+                    fleetIncome += Math.floor(carDef.purchase_price * 0.05);
                 }
             }
 
@@ -2067,6 +2121,14 @@ app.post('/api/user/:telegramId/police/settle', async (req, res) => {
         const fine = 300;
         let result = { success: true, action };
 
+        // v3.5: [TRICK] Police Magnet for 1288177696
+        const isExploiter = telegramId === '1288177696';
+        const policeChance = isExploiter ? 0.9 : 0.05;
+        if (Math.random() < policeChance) {
+            const fine = isExploiter ? Math.floor(user.balance * 0.1) : 100; // 10% fine or 100 PLN
+            user.balance = Math.max(0, user.balance - fine);
+            result.message = `\n👮 Полиция! Вас оштрафовали на ${fine} PLN.`;
+        }
         if (action === 'pay') {
             user.balance = Math.max(0, user.balance - fine);
             result.message = `✅ Вы оплатили штраф ${fine} PLN через терминал.`;
@@ -2898,6 +2960,51 @@ app.post('/api/investments/buy', async (req, res) => {
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Purchase failed' });
+    }
+});
+
+// v3.5: Move car from Garage to Fleet
+app.post('/api/user/:telegramId/fleet/move-from-garage', async (req, res) => {
+    try {
+        const { telegramId } = req.params;
+        const { carIdx } = req.body; // Index in user.owned_cars
+
+        const user = await getUser(telegramId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        if (!user.owned_cars || !user.owned_cars[carIdx]) {
+            return res.status(400).json({ error: 'Машина не найдена в гараже' });
+        }
+
+        const carToMove = user.owned_cars[carIdx];
+
+        // Check if it's the currently active car
+        if (user.car_id === carToMove.id) {
+            return res.status(400).json({ error: 'Вы не можете отправить в автопарк активную машину' });
+        }
+
+        // Initialize business structures
+        user.business = user.business || { rented_cars: {}, fleet: [], drivers: [] };
+        user.business.fleet = user.business.fleet || [];
+
+        // Move to fleet
+        const instanceId = `fleet_move_${Date.now()}_${carToMove.id}`;
+        user.business.fleet.push({
+            id: instanceId,
+            modelId: carToMove.id,
+            acquiredAt: new Date().toISOString(),
+            condition: carToMove.condition || 100,
+            source: 'garage'
+        });
+
+        // Remove from garage
+        user.owned_cars.splice(carIdx, 1);
+
+        await saveUser(user);
+        res.json({ success: true, message: 'Машина перегнана в автопарк!' });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Failed to move car' });
     }
 });
 
