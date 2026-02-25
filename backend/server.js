@@ -3912,7 +3912,7 @@ app.get('/api/admin/activities', adminAuth, async (req, res) => {
             let isSuspicious = false;
             let reason = '';
 
-            if (a.action === 'COMPLETE_RIDE' && details.reward > 1000) {
+            if (a.action === 'COMPLETE_RIDE' && details.earnings > 1000) {
                 isSuspicious = true;
                 reason = 'High reward';
             }
@@ -4057,7 +4057,7 @@ app.get('/api/admin/analytics', adminAuth, async (req, res) => {
         // Economy Flow (Last 7 days)
         // Inflow: Rides
         const inflow = await db.get(`
-            SELECT SUM(reward) as total 
+            SELECT SUM(price) as total 
             FROM orders_history 
             WHERE completed_at >= ?
         `, [sevenDaysAgo]);

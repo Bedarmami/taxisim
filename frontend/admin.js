@@ -189,23 +189,30 @@ async function loadStats() {
 }
 
 async function loadAnalytics() {
-    const res = await fetch('/api/admin/analytics', { headers: { 'x-admin-password': adminPassword } });
-    const data = await res.json();
+    try {
+        const res = await fetch('/api/admin/analytics', { headers: { 'x-admin-password': adminPassword } });
+        const data = await res.json();
 
-    initChart('regChart', 'Регистрации', data.registrations, '#0088cc');
-    initChart('ridesChart', 'Поездки', data.rides, '#34b545');
+        // 🛡️ Robust chart initialization
+        try {
+            if (data.registrations) initChart('regChart', 'Регистрации', data.registrations, '#0088cc');
+            if (data.rides) initChart('ridesChart', 'Поездки', data.rides, '#34b545');
+        } catch (chartErr) { console.error('Chart init error:', chartErr); }
 
-    // Retention / Active Users
-    const statsRet = document.getElementById('stats-retention');
-    if (statsRet) statsRet.textContent = `${data.dau} / ${data.wau}`;
+        // Retention / Active Users
+        const statsRet = document.getElementById('stats-retention');
+        if (statsRet) statsRet.textContent = `${data.dau || 0} / ${data.wau || 0}`;
 
-    // Economy Inflow
-    const economyInflowEl = document.getElementById('economy-inflow');
-    if (economyInflowEl && data.economy) {
-        economyInflowEl.textContent = data.economy.inflow7d + ' PLN';
+        // Economy Inflow
+        const economyInflowEl = document.getElementById('economy-inflow');
+        if (economyInflowEl && data.economy) {
+            economyInflowEl.textContent = (data.economy.inflow7d || 0) + ' PLN';
+        }
+    } catch (e) {
+        console.error('Analytics load error:', e);
     }
 
-    // Load Wealthiest for the table
+    // Load Wealthiest and Status even if charts fail
     loadWealthiest();
     loadBotStatus();
 }
