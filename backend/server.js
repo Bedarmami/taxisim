@@ -12,6 +12,7 @@ console.log('🚀 Server initializing... [fs module:', typeof fs !== 'undefined'
 
 const { router: auctionRouter, initAuction, startAuction } = require('./routes/auction');
 const { initBot, sendNotification, bot } = require('./bot');
+const { runAIAnalysis } = require('./ai_analyst');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -1233,13 +1234,21 @@ async function getUser(telegramId) {
     return row;
 }
 
-/**
- * Helper to get a global configuration value with a default
- */
+// config caching logic
+let CONFIG_CACHE = new Map();
+let CONFIG_CACHE_TTL = 5 * 60 * 1000; // 5 mins
+
 async function getConfig(key, defaultValue) {
+    const cached = CONFIG_CACHE.get(key);
+    if (cached && (Date.now() - cached.timestamp < CONFIG_CACHE_TTL)) {
+        return cached.value;
+    }
+
     try {
         const row = await db.get('SELECT value FROM global_configs WHERE key = ?', [key]);
-        return row ? row.value : defaultValue;
+        const val = row ? row.value : defaultValue;
+        CONFIG_CACHE.set(key, { value: val, timestamp: Date.now() });
+        return val;
     } catch (e) {
         console.error(`Error getting config ${key}:`, e);
         return defaultValue;
@@ -1678,10 +1687,11 @@ app.post('/api/user/:telegramId/ride', rateLimitMiddleware, async (req, res) => 
         if (isNaN(user.gas_fuel)) user.gas_fuel = 0;
 
         // Расчет дохода
-        let earnings = order.price;
+        const multiplier = parseFloat(await getConfig('earnings_multiplier', '1.0'));
+        let earnings = order.price * multiplier;
 
         // v3.5 Sanity Check: Revenue/Distance ratio (prevent price manipulation)
-        if (earnings / order.distance > 2000) {
+        if (earnings / order.distance > 5000) { // Increased limit for multipliers
             logActivity(telegramId, 'ALARM_EXPLOIT', {
                 reason: 'Impossible Ride Revenue',
                 earnings,
@@ -4093,6 +4103,64 @@ app.get('/api/admin/wealthiest', adminAuth, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// v5.0: User Timeline (Deep Dossier)
+app.get('/api/admin/users/:telegramId/timeline', adminAuth, async (req, res) => {
+    try {
+        const { telegramId } = req.params;
+        const user = await db.get('SELECT id, telegram_id, username, balance, created_at FROM users WHERE telegram_id = ?', [telegramId]);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        // Wealth Growth (Orders history)
+        const history = await db.query('SELECT completed_at, price FROM orders_history WHERE user_id = ? ORDER BY completed_at ASC', [user.id]);
+
+        // Activity (Last 50 significant actions)
+        const activities = await db.query('SELECT action, details, timestamp FROM user_activity WHERE user_id = ? ORDER BY timestamp DESC LIMIT 50', [telegramId]);
+
+        res.json({
+            user,
+            wealthHistory: history,
+            activities: activities
+        });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// v5.0: Global Giveaway
+app.post('/api/admin/giveaway', adminAuth, async (req, res) => {
+    try {
+        const { amount, message } = req.body;
+        if (!amount || isNaN(amount) || !message) return res.status(400).json({ error: 'Invalid amount or message' });
+
+        console.log(`🎁 Starting Global Giveaway: ${amount} PLN to all users...`);
+
+        // Update all users balance (atomic)
+        await db.run('UPDATE users SET balance = balance + ? WHERE is_banned = 0', [amount]);
+
+        // Background: Send notification to all users
+        const users = await db.query('SELECT telegram_id FROM users WHERE is_banned = 0');
+        for (const user of users) {
+            if (user.telegram_id) {
+                sendNotification(user.telegram_id, 'BROADCAST', { text: `🎁 <b>БОНУС ОТ АДМИНИСТРАЦИИ!</b>\n\n${message}\n\nНа ваш баланс зачислено: <b>${amount} PLN</b>` }).catch(() => { });
+                await new Promise(r => setTimeout(r, 50));
+            }
+        }
+
+        res.json({ success: true, count: users.length });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// v5.0: Manual Jackpot Adjust
+app.post('/api/admin/jackpot/adjust', adminAuth, async (req, res) => {
+    try {
+        const { amount } = req.body;
+        if (isNaN(amount)) return res.status(400).json({ error: 'Invalid amount' });
+
+        JACKPOT_POOL = parseFloat(amount);
+        await saveJackpot();
+
+        res.json({ success: true, new_pool: JACKPOT_POOL });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/admin/bot-status', adminAuth, async (req, res) => {
     try {
         const https = require('https');
@@ -4163,7 +4231,26 @@ app.get('/api/admin/ai-test', adminAuth, async (req, res) => {
     }
 });
 
-// ============= v3.0: AUCTION ENDPOINTS =============
+// v5.0: AI Monitoring & Automated Reports
+app.post('/api/admin/ai/scan', adminAuth, async (req, res) => {
+    try {
+        const report = await runAIAnalysis();
+        res.json({ report });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Hourly AI Report (Internal)
+setInterval(async () => {
+    console.log('🤖 Running scheduled AI Analysis...');
+    try {
+        const report = await runAIAnalysis();
+        // Send to owner/admin if possible (using a hardcoded admin ID or first user)
+        const adminTid = process.env.ADMIN_TELEGRAM_ID;
+        if (adminTid) {
+            await sendNotification(adminTid, 'BROADCAST', { text: report });
+        }
+    } catch (e) { console.error('Scheduled AI Error:', e); }
+}, 60 * 60 * 1000); // Every hour
 
 // Redundant auction endpoints removed. Using auction.js routes.
 

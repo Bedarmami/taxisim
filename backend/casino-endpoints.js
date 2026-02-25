@@ -29,6 +29,13 @@ app.post('/api/casino/slots', async (req, res) => {
         user.balance += result.winAmount;
         user.casino_spins_today++;
 
+        // v5.0: Jackpot Contribution (1% of bet)
+        const jackpotTax = bet * 0.01;
+        JACKPOT_POOL += jackpotTax;
+        await saveJackpot();
+
+        // Update stats
+
         // Update stats
         user.casino_stats = user.casino_stats || { total_won: 0, total_lost: 0, spins: 0 };
         user.casino_stats.spins++;
@@ -77,6 +84,11 @@ app.post('/api/casino/roulette', async (req, res) => {
         user.balance -= bet;
         user.balance += result.winAmount;
         user.casino_spins_today++;
+
+        // v5.0: Jackpot Contribution (1% of bet)
+        const jackpotTax = bet * 0.01;
+        JACKPOT_POOL += jackpotTax;
+        await saveJackpot();
 
         user.casino_stats = user.casino_stats || { total_won: 0, total_lost: 0, spins: 0 };
         user.casino_stats.spins++;

@@ -24,6 +24,7 @@ function openTab(evt, tabName) {
     if (tabName === 'tab-support') loadSupportMessages();
     if (tabName === 'tab-gas-stations') loadAdminGasStations();
     if (tabName === 'tab-plates') loadAdminPlates();
+    if (tabName === 'tab-live-config') loadConfigs();
 }
 
 async function checkAuth() {
@@ -364,6 +365,7 @@ async function loadUsers() {
             <td>${u.last_login ? new Date(u.last_login).toLocaleString() : '---'}</td>
             <td>
                 <button class="edit-btn" onclick="openEditModal('${u.telegram_id}')">📝 Изменить</button>
+                <button class="success-btn" style="margin-top:5px; width:100%; background: #0088cc;" onclick="openTimeline('${u.telegram_id}')">📊 Досье</button>
                 ${u.is_banned ?
                 `<button class="success-btn" style="margin-top:5px; width:100%;" onclick="unbanUser('${u.telegram_id}')">✅ Разбан</button>` :
                 `<button class="danger-btn" style="margin-top:5px; width:100%;" onclick="banUser('${u.telegram_id}')">🚫 Бан</button>`
@@ -1221,4 +1223,171 @@ async function emergencyResetUser(inputId = 'emergency-target-id') {
         console.error(e);
         alert('Ошибка при выполнении экстренного сброса');
     }
+}
+
+// ============= v5.0: Advanced Economy Tools =============
+
+async function loadConfigs() {
+    const tbody = document.getElementById('config-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="3">Загрузка...</td></tr>';
+
+    const configs = await safeFetchJson('/api/admin/configs', { headers: { 'x-admin-password': adminPassword } });
+    if (!configs || configs._isError) {
+        tbody.innerHTML = '<tr><td colspan="3">Ошибка загрузки</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = '';
+    configs.forEach(cfg => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><b>${cfg.key}</b></td>
+            <td><input type="text" id="cfg-${cfg.key}" value="${cfg.value}" style="width: 80px;"></td>
+            <td><button onclick="updateConfig('${cfg.key}')" class="btn-small">💾</button></td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    // Also update jackpot pool display
+    const jackpotData = await safeFetchJson('/api/admin/stats', { headers: { 'x-admin-password': adminPassword } });
+    if (jackpotData && jackpotData.jackpot) {
+        const poolEl = document.getElementById('jackpot-current-pool');
+        if (poolEl) poolEl.textContent = jackpotData.jackpot.toFixed(2) + ' PLN';
+    }
+}
+
+async function updateConfig(key) {
+    const value = document.getElementById(`cfg-${key}`).value;
+    const res = await safeFetchJson('/api/admin/configs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
+        body: JSON.stringify({ key, value })
+    });
+
+    if (res && !res._isError) {
+        alert('Параметр обновлен!');
+        loadConfigs();
+    } else {
+        alert('Ошибка обновления');
+    }
+}
+
+async function adjustJackpot() {
+    const amount = document.getElementById('jackpot-adjust-amount').value;
+    if (!amount) return alert('Введите сумму');
+
+    const res = await safeFetchJson('/api/admin/jackpot/adjust', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
+        body: JSON.stringify({ amount })
+    });
+
+    if (res && res.success) {
+        alert('Джекпот обновлен!');
+        loadConfigs();
+    } else {
+        alert('Ошибка обновления джекпота');
+    }
+}
+
+async function runAIScan() {
+    const btn = document.querySelector('button[onclick="runAIScan()"]');
+    const text = document.getElementById('ai-report-text');
+
+    btn.disabled = true;
+    const oldText = btn.textContent;
+    btn.textContent = '⏳ Анализирую...';
+    text.textContent = 'Связываюсь с Gemini AI для аудита экономики...';
+
+    const res = await safeFetchJson('/api/admin/ai/scan', {
+        method: 'POST',
+        headers: { 'x-admin-password': adminPassword }
+    });
+
+    btn.disabled = false;
+    btn.textContent = oldText;
+
+    if (res && res.report) {
+        text.innerHTML = res.report.replace(/\n/g, '<br>');
+    } else {
+        text.textContent = 'Ошибка AI-сканирования.';
+    }
+}
+
+// ============= v5.0: User Timeline (Deep Dossier) =============
+
+async function openTimeline(telegramId) {
+    const modal = document.getElementById('timeline-modal');
+    modal.style.display = 'block';
+
+    const res = await safeFetchJson(`/api/admin/users/${telegramId}/timeline`, {
+        headers: { 'x-admin-password': adminPassword }
+    });
+
+    if (!res || res._isError) {
+        alert('Ошибка загрузки досье');
+        return;
+    }
+
+    document.getElementById('timeline-user-title').textContent = `🔍 Досье: ${res.user.username || telegramId}`;
+
+    const statsView = document.getElementById('timeline-stats-view');
+    statsView.innerHTML = `
+        <div class="card" style="margin-bottom: 10px;">
+            <p>💰 Баланс: <b>${res.user.balance.toFixed(2)} PLN</b></p>
+            <p>📅 Регистрация: ${new Date(res.user.created_at).toLocaleDateString()}</p>
+            <p>🚗 Поездок в базе: ${res.wealthHistory.length}</p>
+        </div>
+    `;
+
+    const actBody = document.getElementById('timeline-activities-tbody');
+    actBody.innerHTML = '';
+    res.activities.forEach(a => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><small>${new Date(a.timestamp).toLocaleString()}</small></td>
+            <td><b>${a.action}</b></td>
+            <td><small>${a.details}</small></td>
+        `;
+        actBody.appendChild(tr);
+    });
+
+    renderUserWealthChart(res.wealthHistory);
+}
+
+function closeTimeline() {
+    document.getElementById('timeline-modal').style.display = 'none';
+}
+
+function renderUserWealthChart(history) {
+    const ctx = document.getElementById('userWealthChart').getContext('2d');
+
+    if (charts['userWealth']) charts['userWealth'].destroy();
+
+    let currentBalance = 0;
+    const data = history.map(h => {
+        currentBalance += h.price;
+        return { x: new Date(h.completed_at), y: currentBalance };
+    });
+
+    charts['userWealth'] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            datasets: [{
+                label: 'Накопленный доход (PLN)',
+                data: data,
+                borderColor: '#0088cc',
+                backgroundColor: 'rgba(0, 136, 204, 0.1)',
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: { title: { display: true, text: 'PLN' } }
+            }
+        }
+    });
 }
