@@ -572,3 +572,135 @@ td .status-badge {
         font-size: 0.8rem;
     }
 }
+
+/* v5.1: Premium UI Enhancements */
+.modal-content.timeline-content {
+    width: 950px;
+    max-width: 95vw;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    padding: 25px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+}
+
+.timeline-quick-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.q-stat {
+    background: white;
+    padding: 15px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    transition: transform 0.2s;
+}
+
+.q-stat:hover {
+    transform: translateY(-2px);
+}
+
+.q-icon {
+    font-size: 24px;
+}
+
+.q-info small {
+    color: #666;
+    display: block;
+}
+
+.q-info b {
+    font-size: 18px;
+    color: #333;
+}
+
+.timeline-body-grid {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    gap: 25px;
+}
+
+.chart-wrapper {
+    background: white;
+    padding: 15px;
+    border-radius: 12px;
+    border: 1px solid #eee;
+}
+
+.activity-timeline {
+    max-height: 450px;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+.activity-item {
+    background: #f8f9fa;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    border-left: 4px solid #0088cc;
+    font-size: 13px;
+}
+
+.activity-item .a-time {
+    color: #888;
+    display: block;
+    font-size: 11px;
+    margin-bottom: 4px;
+}
+
+.activity-item .a-action {
+    font-weight: 700;
+    color: #333;
+}
+
+.activity-details {
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.detail-badge {
+    background: #eee;
+    color: #444;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.detail-badge.money {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.detail-badge.danger {
+    background: #ffebee;
+    color: #c62828;
+}
+
+/* AI Scan Button Glow */
+.ai-scan-btn.glow {
+    animation: glow-blue 2s infinite;
+}
+
+@keyframes glow-blue {
+    0% {
+        box-shadow: 0 0 0 0 rgba(0, 136, 204, 0.4);
+    }
+
+    70% {
+        box-shadow: 0 0 0 10px rgba(0, 136, 204, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(0, 136, 204, 0);
+    }
+}

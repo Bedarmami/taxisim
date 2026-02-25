@@ -4250,7 +4250,7 @@ setInterval(async () => {
             await sendNotification(adminTid, 'BROADCAST', { text: report });
         }
     } catch (e) { console.error('Scheduled AI Error:', e); }
-}, 60 * 60 * 1000); // Every hour
+}, 6 * 60 * 60 * 1000); // Every 6 hours
 
 // Redundant auction endpoints removed. Using auction.js routes.
 

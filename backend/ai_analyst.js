@@ -4,11 +4,32 @@ require('dotenv').config();
 
 const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
+// v5.1: AI Robustness (Caching & Backoff)
+let lastReport = null;
+let lastPromptTime = 0;
+let quotaExceededUntil = 0;
+const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes cache
+const QUOTA_BACKOFF = 30 * 60 * 1000; // 30 minutes backoff on 429
+
 /**
  * Runs a deep AI analysis on recent logs and economy state.
  */
 async function runAIAnalysis() {
     if (!genAI) return "⚠️ Gemini API Key missing. AI Monitoring disabled.";
+
+    const now = Date.now();
+
+    // 1. Quota Backoff Check
+    if (now < quotaExceededUntil) {
+        const remaining = Math.ceil((quotaExceededUntil - now) / 60000);
+        return `⚠️ <b>AI находится на отдыхе (Quota 429).</b> Попробуйте снова через ${remaining} мин. Используется кэшированный отчет...<br><br>${lastReport || ''}`;
+    }
+
+    // 2. Cache Check (Throttle API calls)
+    if (lastReport && (now - lastPromptTime < CACHE_DURATION)) {
+        console.log('🤖 Serving cached AI report...');
+        return lastReport;
+    }
 
     try {
         // 1. Gather recent logs (last 200 activity logs)
@@ -52,10 +73,24 @@ async function runAIAnalysis() {
 
         const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
         const result = await model.generateContent(prompt);
-        return result.response.text();
+        const reportText = result.response.text();
+
+        // Update cache
+        lastReport = reportText;
+        lastPromptTime = Date.now();
+        quotaExceededUntil = 0;
+
+        return reportText;
 
     } catch (e) {
         console.error('AI Analysis Error:', e);
+
+        // Handle 429 specifically
+        if (e.status === 429 || (e.message && e.message.includes('429'))) {
+            quotaExceededUntil = Date.now() + QUOTA_BACKOFF;
+            return `⚠️ <b>Лимит API исчерпан (Quota 429).</b> Перехожу в режим ожидания на 30 минут.`;
+        }
+
         return "⚠️ Ошибка при формировании AI отчета.";
     }
 }

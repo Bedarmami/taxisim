@@ -600,31 +600,52 @@
         </main>
 
         <!-- Модальное окно: Досье игрока (Timeline) -->
-        <div id="timeline-modal" class="modal" style="display: none;">
-            <div class="modal-content" style="max-width: 900px;">
+        <div id="timeline-modal" class="modal">
+            <div class="modal-content timeline-content">
                 <span class="close" onclick="closeTimeline()">&times;</span>
-                <h2 id="timeline-user-title">🔍 Досье: Игрок</h2>
-                <div class="timeline-grid" style="display: grid; grid-template-columns: 300px 1fr; gap: 20px;">
-                    <div id="timeline-stats-view">
-                        <!-- Статы игрока -->
+                <div class="timeline-header">
+                    <h2>🔍 Досье: <span id="timeline-tid">---</span></h2>
+                </div>
+
+                <div class="timeline-quick-stats">
+                    <div class="q-stat" title="Текущий баланс">
+                        <span class="q-icon">💰</span>
+                        <div class="q-info">
+                            <small>Баланс</small>
+                            <b id="timeline-balance">0.00</b> PLN
+                        </div>
                     </div>
-                    <div>
-                        <h3>📈 Рост баланса (История)</h3>
-                        <canvas id="userWealthChart" style="height: 200px; width: 100%;"></canvas>
+                    <div class="q-stat" title="Дата регистрации">
+                        <span class="q-icon">📅</span>
+                        <div class="q-info">
+                            <small>Регистрация</small>
+                            <b id="timeline-reg-date">--.--.----</b>
+                        </div>
+                    </div>
+                    <div class="q-stat" title="Всего поездок">
+                        <span class="q-icon">🚗</span>
+                        <div class="q-info">
+                            <small>Поездок</small>
+                            <b id="timeline-rides">0</b>
+                        </div>
                     </div>
                 </div>
-                <h3 style="margin-top: 20px;">📜 История действий</h3>
-                <div style="max-height: 300px; overflow-y: auto;">
-                    <table class="admin-table">
-                        <thead>
-                            <tr>
-                                <th>Время</th>
-                                <th>Действие</th>
-                                <th>Детали</th>
-                            </tr>
-                        </thead>
-                        <tbody id="timeline-activities-tbody"></tbody>
-                    </table>
+
+                <div class="timeline-body-grid">
+                    <div class="timeline-chart-section">
+                        <h3>📈 Рост баланса (История)</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="userWealthChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="timeline-log-section">
+                        <h3>📜 История действий</h3>
+                        <div class="activity-timeline" id="timeline-activity-list">
+                            <!-- Activity items go here -->
+                            <div class="loading-spinner">Загрузка данных...</div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

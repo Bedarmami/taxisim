@@ -1318,39 +1318,49 @@ async function runAIScan() {
 // ============= v5.0: User Timeline (Deep Dossier) =============
 
 async function openTimeline(telegramId) {
-    const modal = document.getElementById('timeline-modal');
-    modal.style.display = 'block';
+    document.getElementById('timeline-modal').style.display = 'block';
+    document.getElementById('timeline-tid').textContent = telegramId;
+    const actList = document.getElementById('timeline-activity-list');
+    actList.innerHTML = '<div class="loading-spinner">📡 Подключаюсь к базе данных...</div>';
 
     const res = await safeFetchJson(`/api/admin/users/${telegramId}/timeline`, {
         headers: { 'x-admin-password': adminPassword }
     });
 
     if (!res || res._isError) {
-        alert('Ошибка загрузки досье');
+        actList.innerHTML = '<div class="danger-text">❌ Ошибка загрузки данных</div>';
         return;
     }
 
-    document.getElementById('timeline-user-title').textContent = `🔍 Досье: ${res.user.username || telegramId}`;
+    document.getElementById('timeline-balance').textContent = res.user.balance.toFixed(2);
+    document.getElementById('timeline-reg-date').textContent = res.user.created_at ? new Date(res.user.created_at).toLocaleDateString() : 'Неизвестно';
+    document.getElementById('timeline-rides').textContent = res.user.rides_total || 0;
 
-    const statsView = document.getElementById('timeline-stats-view');
-    statsView.innerHTML = `
-        <div class="card" style="margin-bottom: 10px;">
-            <p>💰 Баланс: <b>${res.user.balance.toFixed(2)} PLN</b></p>
-            <p>📅 Регистрация: ${new Date(res.user.created_at).toLocaleDateString()}</p>
-            <p>🚗 Поездок в базе: ${res.wealthHistory.length}</p>
-        </div>
-    `;
+    actList.innerHTML = '';
+    res.history.forEach(a => {
+        const item = document.createElement('div');
+        item.className = 'activity-item';
 
-    const actBody = document.getElementById('timeline-activities-tbody');
-    actBody.innerHTML = '';
-    res.activities.forEach(a => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td><small>${new Date(a.timestamp).toLocaleString()}</small></td>
-            <td><b>${a.action}</b></td>
-            <td><small>${a.details}</small></td>
+        // Parse details if it's JSON
+        let detailHtml = '';
+        try {
+            const details = typeof a.details === 'string' ? JSON.parse(a.details) : a.details;
+            if (details) {
+                Object.entries(details).forEach(([k, v]) => {
+                    let cls = 'detail-badge';
+                    if (k === 'earned' || k === 'won' || k === 'amount') cls += ' money';
+                    if (k === 'reason' || k === 'error') cls += ' danger';
+                    detailHtml += `<span class="${cls}">${k}: ${v}</span>`;
+                });
+            }
+        } catch (e) { detailHtml = `<span class="detail-badge">${a.details}</span>`; }
+
+        item.innerHTML = `
+            <span class="a-time">${new Date(a.timestamp).toLocaleString()}</span>
+            <span class="a-action">${a.action}</span>
+            <div class="activity-details">${detailHtml}</div>
         `;
-        actBody.appendChild(tr);
+        actList.appendChild(item);
     });
 
     renderUserWealthChart(res.wealthHistory);
@@ -1361,7 +1371,9 @@ function closeTimeline() {
 }
 
 function renderUserWealthChart(history) {
-    const ctx = document.getElementById('userWealthChart').getContext('2d');
+    const canvas = document.getElementById('userWealthChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
 
     if (charts['userWealth']) charts['userWealth'].destroy();
 
@@ -1369,7 +1381,7 @@ function renderUserWealthChart(history) {
     const data = history.map(h => {
         currentBalance += h.price;
         return { x: new Date(h.completed_at), y: currentBalance };
-    });
+    }).reverse(); // Most recent last for the chart
 
     charts['userWealth'] = new Chart(ctx, {
         type: 'line',
@@ -1380,13 +1392,35 @@ function renderUserWealthChart(history) {
                 borderColor: '#0088cc',
                 backgroundColor: 'rgba(0, 136, 204, 0.1)',
                 fill: true,
-                tension: 0.3
+                pointRadius: 4,
+                pointBackgroundColor: '#fff',
+                pointBorderWidth: 2,
+                tension: 0.4
             }]
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
             scales: {
-                y: { title: { display: true, text: 'PLN' } }
+                x: {
+                    type: 'time',
+                    time: { unit: 'day' },
+                    grid: { display: false }
+                },
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(0,0,0,0.05)' },
+                    ticks: { callback: value => value + ' PLN' }
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    padding: 10
+                }
             }
         }
     });
