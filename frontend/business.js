@@ -337,15 +337,25 @@ class BusinessManager {
                             <button class="action-btn small" style="background:#f39c12; padding:4px 10px;" onclick="businessManager.buyStock('${station.id}')">➕ Закупка</button>
                         </div>
 
-                        ${(station.uncollected_revenue || 0) > 0 ? `
-                        <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center; background:rgba(46, 204, 113, 0.1); padding:10px; border-radius:10px; border:1px solid #2ecc71;">
-                            <div>
-                                <div style="font-size:0.75em; color:#888;">💰 В кассе:</div>
-                                <div style="font-weight:bold; color:#2ecc71;">${(station.uncollected_revenue || 0).toFixed(2)} PLN</div>
+                        ${isMine ? `
+                            <div style="margin-top:15px; border-top:1px solid #333; padding-top:12px;">
+                                <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center; background:rgba(46, 204, 113, 0.1); padding:10px; border-radius:10px; border:1px solid #2ecc71;">
+                                    <div>
+                                        <div style="font-size:0.75em; color:#888;">💰 В кассе:</div>
+                                        <div style="font-weight:bold; color:#2ecc71;">${(station.uncollected_revenue || 0).toFixed(2)} PLN</div>
+                                    </div>
+                                    <button class="action-btn success small" onclick="businessManager.withdrawStationProfit('${station.id}')">💰 Снять</button>
+                                </div>
                             </div>
-                            <button class="action-btn success small" onclick="businessManager.withdrawStationProfit('${station.id}')">💰 Снять</button>
-                        </div>
                         ` : ''}
+
+                        <div style="margin-top:10px; border-top:1px dashed #333; padding-top:8px; display:flex; justify-content:center;">
+                            <button class="action-btn small" 
+                                    style="background:transparent; color:#e74c3c; border:1px solid #e74c3c; padding:4px 12px; font-size:0.8em;" 
+                                    onclick="businessManager.sellStationToState('${station.id}')">
+                                🏦 Продать гос. (-30%)
+                            </button>
+                        </div>
                     </div>
                 ` : `
                     <div style="margin-top:10px; display:flex; gap:15px; font-size:0.8em; color:#777; background:rgba(255,255,255,0.03); padding:8px; border-radius:8px;">
@@ -366,9 +376,9 @@ class BusinessManager {
         const station = this.gasStations.find(s => s.id === stationId);
         if (!station) return;
 
-        if (confirm(`Вы действительно хотите купить ${station.name} за ${station.purchase_price.toLocaleString()} PLN?`)) {
+        if (confirm(`Вы действительно хотите купить ${station.name} за ${station.purchase_price.toLocaleString()} PLN ? `)) {
             try {
-                const data = await safeFetchJson(`${API_BASE_URL}/investments/buy`, {
+                const data = await safeFetchJson(`${API_BASE_URL} / investments / buy`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ telegramId, stationId })
@@ -390,11 +400,11 @@ class BusinessManager {
         const user = Telegram.WebApp.initDataUnsafe?.user;
         const telegramId = user ? user.id : 'test_user';
 
-        const pricePetrol = parseFloat(document.getElementById(`petrol-price-${stationId}`).value);
-        const priceGas = parseFloat(document.getElementById(`gas-price-${stationId}`).value);
+        const pricePetrol = parseFloat(document.getElementById(`petrol - price - ${stationId}`).value);
+        const priceGas = parseFloat(document.getElementById(`gas - price - ${stationId}`).value);
 
         try {
-            const data = await safeFetchJson(`${API_BASE_URL}/investments/update-prices`, {
+            const data = await safeFetchJson(`${API_BASE_URL} / investments / update - prices`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ telegramId, stationId, pricePetrol, priceGas })
@@ -422,19 +432,19 @@ class BusinessManager {
             div.style.cssText = 'background:#1e1e2e; margin:8px 10px; padding:14px; border-radius:12px; border:1px solid #333; display:flex; justify-content:space-between; align-items:center;';
 
             div.innerHTML = `
-                <div style="flex:1;">
+        < div style = "flex:1;" >
                     <div style="font-weight:bold; color:#e0e0e0;">
                         <span style="font-size:1.2em; margin-right:6px;">${car.image}</span>
                         ${car.name}
                     </div>
                     <div style="font-size:0.8em; color:#888; margin-top:4px;">${car.description}</div>
                     <div style="font-size:0.8em; color:#aaa; margin-top:2px;">⛽ ${car.fuel_consumption} л/100км</div>
-                </div>
-                <button style="background:${canAfford ? '#2ecc71' : '#555'}; color:white; border:none; padding:8px 14px; border-radius:8px; font-weight:bold; cursor:${canAfford ? 'pointer' : 'not-allowed'}; min-width:100px; opacity:${canAfford ? 1 : 0.6};"
-                    ${canAfford ? '' : 'disabled'}
-                    onclick="businessManager.buyCar('${car.id}', ${car.purchase_price})">
-                    🛒 ${car.purchase_price.toLocaleString()} PLN
-                </button>
+                </div >
+            <button style="background:${canAfford ? '#2ecc71' : '#555'}; color:white; border:none; padding:8px 14px; border-radius:8px; font-weight:bold; cursor:${canAfford ? 'pointer' : 'not-allowed'}; min-width:100px; opacity:${canAfford ? 1 : 0.6};"
+                ${canAfford ? '' : 'disabled'}
+                onclick="businessManager.buyCar('${car.id}', ${car.purchase_price})">
+                🛒 ${car.purchase_price.toLocaleString()} PLN
+            </button>
             `;
             shop.appendChild(div);
         });
@@ -454,9 +464,9 @@ class BusinessManager {
         const user = Telegram.WebApp.initDataUnsafe?.user;
         const telegramId = user ? user.id : 'test_user';
 
-        if (confirm(`Купить машину для автопарка за ${price.toLocaleString()} PLN?`)) {
+        if (confirm(`Купить машину для автопарка за ${price.toLocaleString()} PLN ? `)) {
             try {
-                const data = await safeFetchJson(`${API_BASE_URL}/user/${telegramId}/fleet/buy`, {
+                const data = await safeFetchJson(`${API_BASE_URL} / user / ${telegramId} / fleet / buy`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ carId })
@@ -480,7 +490,7 @@ class BusinessManager {
 
         if (confirm('Нанять водителя за 1000 PLN?')) {
             try {
-                const data = await safeFetchJson(`${API_BASE_URL}/user/${telegramId}/drivers/hire`, { method: 'POST' });
+                const data = await safeFetchJson(`${API_BASE_URL} / user / ${telegramId} / drivers / hire`, { method: 'POST' });
                 if (data.success) {
                     showNotification(data.message, 'success');
                     this.loadData();
@@ -497,7 +507,7 @@ class BusinessManager {
         const telegramId = user ? user.id : 'test_user';
 
         try {
-            const data = await safeFetchJson(`${API_BASE_URL}/user/${telegramId}/drivers/collect`, {
+            const data = await safeFetchJson(`${API_BASE_URL} / user / ${telegramId} / drivers / collect`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ driverId })
@@ -529,13 +539,13 @@ class BusinessManager {
         if (idleDrivers.length === 1) {
             const driver = idleDrivers[0];
             const carName = this.getCarName(modelId);
-            if (confirm(`Назначить ${driver.name} на ${carName}?`)) {
+            if (confirm(`Назначить ${driver.name} на ${carName} ? `)) {
                 await this._doAssign(telegramId, driver.id, instanceId);
             }
         } else {
             // Show driver selection
             const names = idleDrivers.map((d, i) => `${i + 1}. ${d.name} (⭐${d.skill})`).join('\n');
-            const picked = prompt(`Выберите водителя (номер):\n${names}`);
+            const picked = prompt(`Выберите водителя(номер): \n${names} `);
             const idx = parseInt(picked) - 1;
             if (idx >= 0 && idx < idleDrivers.length) {
                 await this._doAssign(telegramId, idleDrivers[idx].id, instanceId);
@@ -545,7 +555,7 @@ class BusinessManager {
 
     async _doAssign(telegramId, driverId, carId) {
         try {
-            const data = await safeFetchJson(`${API_BASE_URL}/user/${telegramId}/drivers/assign`, {
+            const data = await safeFetchJson(`${API_BASE_URL} /user/${telegramId} /drivers/assign`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ driverId, carId })
@@ -559,6 +569,34 @@ class BusinessManager {
         } catch (e) { console.error(e); }
     }
 
+    async sellStationToState(stationId) {
+        const user = Telegram.WebApp.initDataUnsafe?.user;
+        const telegramId = user ? user.id : 'test_user';
+
+        const station = this.gasStations.find(s => s.id === stationId);
+        if (!station) return;
+
+        const refund = Math.floor(station.purchase_price * 0.7);
+        if (confirm(`Вы действительно хотите продать ${station.name} государству за ${refund.toLocaleString()} PLN ? (Это вернет 70 % стоимости)`)) {
+            try {
+                const data = await safeFetchJson(`${API_BASE_URL} /investments/sell - to - state`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ telegramId, stationId })
+                });
+
+                if (data.success) {
+                    showNotification(data.message, 'success');
+                    this.loadData();
+                } else {
+                    showNotification(data.error || 'Ошибка продажи', 'error');
+                }
+            } catch (e) {
+                showNotification('Ошибка при продаже', 'error');
+            }
+        }
+    }
+
     async buyStock(stationId) {
         const user = Telegram.WebApp.initDataUnsafe?.user;
         const telegramId = user ? user.id : 'test_user';
@@ -567,7 +605,7 @@ class BusinessManager {
         if (liters <= 0) return;
 
         try {
-            const data = await safeFetchJson(`${API_BASE_URL}/investments/buy-stock`, {
+            const data = await safeFetchJson(`${API_BASE_URL} /investments/buy - stock`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ telegramId, stationId, liters })
@@ -591,7 +629,7 @@ class BusinessManager {
         const telegramId = user ? user.id : 'test_user';
 
         try {
-            const data = await safeFetchJson(`${API_BASE_URL}/investments/withdraw`, {
+            const data = await safeFetchJson(`${API_BASE_URL} /investments/withdraw`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ telegramId, stationId })
@@ -615,7 +653,7 @@ class BusinessManager {
         const telegramId = user ? user.id : 'test_user';
 
         try {
-            const data = await safeFetchJson(`${API_BASE_URL}/user/${telegramId}/withdraw-fleet`, {
+            const data = await safeFetchJson(`${API_BASE_URL} /user/${telegramId}/withdraw-fleet`, {
                 method: 'POST'
             });
 

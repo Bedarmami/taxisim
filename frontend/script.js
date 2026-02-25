@@ -205,15 +205,13 @@ function handlePoliceEncounter(fine) {
 
 async function settlePoliceEncounter(action) {
     try {
-        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/police/settle`, {
+        const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/police/settle`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action })
         });
 
-        const result = await response.json();
-
-        if (result.success) {
+        if (result && result.success) {
             userData.balance = result.new_balance;
             updateMainScreen();
 
@@ -232,6 +230,8 @@ async function settlePoliceEncounter(action) {
             } else {
                 try { soundManager.play('success'); } catch (e) { }
             }
+        } else {
+            showNotification(result?.error || 'Ошибка связи с ГАИ', 'error');
         }
     } catch (e) {
         console.error('Police settle error:', e);
@@ -241,10 +241,9 @@ async function settlePoliceEncounter(action) {
 
 async function checkAnnouncements() {
     try {
-        const res = await fetch(`${API_BASE_URL}/announcement`);
-        const data = await res.json();
+        const data = await safeFetchJson(`${API_BASE_URL}/announcement`);
 
-        if (data.active) {
+        if (data && data.active) {
             document.getElementById('game-ann-title').textContent = data.data.title;
             document.getElementById('game-ann-message').textContent = data.data.message;
 
@@ -271,15 +270,13 @@ async function redeemPromo() {
     if (!code) return;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/promo/redeem`, {
+        const data = await safeFetchJson(`${API_BASE_URL}/promo/redeem`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ telegramId: TELEGRAM_ID, code })
         });
 
-        const data = await response.json();
-
-        if (response.ok) {
+        if (data && !data._isError) {
             resultDiv.style.color = '#34b545';
             resultDiv.textContent = '✅ Промокод активирован!';
             try { soundManager.play('success'); } catch (e) { }
@@ -298,7 +295,9 @@ async function redeemPromo() {
             try { soundManager.play('error'); } catch (e) { }
         }
     } catch (e) {
-        resultDiv.textContent = 'Ошика сервера';
+        console.error('Promo error:', e);
+        resultDiv.style.color = '#ff3b30';
+        resultDiv.textContent = 'Ошибка сети';
     }
 }
 
@@ -508,23 +507,26 @@ async function loadOrders() {
             ordersList.innerHTML = '<div class="loading">⏳ Загрузка заказов...</div>';
         }
 
-        const response = await fetch(`${API_BASE_URL}/orders/${TELEGRAM_ID}?district=${currentDistrict}`);
-        if (checkMaintenance(response.status)) return;
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+        const url = `${API_BASE_URL}/orders/${TELEGRAM_ID}?district=${currentDistrict}`;
+        const data = await safeFetchJson(url);
+
+        if (data && data.status === 503) {
+            checkMaintenance(503);
+            return;
         }
 
-        orders = await response.json();
+        if (data && !data._isError) {
+            orders = Array.isArray(data) ? data : (data.orders || []);
+            orderTimers.forEach(timer => clearTimeout(timer));
+            orderTimers = [];
+            displayOrders();
 
-        orderTimers.forEach(timer => clearTimeout(timer));
-        orderTimers = [];
-
-        displayOrders();
-
-        if (orders && orders.length > 0) {
-            showNotification(`✅ Загружено ${orders.length} новых заказов`, 'success');
+            if (orders && orders.length > 0) {
+                showNotification(`✅ Загружено ${orders.length} новых заказов`, 'success');
+            }
+        } else {
+            showNotification('❌ Ошибка загрузки заказов', 'error');
         }
-
     } catch (error) {
         console.error('Error loading orders:', error);
         showNotification('❌ Ошибка загрузки заказов', 'error');
@@ -534,9 +536,14 @@ async function loadOrders() {
 // ============= v2.2: ЗАГРУЗКА РАЙОНОВ =============
 async function loadDistricts() {
     try {
-        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/districts`);
-        if (checkMaintenance(response.status)) return;
-        districts = await response.json();
+        const data = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/districts`);
+        if (data && data.status === 503) {
+            checkMaintenance(503);
+            return;
+        }
+        if (data && !data._isError) {
+            districts = Array.isArray(data) ? data : (data.districts || []);
+        }
     } catch (error) {
         console.error('Error loading districts:', error);
     }
@@ -771,18 +778,15 @@ async function takeOrder(orderId, event) {
         const rideDuration = 3000; // 3 seconds visual ride
         const animationPromise = animateRide(orderId, rideDuration);
 
-        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/ride`, {
+        const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/ride`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ order: orderId, useGas: false })
         });
 
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Ошибка выполнения заказа');
+        if (result && result._isError) {
+            throw new Error(result.error || 'Ошибка выполнения заказа');
         }
-
-        const result = await response.json();
 
         // Wait for animation to finish
         await animationPromise;
@@ -919,7 +923,7 @@ async function refuel() {
     try {
         console.log('📡 Отправка запроса...');
 
-        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/fuel`, {
+        const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/fuel`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -928,12 +932,9 @@ async function refuel() {
             body: JSON.stringify({ liters, type: fuelType })
         });
 
-        console.log('📡 Статус:', response.status);
-
-        const result = await response.json();
         console.log('📡 Результат:', result);
 
-        if (response.ok && result.success) {
+        if (result && !result._isError && result.success) {
             userData.balance = result.new_balance || userData.balance;
             userData.fuel = result.new_fuel !== undefined ? result.new_fuel : userData.fuel;
             userData.gas_fuel = result.new_gas_fuel !== undefined ? result.new_gas_fuel : (userData.gas_fuel || 0);
@@ -946,7 +947,7 @@ async function refuel() {
 
             setTimeout(() => showScreen('main'), 1500);
         } else {
-            showNotification(result.error || '❌ Ошибка заправки', 'error');
+            showNotification(result?.error || '❌ Ошибка заправки', 'error');
         }
 
     } catch (error) {
@@ -1213,92 +1214,75 @@ function updateGarageScreen() {
 // ============= ЗАГРУЗКА МОИХ МАШИН (ГАРАЖ) =============
 async function loadMyCars() {
     try {
-        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/garage`);
-        if (!response.ok) throw new Error('Failed to load garage');
+        const data = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/garage`);
+        if (data && !data._isError) {
+            const myCars = Array.isArray(data) ? data : (data.plates || data.owned_cars || []);
+            const businessData = userData.business || { rented_cars: {} };
+            const rentedCars = businessData.rented_cars || {};
 
-        const myCars = await response.json();
-        const businessData = userData.business || { rented_cars: {} };
-        const rentedCars = businessData.rented_cars || {};
+            let myCarsList = document.getElementById('my-cars-list');
+            if (!myCarsList) {
+                const currentCarCard = document.querySelector('.current-car-card') || document.querySelector('.status-card');
+                if (currentCarCard) {
+                    myCarsList = document.createElement('div');
+                    myCarsList.id = 'my-cars-list';
+                    myCarsList.className = 'cars-list';
+                    myCarsList.style.marginBottom = '20px';
 
-        // Ensure container exists
-        let myCarsList = document.getElementById('my-cars-list');
-        if (!myCarsList) {
-            const currentCarCard = document.querySelector('.current-car-card') || document.querySelector('.status-card');
-            if (currentCarCard) {
-                myCarsList = document.createElement('div');
-                myCarsList.id = 'my-cars-list';
-                myCarsList.className = 'cars-list';
-                myCarsList.style.marginBottom = '20px';
+                    const title = document.createElement('h3');
+                    title.textContent = '🚙 Мой автопарк';
 
-                const title = document.createElement('h3');
-                title.textContent = '🚙 Мой автопарк';
+                    currentCarCard.parentNode.insertBefore(title, currentCarCard.nextSibling);
+                    currentCarCard.parentNode.insertBefore(myCarsList, title.nextSibling);
+                }
+            }
 
-                currentCarCard.parentNode.insertBefore(title, currentCarCard.nextSibling);
-                currentCarCard.parentNode.insertBefore(myCarsList, title.nextSibling);
+            if (myCarsList) {
+                if (myCars.length === 0) {
+                    myCarsList.innerHTML = '<div class="no-cars">У вас пока одна машина</div>';
+                } else {
+                    myCarsList.innerHTML = myCars.map(car => {
+                        const isRented = !!rentedCars[car.id];
+                        const income = car.purchase_price ? Math.floor(car.purchase_price * 0.1) : 0;
+                        let actionButton = '';
+
+                        if (car.is_selected) {
+                            actionButton = '<div class="car-status-badge">✅ Текущая</div>';
+                        } else if (isRented) {
+                            actionButton = `
+                                <div class="car-status-badge" style="background: #FF9500; color: #fff; margin-bottom: 5px; padding: 4px; border-radius: 4px;">💼 Сдана в аренду</div>
+                                <div style="font-size: 12px; color: #8E8E93; margin-bottom: 5px;">Доход: ${income} PLN/нед</div>
+                                <button class="action-btn" onclick="recallCar('${car.id}')" style="background: #FF3B30; width: 100%;">Вернуть в гараж</button>
+                            `;
+                        } else {
+                            actionButton = `
+                                <button class="action-btn" onclick="selectCar('${car.id}')" style="margin-bottom: 5px; width: 100%;">Сесть за руль</button>
+                                ${car.purchase_price > 0 ? `<button class="action-btn" onclick="moveToFleet(${myCars.indexOf(car)})" style="background: #5856D6; width: 100%;">Отправить в автопарк</button>` : ''}
+                            `;
+                        }
+
+                        const plateHtml = car.plate ? `<div class="license-plate ${car.plate.rarity}">${car.plate.number}</div>` : '';
+
+                        return `
+                            <div class="car-card ${car.is_selected ? 'selected-car' : ''}" style="${car.is_selected ? 'border: 2px solid #34C759;' : ''}">
+                                <div class="car-card-header">
+                                    <span class="car-icon">${renderCarImage(car)}</span>
+                                    <div style="display: flex; flex-direction: column;">
+                                        <span class="car-name">${car.name}</span>
+                                        ${plateHtml}
+                                    </div>
+                                </div>
+                                <div class="car-specs">
+                                    <div>⛽ ${car.fuel_consumption} л/100км</div>
+                                    <div>🛢️ ${car.tank_capacity} л</div>
+                                </div>
+                                <div style="margin-top: 10px; width: 100%;">${actionButton}</div>
+                            </div>
+                        `;
+                    }).join('');
+                }
             }
         }
-
-        if (myCarsList) {
-            if (myCars.length === 0) {
-                myCarsList.innerHTML = '<div class="no-cars">У вас пока одна машина</div>';
-            } else {
-                myCarsList.innerHTML = myCars.map(car => {
-                    const isRented = !!rentedCars[car.id];
-                    const income = car.purchase_price ? Math.floor(car.purchase_price * 0.1) : 0;
-
-                    let actionButton = '';
-
-                    if (car.is_selected) {
-                        actionButton = '<div class="car-status-badge">✅ Текущая</div>';
-                    } else if (isRented) {
-                        actionButton = `
-                        <div class="car-status-badge" style="background: #FF9500; color: #fff; margin-bottom: 5px; padding: 4px; border-radius: 4px;">💼 Сдана в аренду</div>
-                        <div style="font-size: 12px; color: #8E8E93; margin-bottom: 5px;">Доход: ${income} PLN/нед</div>
-                        <button class="action-btn" onclick="recallCar('${car.id}')" style="background: #FF3B30; width: 100%;">
-                            Вернуть в гараж
-                        </button>
-                    `;
-                    } else {
-                        // v3.5: Moved to Fleet instead of Renting out from garage
-                        actionButton = `
-                        <button class="action-btn" onclick="selectCar('${car.id}')" style="margin-bottom: 5px; width: 100%;">
-                            Сесть за руль
-                        </button>
-                        ${car.purchase_price > 0 ? `
-                        <button class="action-btn" onclick="moveToFleet(${myCars.indexOf(car)})" style="background: #5856D6; width: 100%;">
-                            Отправить в автопарк
-                        </button>` : ''}
-                    `;
-                    }
-
-                    const plateHtml = car.plate ? `
-                        <div class="license-plate ${car.plate.rarity}" style="font-size: 10px; height: 18px; min-width: 60px; margin-bottom: 5px;">
-                            ${car.plate.number}
-                        </div>
-                    ` : '';
-
-                    return `
-                <div class="car-card ${car.is_selected ? 'selected-car' : ''}" style="${car.is_selected ? 'border: 2px solid #34C759;' : ''}">
-                    <div class="car-card-header">
-                        <span class="car-icon">${renderCarImage(car)}</span>
-                        <div style="display: flex; flex-direction: column;">
-                            <span class="car-name">${car.name}</span>
-                            ${plateHtml}
-                        </div>
-                    </div>
-                    <div class="car-specs">
-                        <div>⛽ ${car.fuel_consumption} л/100км</div>
-                        <div>🛢️ ${car.tank_capacity} л</div>
-                    </div>
-                    <div style="margin-top: 10px; width: 100%;">
-                        ${actionButton}
-                    </div>
-                </div>
-            `;
-                }).join('');
-            }
-        }
-
     } catch (error) {
         console.error('Error loading garage:', error);
     }
@@ -1309,21 +1293,22 @@ async function moveToFleet(carIdx) {
     try {
         if (!confirm('Перегнать эту машину в бизнес-автопарк? Вы сможете нанимать водителей для неё в меню Бизнес.')) return;
 
-        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/fleet/move-from-garage`, {
+        const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/fleet/move-from-garage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ carIdx })
         });
 
-        const result = await response.json();
-        if (result.success) {
+        if (result && result.success) {
             showNotification(result.message, 'success');
             // Refresh local data
-            const userRes = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}`);
-            userData = await userRes.json();
+            const userDataResult = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}`);
+            if (userDataResult && !userDataResult._isError) {
+                userData = userDataResult;
+            }
             updateGarageScreen();
         } else {
-            showNotification(result.error || 'Ошибка', 'error');
+            showNotification(result?.error || 'Ошибка', 'error');
         }
     } catch (e) {
         console.error(e);
@@ -1333,19 +1318,18 @@ async function moveToFleet(carIdx) {
 
 async function recallCar(carId) {
     try {
-        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/fleet/recall`, {
+        const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/fleet/recall`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ carId })
         });
 
-        const result = await response.json();
-        if (result.success) {
+        if (result && result.success) {
             userData.business = result.business;
             showNotification(result.message, 'success');
             updateGarageScreen();
         } else {
-            showNotification(result.error || 'Ошибка', 'error');
+            showNotification(result?.error || 'Ошибка', 'error');
         }
     } catch (e) {
         console.error(e);
@@ -1356,21 +1340,19 @@ async function recallCar(carId) {
 // ============= ВЫБОР МАШИНЫ =============
 async function selectCar(carId) {
     try {
-        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/select-car`, {
+        const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/select-car`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ carId })
         });
 
-        const result = await response.json();
-
-        if (result.success) {
+        if (result && result.success) {
             userData.car = result.new_car;
             showNotification(`🚗 Вы пересели на ${result.new_car.name}`, 'success');
             updateMainScreen();
             updateGarageScreen();
         } else {
-            showNotification(result.error || 'Ошибка смены машины', 'error');
+            showNotification(result?.error || 'Ошибка смены машины', 'error');
         }
     } catch (error) {
         console.error('Error selecting car:', error);
@@ -1383,12 +1365,13 @@ async function loadAvailableCars() {
     try {
         console.log('Загрузка списка машин...');
 
-        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/available-cars`);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        const cars = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/available-cars`);
+        console.log('Получены машины:', cars);
 
-        const cars = await response.json();
+        if (!cars || cars._isError || !Array.isArray(cars)) {
+            console.error('Сервер вернул ошибку или не массив:', cars);
+            return;
+        }
         console.log('Получены машины:', cars);
 
         if (!Array.isArray(cars)) {
@@ -1460,141 +1443,139 @@ async function loadAvailableCars() {
 
 // ============= АРЕНДА МАШИНЫ =============
 async function rentCar(carId) {
-    try {
-        console.log('Аренда машины:', carId);
+    async function rentCar(carId) {
+        try {
+            console.log('Аренда машины:', carId);
 
-        const response = await fetch(`${API_BASE_URL}/user/${TELEGRAM_ID}/rent-car`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ carId })
-        });
+            const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/rent-car`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ carId })
+            });
 
-        const result = await response.json();
+            if (result && result.success) {
+                userData.car = result.new_car;
+                userData.balance = result.new_balance;
+                userData.fuel = result.new_fuel || userData.fuel;
 
-        if (response.ok && result.success) {
-            userData.car = result.new_car;
-            userData.balance = result.new_balance;
-            userData.fuel = result.new_fuel || userData.fuel;
+                updateMainScreen();
+                updateGarageScreen();
+                showNotification(result.message, 'success');
+            } else {
+                showNotification(result?.error || '❌ Ошибка аренды', 'error');
+            }
+        } catch (error) {
+            console.error('Error renting car:', error);
+            showNotification('❌ Ошибка соединения', 'error');
+        }
+    }
 
-            updateMainScreen();
-            updateGarageScreen();
-            showNotification(result.message, 'success');
-        } else {
-            showNotification(result.error || '❌ Ошибка аренды', 'error');
+    // ============= ПОКУПКА МАШИНЫ =============
+    async function buyCar(carId) {
+        try {
+            console.log('Покупка машины:', carId);
+
+            const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/buy-car`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ carId })
+            });
+
+            if (result && !result._isError && result.success) {
+                userData.car = result.new_car;
+                userData.balance = result.new_balance;
+                userData.fuel = result.new_fuel || userData.fuel;
+
+                updateMainScreen();
+                updateGarageScreen();
+                showNotification(result.message, 'success');
+            } else {
+                showNotification(result.error || '❌ Ошибка покупки', 'error');
+            }
+
+        } catch (error) {
+            console.error('Error buying car:', error);
+            showNotification('❌ Ошибка соединения', 'error');
+        }
+    }
+
+    // ============= ОБНОВЛЕНИЕ ИНФОРМАЦИИ О ПАРТНЁРЕ =============
+    function updatePartnerInfo() {
+        if (!userData) return;
+
+        const elements = {
+            partnerName: document.getElementById('partner-name'),
+            partnerDetails: document.getElementById('partner-details'),
+            ridesToNext: document.getElementById('rides-to-next'),
+            progressFill: document.getElementById('partner-progress-fill')
+        };
+
+        const currentPartner = PARTNERS.find(p => p.id === userData.partner_id) || PARTNERS[0];
+
+        if (elements.partnerName) {
+            elements.partnerName.textContent = currentPartner.name;
         }
 
-    } catch (error) {
-        console.error('Error renting car:', error);
-        showNotification('❌ Ошибка соединения', 'error');
-    }
-}
+        if (elements.partnerDetails) {
+            let details = [];
+            if (currentPartner.provides_car) details.push('🚗 их машина');
+            else details.push('🚗 ваша машина');
 
-// ============= ПОКУПКА МАШИНЫ =============
-async function buyCar(carId) {
-    try {
-        console.log('Покупка машины:', carId);
+            if (currentPartner.fuel_provided) details.push('⛽ их топливо');
+            else details.push('⛽ ваше топливо');
 
-        const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/buy-car`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ carId })
-        });
+            const playerShare = Math.round((1 - currentPartner.revenue_split) * 100);
+            const partnerShare = Math.round(currentPartner.revenue_split * 100);
+            details.push(`${playerShare}/${partnerShare}`);
 
-        if (result && !result._isError && result.success) {
-            userData.car = result.new_car;
-            userData.balance = result.new_balance;
-            userData.fuel = result.new_fuel || userData.fuel;
-
-            updateMainScreen();
-            updateGarageScreen();
-            showNotification(result.message, 'success');
-        } else {
-            showNotification(result.error || '❌ Ошибка покупки', 'error');
+            elements.partnerDetails.innerHTML = details.map(d => `<span>${d}</span>`).join('');
         }
 
-    } catch (error) {
-        console.error('Error buying car:', error);
-        showNotification('❌ Ошибка соединения', 'error');
-    }
-}
+        // Поиск следующего партнёра
+        const nextPartner = PARTNERS.find(p =>
+            p.requirements.rides > (userData.rides_completed || 0) &&
+            p.id > (userData.partner_id || 1)
+        );
 
-// ============= ОБНОВЛЕНИЕ ИНФОРМАЦИИ О ПАРТНЁРЕ =============
-function updatePartnerInfo() {
-    if (!userData) return;
+        if (nextPartner && elements.ridesToNext) {
+            const ridesNeeded = nextPartner.requirements.rides - (userData.rides_completed || 0);
+            elements.ridesToNext.textContent = `${ridesNeeded} заказов до ${nextPartner.name}`;
 
-    const elements = {
-        partnerName: document.getElementById('partner-name'),
-        partnerDetails: document.getElementById('partner-details'),
-        ridesToNext: document.getElementById('rides-to-next'),
-        progressFill: document.getElementById('partner-progress-fill')
-    };
-
-    const currentPartner = PARTNERS.find(p => p.id === userData.partner_id) || PARTNERS[0];
-
-    if (elements.partnerName) {
-        elements.partnerName.textContent = currentPartner.name;
-    }
-
-    if (elements.partnerDetails) {
-        let details = [];
-        if (currentPartner.provides_car) details.push('🚗 их машина');
-        else details.push('🚗 ваша машина');
-
-        if (currentPartner.fuel_provided) details.push('⛽ их топливо');
-        else details.push('⛽ ваше топливо');
-
-        const playerShare = Math.round((1 - currentPartner.revenue_split) * 100);
-        const partnerShare = Math.round(currentPartner.revenue_split * 100);
-        details.push(`${playerShare}/${partnerShare}`);
-
-        elements.partnerDetails.innerHTML = details.map(d => `<span>${d}</span>`).join('');
-    }
-
-    // Поиск следующего партнёра
-    const nextPartner = PARTNERS.find(p =>
-        p.requirements.rides > (userData.rides_completed || 0) &&
-        p.id > (userData.partner_id || 1)
-    );
-
-    if (nextPartner && elements.ridesToNext) {
-        const ridesNeeded = nextPartner.requirements.rides - (userData.rides_completed || 0);
-        elements.ridesToNext.textContent = `${ridesNeeded} заказов до ${nextPartner.name}`;
-
-        if (elements.progressFill) {
-            const currentRequirement = currentPartner.requirements.rides;
-            const nextRequirement = nextPartner.requirements.rides;
-            const totalRange = nextRequirement - currentRequirement;
-            const currentProgress = (userData.rides_completed || 0) - currentRequirement;
-            const percent = Math.min(100, Math.max(0, (currentProgress / totalRange) * 100));
-            elements.progressFill.style.width = `${percent}%`;
+            if (elements.progressFill) {
+                const currentRequirement = currentPartner.requirements.rides;
+                const nextRequirement = nextPartner.requirements.rides;
+                const totalRange = nextRequirement - currentRequirement;
+                const currentProgress = (userData.rides_completed || 0) - currentRequirement;
+                const percent = Math.min(100, Math.max(0, (currentProgress / totalRange) * 100));
+                elements.progressFill.style.width = `${percent}%`;
+            }
+        } else if (elements.ridesToNext) {
+            elements.ridesToNext.textContent = '👑 Максимальный уровень!';
+            if (elements.progressFill) elements.progressFill.style.width = '100%';
         }
-    } else if (elements.ridesToNext) {
-        elements.ridesToNext.textContent = '👑 Максимальный уровень!';
-        if (elements.progressFill) elements.progressFill.style.width = '100%';
-    }
-}
-
-// ============= СПИСОК ПАРТНЁРОВ =============
-function showPartnersList() {
-    if (!userData) {
-        showNotification('❌ Данные не загружены', 'error');
-        return;
     }
 
-    const partnersList = document.getElementById('partners-list');
-    if (!partnersList) {
-        console.error('❌ partners-list не найден');
-        return;
-    }
+    // ============= СПИСОК ПАРТНЁРОВ =============
+    function showPartnersList() {
+        if (!userData) {
+            showNotification('❌ Данные не загружены', 'error');
+            return;
+        }
 
-    const currentPartnerId = userData.partner_id || 1;
+        const partnersList = document.getElementById('partners-list');
+        if (!partnersList) {
+            console.error('❌ partners-list не найден');
+            return;
+        }
 
-    partnersList.innerHTML = PARTNERS.map(partner => {
-        const isCurrent = partner.id === currentPartnerId;
-        const canSwitch = partner.requirements.rides <= (userData.rides_completed || 0);
-        const ridesNeeded = Math.max(0, partner.requirements.rides - (userData.rides_completed || 0));
+        const currentPartnerId = userData.partner_id || 1;
 
-        return `
+        partnersList.innerHTML = PARTNERS.map(partner => {
+            const isCurrent = partner.id === currentPartnerId;
+            const canSwitch = partner.requirements.rides <= (userData.rides_completed || 0);
+            const ridesNeeded = Math.max(0, partner.requirements.rides - (userData.rides_completed || 0));
+
+            return `
             <div class="partner-card ${isCurrent ? 'current' : ''}" data-partner-id="${partner.id}">
                 <div class="partner-header">
                     <h3>${partner.name}</h3>
@@ -1619,81 +1600,85 @@ function showPartnersList() {
                 ` : '<button class="switch-partner-btn" disabled>Текущий партнёр</button>'}
             </div>
         `;
-    }).join('');
+        }).join('');
 
-    showScreen('partners');
-}
+        showScreen('partners');
+    }
 
-// ============= СМЕНА ПАРТНЁРА =============
-async function changePartner(partnerId) {
-    try {
-        const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/partner`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ partnerId })
-        });
+    // ============= СМЕНА ПАРТНЁРА =============
+    async function changePartner(partnerId) {
+        try {
+            const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/partner`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ partnerId })
+            });
 
-        if (result && !result._isError && result.success) {
-            userData.partner_id = partnerId;
-            showNotification(result.message || '✅ Партнёр изменён', 'success');
-            updatePartnerInfo();
-            showPartnersList();
-        } else {
-            showNotification(result.error || '❌ Ошибка', 'error');
+            if (result && !result._isError && result.success) {
+                userData.partner_id = partnerId;
+                showNotification(result.message || '✅ Партнёр изменён', 'success');
+                updatePartnerInfo();
+                showPartnersList();
+            } else {
+                showNotification(result.error || '❌ Ошибка', 'error');
+            }
+
+        } catch (error) {
+            console.error('Error:', error);
+            showNotification('❌ Ошибка соединения', 'error', error);
+        }
+    }
+
+    // ============= ОТДЫХ С ПОДСЧЁТОМ ДНЕЙ =============
+    async function rest() {
+        if (userData.stamina >= 100) {
+            showNotification('⚡ Вы бодры и полны сил!', 'info');
+            return;
+        }
+        try {
+            const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/rest`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (result && !result._isError && result.success) {
+                userData.stamina = result.stamina;
+                userData.rides_streak = 0;
+                userData.balance = result.new_balance;
+                userData.days_passed = result.days_passed;
+                userData.week_days = result.week_days;
+                userData.weeks_passed = result.weeks_passed;
+
+                updateMainScreen();
+
+                // Главное уведомление
+                showNotification(result.message, result.week_completed ? 'warning' : 'success');
+
+                // Статистика дней/недель
+                showDayStatistic(result.days_passed, result.week_days, result.weeks_passed, result.week_completed);
+
+            } else {
+                showNotification('❌ Ошибка отдыха', 'error');
+            }
+
+        } catch (error) {
+            console.error('Error:', error);
+            showNotification('❌ Ошибка соединения', 'error', error);
+        }
+    }
+
+    // ============= ПОКАЗАТЬ СТАТИСТИКУ ДНЕЙ =============
+    function showDayStatistic(days, weekDays, weeks, weekCompleted) {
+        const popup = document.createElement('div');
+        popup.className = 'day-statistic-popup';
+
+        let weekBar = '';
+        for (let i = 0; i < 7; i++) {
+            const filled = i < weekDays ? 'filled' : '';
+            weekBar += `<div class="week-day ${filled}"></div>`;
         }
 
-    } catch (error) {
-        console.error('Error:', error);
-        showNotification('❌ Ошибка соединения', 'error', error);
-    }
-}
-
-// ============= ОТДЫХ С ПОДСЧЁТОМ ДНЕЙ =============
-async function rest() {
-    try {
-        const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/rest`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        });
-
-        if (result && !result._isError && result.success) {
-            userData.stamina = result.stamina;
-            userData.rides_streak = 0;
-            userData.balance = result.new_balance;
-            userData.days_passed = result.days_passed;
-            userData.week_days = result.week_days;
-            userData.weeks_passed = result.weeks_passed;
-
-            updateMainScreen();
-
-            // Главное уведомление
-            showNotification(result.message, result.week_completed ? 'warning' : 'success');
-
-            // Статистика дней/недель
-            showDayStatistic(result.days_passed, result.week_days, result.weeks_passed, result.week_completed);
-
-        } else {
-            showNotification('❌ Ошибка отдыха', 'error');
-        }
-
-    } catch (error) {
-        console.error('Error:', error);
-        showNotification('❌ Ошибка соединения', 'error', error);
-    }
-}
-
-// ============= ПОКАЗАТЬ СТАТИСТИКУ ДНЕЙ =============
-function showDayStatistic(days, weekDays, weeks, weekCompleted) {
-    const popup = document.createElement('div');
-    popup.className = 'day-statistic-popup';
-
-    let weekBar = '';
-    for (let i = 0; i < 7; i++) {
-        const filled = i < weekDays ? 'filled' : '';
-        weekBar += `<div class="week-day ${filled}"></div>`;
-    }
-
-    popup.innerHTML = `
+        popup.innerHTML = `
         <div class="day-stat-content">
             <div class="stat-title">📊 Статистика игрового времени</div>
             
@@ -1724,87 +1709,87 @@ function showDayStatistic(days, weekDays, weeks, weekCompleted) {
         </div>
     `;
 
-    document.body.appendChild(popup);
+        document.body.appendChild(popup);
 
-    setTimeout(() => {
-        popup.style.animation = 'fadeOut 0.3s ease';
-        setTimeout(() => popup.remove(), 300);
-    }, 4500);
-}
+        setTimeout(() => {
+            popup.style.animation = 'fadeOut 0.3s ease';
+            setTimeout(() => popup.remove(), 300);
+        }, 4500);
+    }
 
-// ============= ТАЙМЕРЫ ЗАКАЗОВ =============
-function startOrderTimers() {
-    const orderCards = document.querySelectorAll('.order-card');
+    // ============= ТАЙМЕРЫ ЗАКАЗОВ =============
+    function startOrderTimers() {
+        const orderCards = document.querySelectorAll('.order-card');
 
-    orderCards.forEach((card, cardIndex) => {
-        const timerSpan = card.querySelector('.timer');
-        if (!timerSpan) return;
+        orderCards.forEach((card, cardIndex) => {
+            const timerSpan = card.querySelector('.timer');
+            if (!timerSpan) return;
 
-        let timeLeft = 45;
+            let timeLeft = 45;
 
-        const timer = setInterval(() => {
-            timeLeft--;
-            if (timerSpan) {
-                timerSpan.innerHTML = `⏱️ ${timeLeft}с`;
-            }
+            const timer = setInterval(() => {
+                timeLeft--;
+                if (timerSpan) {
+                    timerSpan.innerHTML = `⏱️ ${timeLeft}с`;
+                }
 
-            if (timeLeft <= 0) {
-                clearInterval(timer);
-                card.classList.add('order-expired');
-                setTimeout(() => {
-                    orders.splice(cardIndex, 1);
-                    displayOrders();
-                }, 500);
-            }
-        }, 1000);
+                if (timeLeft <= 0) {
+                    clearInterval(timer);
+                    card.classList.add('order-expired');
+                    setTimeout(() => {
+                        orders.splice(cardIndex, 1);
+                        displayOrders();
+                    }, 500);
+                }
+            }, 1000);
 
-        orderTimers.push(timer);
-    });
-}
+            orderTimers.push(timer);
+        });
+    }
 
-// ============= УВЕДОМЛЕНИЯ =============
-function showNotification(message, type = 'info', details = null) {
-    try { soundManager.play('notification'); } catch (e) { }
-    const container = document.getElementById('notification-container');
-    if (!container) return;
+    // ============= УВЕДОМЛЕНИЯ =============
+    function showNotification(message, type = 'info', details = null) {
+        try { soundManager.play('notification'); } catch (e) { }
+        const container = document.getElementById('notification-container');
+        if (!container) return;
 
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
 
-    let icon = 'ℹ️';
-    if (type === 'success') icon = '✅';
-    if (type === 'error') icon = '❌';
-    if (type === 'warning') icon = '⚠️';
+        let icon = 'ℹ️';
+        if (type === 'success') icon = '✅';
+        if (type === 'error') icon = '❌';
+        if (type === 'warning') icon = '⚠️';
 
-    if (type === 'error') {
-        const stackContext = details ? (details.stack || JSON.stringify(details)) : 'No technical details provided';
-        const escapedStack = stackContext.toString().replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        if (type === 'error') {
+            const stackContext = details ? (details.stack || JSON.stringify(details)) : 'No technical details provided';
+            const escapedStack = stackContext.toString().replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
-        notification.innerHTML = `
+            notification.innerHTML = `
             <div class="notif-content">
                 <span>${icon} ${message}</span>
                 <button class="notif-report-btn" onclick="sendErrorReport('${message.replace(/'/g, "\\'")}', '${escapedStack}')">Отчёт</button>
             </div>
         `;
-    } else {
-        notification.innerHTML = `${icon} ${message}`;
+        } else {
+            notification.innerHTML = `${icon} ${message}`;
+        }
+
+        notification.style.animation = 'slideInRight 0.3s ease-out';
+        container.appendChild(notification);
+
+        const duration = type === 'error' ? 10000 : 3000;
+        setTimeout(() => {
+            notification.style.animation = 'slideOut 0.3s ease-in';
+            setTimeout(() => notification.remove(), 300);
+        }, duration);
     }
 
-    notification.style.animation = 'slideInRight 0.3s ease-out';
-    container.appendChild(notification);
-
-    const duration = type === 'error' ? 10000 : 3000;
-    setTimeout(() => {
-        notification.style.animation = 'slideOut 0.3s ease-in';
-        setTimeout(() => notification.remove(), 300);
-    }, duration);
-}
-
-// ============= ДОСТИЖЕНИЯ =============
-function showAchievement(achievement) {
-    const popup = document.createElement('div');
-    popup.className = 'achievement-popup';
-    popup.innerHTML = `
+    // ============= ДОСТИЖЕНИЯ =============
+    function showAchievement(achievement) {
+        const popup = document.createElement('div');
+        popup.className = 'achievement-popup';
+        popup.innerHTML = `
         <div class="achievement-icon">${achievement.icon || '🎉'}</div>
         <div class="achievement-text">
             <div class="achievement-title">🏆 Достижение!</div>
@@ -1814,461 +1799,465 @@ function showAchievement(achievement) {
         </div>
     `;
 
-    document.body.appendChild(popup);
+        document.body.appendChild(popup);
 
-    setTimeout(() => {
-        popup.remove();
-    }, 4000);
-}
-
-// ============= НАВИГАЦИЯ =============
-async function showScreen(screenName) {
-    console.log(`[NAV] Switching to screen: ${screenName}`);
-
-    // v3.4: Hide any active modals/overlays if returning to main or switching main screens
-    if (screenName !== 'profile') {
-        const modals = ['profile-modal', 'promo-modal', 'ann-modal', 'plates-modal', 'police-modal'];
-        modals.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.style.display = 'none';
-        });
+        setTimeout(() => {
+            popup.remove();
+        }, 4000);
     }
 
-    if (screenName === 'profile') {
-        const profileModal = document.getElementById('profile-modal');
-        if (profileModal) {
-            profileModal.style.display = 'flex';
-            updateProfileScreen();
-        }
-        return;
-    }
+    // ============= НАВИГАЦИЯ =============
+    async function showScreen(screenName) {
+        console.log(`[NAV] Switching to screen: ${screenName}`);
 
-    // Stop containers polling when leaving that screen
-    if (screenName !== 'containers' && typeof containersManager !== 'undefined') {
-        containersManager.stopPolling();
-    }
-
-    // v3.4: Thoroughly clear ALL screens (both classes and manual styles from business/skills)
-    Object.entries(screens).forEach(([name, screen]) => {
-        if (screen) {
-            screen.classList.remove('active');
-            // Clear manual display styles that might have been set by old business/skills logic
-            if (name !== 'profile') {
-                screen.style.display = '';
-            }
-        }
-    });
-
-    if (screens[screenName]) {
+        // v3.4: Hide any active modals/overlays if returning to main or switching main screens
         if (screenName !== 'profile') {
-            screens[screenName].classList.add('active');
+            const modals = ['profile-modal', 'promo-modal', 'ann-modal', 'plates-modal', 'police-modal'];
+            modals.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = 'none';
+            });
         }
-    } else {
-        console.warn(`Screen '${screenName}' not found`);
-        return;
-    }
 
-    if (tg && tg.version >= '6.1') {
-        if (screenName === 'main') {
-            tg.BackButton.hide();
-        } else {
-            tg.BackButton.show();
+        if (screenName === 'profile') {
+            const profileModal = document.getElementById('profile-modal');
+            if (profileModal) {
+                profileModal.style.display = 'flex';
+                updateProfileScreen();
+            }
+            return;
         }
-    }
 
-    // Load screen-specific data
-    if (screenName === 'orders') {
-        await loadUserData();
-        await loadDistricts();
-        await loadOrders();
-    } else if (screenName === 'fuel') {
-        updateFuelScreen();
-    } else if (screenName === 'garage') {
-        updateGarageScreen();
-    } else if (screenName === 'business') {
-        if (window.businessManager) window.businessManager.loadData();
-    } else if (screenName === 'skills') {
-        if (window.skillsManager) window.skillsManager.loadData();
-    }
-}
-
-// ============= v2.1: ЕЖЕДНЕВНЫЙ БОНУС =============
-async function claimDailyBonus() {
-    try {
-        const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/daily-bonus`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        });
-
-        if (result && !result._isError && result.success) {
-            await loadUserData();
-            showNotification(`🎁 ${result.reward.label}`, 'success');
-        } else if (result && result.timeLeft) {
-            const hours = Math.floor(result.timeLeft / (1000 * 60 * 60));
-            const minutes = Math.floor((result.timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-            showNotification(`⏰ Бонус будет доступен через ${hours}ч ${minutes}м`, 'warning');
-        } else {
-            showNotification(result?.error || 'Ошибка', 'error');
+        // Stop containers polling when leaving that screen
+        if (screenName !== 'containers' && typeof containersManager !== 'undefined') {
+            containersManager.stopPolling();
         }
-    } catch (error) {
-        console.error('Error claiming bonus:', error);
-        showNotification('Ошибка сети', 'error');
-    }
-}
 
-// ============= v2.1: РЕМОНТ МАШИНЫ =============
-async function repairCar() {
-    try {
-        if (!confirm('Починить машину за 150 PLN?')) return;
-
-        const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/repair`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        });
-
-        if (result && !result._isError && result.success) {
-            userData.balance = result.balance;
-            userData.car = result.car;
-            updateMainScreen();
-            updateGarageScreen();
-            showNotification('🔧 Машина отремонтирована!', 'success');
-        } else {
-            showNotification(result.error || 'Ошибка ремонта', 'error');
-        }
-    } catch (error) {
-        console.error('Error repairing car:', error);
-        showNotification('Ошибка сети', 'error');
-    }
-}
-
-// ============= НАСТРОЙКА ОБРАБОТЧИКОВ СОБЫТИЙ =============
-function setupEventListeners() {
-    setupPromoListeners();
-    setupAnnouncementListeners();
-    setupPoliceListeners();
-    setupMuteListener();
-    console.log('🔄 Настройка обработчиков...');
-
-    // Главное меню
-    const buttons = {
-        'online-btn': () => showScreen('orders'),
-        'fuel-btn': () => showScreen('fuel'),
-        'garage-btn': () => showScreen('garage'),
-        'rest-btn': rest,
-        'show-partners-btn': showPartnersList,
-        'casino-btn': () => {
-            showScreen('casino');
-            if (typeof updateCasinoUI === 'function') updateCasinoUI();
-        },
-        'lootbox-btn': () => {
-            showScreen('lootbox');
-            if (typeof loadLootboxes === 'function') loadLootboxes();
-        },
-        'containers-btn': () => {
-            showScreen('containers');
-            if (typeof containersManager !== 'undefined') containersManager.onScreenOpen();
-        }
-    };
-
-    Object.entries(buttons).forEach(([id, handler]) => {
-        const btn = document.getElementById(id);
-        if (btn) {
-            btn.addEventListener('click', handler);
-            console.log(`✅ ${id} привязана`);
-        }
-    });
-
-    // Кнопки назад
-    const backButtons = {
-        'back-from-orders': 'main',
-        'back-from-fuel': 'main',
-        'back-from-garage': 'main',
-        'back-from-partners': 'main',
-        'back-from-containers': 'main'
-    };
-
-    Object.entries(backButtons).forEach(([id, screenName]) => {
-        const btn = document.getElementById(id);
-        if (btn) {
-            btn.addEventListener('click', () => showScreen(screenName));
-        }
-    });
-
-    // v3.4: Add missing back buttons
-    const moreBackBtns = {
-        'back-from-skills': 'main',
-        'back-from-business': 'main'
-    };
-    Object.entries(moreBackBtns).forEach(([id, screenName]) => {
-        const btn = document.getElementById(id);
-        if (btn) btn.addEventListener('click', () => showScreen(screenName));
-    });
-
-    // Telegram BackButton
-    if (tg && tg.version >= '6.1') {
-        tg.BackButton.onClick(() => showScreen('main'));
-    }
-
-    // Заправка
-    const fuelRange = document.getElementById('fuel-range');
-    if (fuelRange) {
-        fuelRange.addEventListener('input', updateFuelCost);
-    }
-
-    const refuelBtn = document.getElementById('refuel-btn');
-    if (refuelBtn) {
-        refuelBtn.addEventListener('click', refuel);
-        console.log('✅ Кнопка заправки привязана');
-    }
-
-    // Пресеты заправки
-    document.querySelectorAll('.preset-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const liters = parseInt(btn.dataset.liters);
-            const range = document.getElementById('fuel-range');
-            if (range) {
-                range.value = Math.min(liters, range.max || 100);
-                updateFuelCost();
+        // v3.4: Thoroughly clear ALL screens (both classes and manual styles from business/skills)
+        Object.entries(screens).forEach(([name, screen]) => {
+            if (screen) {
+                screen.classList.remove('active');
+                // Clear manual display styles that might have been set by old business/skills logic
+                if (name !== 'profile') {
+                    screen.style.display = '';
+                }
             }
         });
-    });
 
-    // Выбор типа топлива
-    document.querySelectorAll('.fuel-type-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            document.querySelectorAll('.fuel-type-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-            updateFuelCost();
-        });
-    });
+        if (screens[screenName]) {
+            if (screenName !== 'profile') {
+                screens[screenName].classList.add('active');
+            }
+        } else {
+            console.warn(`Screen '${screenName}' not found`);
+            return;
+        }
 
-    // Фильтры заказов
-    document.querySelectorAll('.filter-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-            currentFilter = e.target.dataset.filter || 'all';
-            displayOrders();
-            updateDistrictBackground();
-        });
-    });
+        if (tg && tg.version >= '6.1') {
+            if (screenName === 'main') {
+                tg.BackButton.hide();
+            } else {
+                tg.BackButton.show();
+            }
+        }
 
-    // v2.1: Daily Bonus
-    const dailyBonusBtn = document.getElementById('daily-bonus-btn');
-    if (dailyBonusBtn) {
-        dailyBonusBtn.addEventListener('click', claimDailyBonus);
+        // Load screen-specific data
+        if (screenName === 'orders') {
+            await loadUserData();
+            await loadDistricts();
+            await loadOrders();
+        } else if (screenName === 'fuel') {
+            updateFuelScreen();
+        } else if (screenName === 'garage') {
+            updateGarageScreen();
+        } else if (screenName === 'business') {
+            if (window.businessManager) window.businessManager.loadData();
+        } else if (screenName === 'skills') {
+            if (window.skillsManager) window.skillsManager.loadData();
+        }
     }
 
-    // v2.1: Repair
-    const repairBtn = document.getElementById('repair-btn');
-    if (repairBtn) {
-        repairBtn.addEventListener('click', repairCar);
+    // ============= v2.1: ЕЖЕДНЕВНЫЙ БОНУС =============
+    async function claimDailyBonus() {
+        try {
+            const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/daily-bonus`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (result && !result._isError && result.success) {
+                await loadUserData();
+                showNotification(`🎁 ${result.reward.label}`, 'success');
+            } else if (result && result.timeLeft) {
+                const hours = Math.floor(result.timeLeft / (1000 * 60 * 60));
+                const minutes = Math.floor((result.timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                showNotification(`⏰ Бонус будет доступен через ${hours}ч ${minutes}м`, 'warning');
+            } else {
+                showNotification(result?.error || 'Ошибка', 'error');
+            }
+        } catch (error) {
+            console.error('Error claiming bonus:', error);
+            showNotification('Ошибка сети', 'error');
+        }
     }
 
-    // v3.1: Profile Trigger
-    const profileTrigger = document.getElementById('profile-trigger');
-    if (profileTrigger) {
-        console.log('✅ Настройка триггера профиля');
-        profileTrigger.style.cursor = 'pointer'; // Force cursor
-        profileTrigger.addEventListener('click', (e) => {
-            console.log('👤 Клик по профилю');
-            showScreen('profile');
-        });
+    // ============= v2.1: РЕМОНТ МАШИНЫ =============
+    async function repairCar() {
+        try {
+            if (!confirm('Починить машину за 150 PLN?')) return;
+
+            const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/repair`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (result && !result._isError && result.success) {
+                userData.balance = result.balance;
+                userData.car = result.car;
+                updateMainScreen();
+                updateGarageScreen();
+                showNotification('🔧 Машина отремонтирована!', 'success');
+            } else {
+                showNotification(result.error || 'Ошибка ремонта', 'error');
+            }
+        } catch (error) {
+            console.error('Error repairing car:', error);
+            showNotification('Ошибка сети', 'error');
+        }
     }
 
-    setupProfileListeners();
+    // ============= НАСТРОЙКА ОБРАБОТЧИКОВ СОБЫТИЙ =============
+    function setupEventListeners() {
+        setupPromoListeners();
+        setupAnnouncementListeners();
+        setupPoliceListeners();
+        setupMuteListener();
+        console.log('🔄 Настройка обработчиков...');
 
-    console.log('✅ Все обработчики настроены');
-}
-
-// ============= v2.8: УПРАВЛЕНИЕ ЗВУКОМ =============
-function setupMuteListener() {
-    const muteBtn = document.getElementById('mute-btn');
-    if (muteBtn) {
-        muteBtn.addEventListener('click', () => {
-            const isMuted = soundManager.toggleMute();
-            muteBtn.textContent = isMuted ? '🔇' : '🔊';
-            try { soundManager.play('button'); } catch (e) { }
-        });
-
-        // Initial state
-        muteBtn.textContent = soundManager.muted ? '🔇' : '🔊';
-    }
-}
-
-// ============= ЗАПУСК ПРИЛОЖЕНИЯ =============
-(function () {
-    try {
-        const bootstrap = () => {
-            console.log("🚦 Booting application...");
-            setupEventListeners();
-            initApp();
+        // Главное меню
+        const buttons = {
+            'online-btn': () => showScreen('orders'),
+            'fuel-btn': () => showScreen('fuel'),
+            'garage-btn': () => showScreen('garage'),
+            'rest-btn': rest,
+            'plates-btn': () => {
+                document.getElementById('plates-modal').style.display = 'block';
+                if (typeof loadPlates === 'function') loadPlates();
+            },
+            'show-partners-btn': showPartnersList,
+            'casino-btn': () => {
+                showScreen('casino');
+                if (typeof updateCasinoUI === 'function') updateCasinoUI();
+            },
+            'lootbox-btn': () => {
+                showScreen('lootbox');
+                if (typeof loadLootboxes === 'function') loadLootboxes();
+            },
+            'containers-btn': () => {
+                showScreen('containers');
+                if (typeof containersManager !== 'undefined') containersManager.onScreenOpen();
+            }
         };
 
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', bootstrap);
-        } else {
-            bootstrap();
+        Object.entries(buttons).forEach(([id, handler]) => {
+            const btn = document.getElementById(id);
+            if (btn) {
+                btn.addEventListener('click', handler);
+                console.log(`✅ ${id} привязана`);
+            }
+        });
+
+        // Кнопки назад
+        const backButtons = {
+            'back-from-orders': 'main',
+            'back-from-fuel': 'main',
+            'back-from-garage': 'main',
+            'back-from-partners': 'main',
+            'back-from-containers': 'main'
+        };
+
+        Object.entries(backButtons).forEach(([id, screenName]) => {
+            const btn = document.getElementById(id);
+            if (btn) {
+                btn.addEventListener('click', () => showScreen(screenName));
+            }
+        });
+
+        // v3.4: Add missing back buttons
+        const moreBackBtns = {
+            'back-from-skills': 'main',
+            'back-from-business': 'main'
+        };
+        Object.entries(moreBackBtns).forEach(([id, screenName]) => {
+            const btn = document.getElementById(id);
+            if (btn) btn.addEventListener('click', () => showScreen(screenName));
+        });
+
+        // Telegram BackButton
+        if (tg && tg.version >= '6.1') {
+            tg.BackButton.onClick(() => showScreen('main'));
         }
-    } catch (e) {
-        console.error("FATAL BOOT ERROR:", e);
-        const splash = document.getElementById('splash-status');
-        if (splash) splash.textContent = "Fatal: " + e.message;
+
+        // Заправка
+        const fuelRange = document.getElementById('fuel-range');
+        if (fuelRange) {
+            fuelRange.addEventListener('input', updateFuelCost);
+        }
+
+        const refuelBtn = document.getElementById('refuel-btn');
+        if (refuelBtn) {
+            refuelBtn.addEventListener('click', refuel);
+            console.log('✅ Кнопка заправки привязана');
+        }
+
+        // Пресеты заправки
+        document.querySelectorAll('.preset-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const liters = parseInt(btn.dataset.liters);
+                const range = document.getElementById('fuel-range');
+                if (range) {
+                    range.value = Math.min(liters, range.max || 100);
+                    updateFuelCost();
+                }
+            });
+        });
+
+        // Выбор типа топлива
+        document.querySelectorAll('.fuel-type-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.fuel-type-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                updateFuelCost();
+            });
+        });
+
+        // Фильтры заказов
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                currentFilter = e.target.dataset.filter || 'all';
+                displayOrders();
+                updateDistrictBackground();
+            });
+        });
+
+        // v2.1: Daily Bonus
+        const dailyBonusBtn = document.getElementById('daily-bonus-btn');
+        if (dailyBonusBtn) {
+            dailyBonusBtn.addEventListener('click', claimDailyBonus);
+        }
+
+        // v2.1: Repair
+        const repairBtn = document.getElementById('repair-btn');
+        if (repairBtn) {
+            repairBtn.addEventListener('click', repairCar);
+        }
+
+        // v3.1: Profile Trigger
+        const profileTrigger = document.getElementById('profile-trigger');
+        if (profileTrigger) {
+            console.log('✅ Настройка триггера профиля');
+            profileTrigger.style.cursor = 'pointer'; // Force cursor
+            profileTrigger.addEventListener('click', (e) => {
+                console.log('👤 Клик по профилю');
+                showScreen('profile');
+            });
+        }
+
+        setupProfileListeners();
+
+        console.log('✅ Все обработчики настроены');
     }
-})();
-// End of main script
+
+    // ============= v2.8: УПРАВЛЕНИЕ ЗВУКОМ =============
+    function setupMuteListener() {
+        const muteBtn = document.getElementById('mute-btn');
+        if (muteBtn) {
+            muteBtn.addEventListener('click', () => {
+                const isMuted = soundManager.toggleMute();
+                muteBtn.textContent = isMuted ? '🔇' : '🔊';
+                try { soundManager.play('button'); } catch (e) { }
+            });
+
+            // Initial state
+            muteBtn.textContent = soundManager.muted ? '🔇' : '🔊';
+        }
+    }
+
+    // ============= ЗАПУСК ПРИЛОЖЕНИЯ =============
+    (function () {
+        try {
+            const bootstrap = () => {
+                console.log("🚦 Booting application...");
+                setupEventListeners();
+                initApp();
+            };
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', bootstrap);
+            } else {
+                bootstrap();
+            }
+        } catch (e) {
+            console.error("FATAL BOOT ERROR:", e);
+            const splash = document.getElementById('splash-status');
+            if (splash) splash.textContent = "Fatal: " + e.message;
+        }
+    })();
+    // End of main script
 
 
-// ============= v3.3: LEVEL UP WOW EFFECT =============
-function showLevelUpWow(newLevel) {
-    const modal = document.getElementById('level-up-modal');
-    const badge = document.getElementById('new-level-badge');
-    if (!modal || !badge) return;
+    // ============= v3.3: LEVEL UP WOW EFFECT =============
+    function showLevelUpWow(newLevel) {
+        const modal = document.getElementById('level-up-modal');
+        const badge = document.getElementById('new-level-badge');
+        if (!modal || !badge) return;
 
-    badge.textContent = newLevel;
-    modal.style.display = 'flex';
+        badge.textContent = newLevel;
+        modal.style.display = 'flex';
 
-    try { soundManager.play('achievement'); } catch (e) { }
+        try { soundManager.play('achievement'); } catch (e) { }
 
-    // Simple confetti simulation
-    const container = document.getElementById('confetti-container');
-    if (container) {
-        container.innerHTML = '';
-        for (let i = 0; i < 50; i++) {
-            const confetti = document.createElement('div');
-            confetti.style.position = 'absolute';
-            confetti.style.width = '8px';
-            confetti.style.height = '8px';
-            confetti.style.background = ['#f3a000', '#ff9500', '#ffffff', '#007aff'][Math.floor(Math.random() * 4)];
-            confetti.style.left = Math.random() * 100 + '%';
-            confetti.style.top = '-10px';
-            confetti.style.borderRadius = '50%';
-            confetti.style.opacity = Math.random();
-            confetti.style.transform = `rotate(${Math.random() * 360}deg)`;
+        // Simple confetti simulation
+        const container = document.getElementById('confetti-container');
+        if (container) {
+            container.innerHTML = '';
+            for (let i = 0; i < 50; i++) {
+                const confetti = document.createElement('div');
+                confetti.style.position = 'absolute';
+                confetti.style.width = '8px';
+                confetti.style.height = '8px';
+                confetti.style.background = ['#f3a000', '#ff9500', '#ffffff', '#007aff'][Math.floor(Math.random() * 4)];
+                confetti.style.left = Math.random() * 100 + '%';
+                confetti.style.top = '-10px';
+                confetti.style.borderRadius = '50%';
+                confetti.style.opacity = Math.random();
+                confetti.style.transform = `rotate(${Math.random() * 360}deg)`;
 
-            container.appendChild(confetti);
+                container.appendChild(confetti);
 
-            const duration = 2000 + Math.random() * 3000;
-            confetti.animate([
-                { top: '-10px', transform: `translateX(0) rotate(0deg)` },
-                { top: '100%', transform: `translateX(${Math.random() * 100 - 50}px) rotate(${Math.random() * 720}deg)` }
-            ], {
-                duration: duration,
-                easing: 'cubic-bezier(0, .9, .6, 1)',
-                fill: 'forwards'
+                const duration = 2000 + Math.random() * 3000;
+                confetti.animate([
+                    { top: '-10px', transform: `translateX(0) rotate(0deg)` },
+                    { top: '100%', transform: `translateX(${Math.random() * 100 - 50}px) rotate(${Math.random() * 720}deg)` }
+                ], {
+                    duration: duration,
+                    easing: 'cubic-bezier(0, .9, .6, 1)',
+                    fill: 'forwards'
+                });
+            }
+        }
+    }
+
+    // v3.3: Dynamic Backgrounds
+    function updateDistrictBackground() {
+        const screen = document.getElementById('orders-screen');
+        if (!screen) return;
+
+        screen.classList.remove('bg-suburbs', 'bg-center', 'bg-airport');
+        screen.classList.add(`bg-${currentDistrict}`);
+    }
+
+
+    // ============= v2.9:  =============
+    function setupTutorialListener() {
+        const closeBtn = document.getElementById('close-tutorial-btn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                document.getElementById('tutorial-modal').style.display = 'none';
+                localStorage.setItem('tutorial_completed', 'true');
+                try { soundManager.play('button'); } catch (e) { }
+                showNotification('Удачной работы! 🚀', 'success');
             });
         }
     }
-}
 
-// v3.3: Dynamic Backgrounds
-function updateDistrictBackground() {
-    const screen = document.getElementById('orders-screen');
-    if (!screen) return;
-
-    screen.classList.remove('bg-suburbs', 'bg-center', 'bg-airport');
-    screen.classList.add(`bg-${currentDistrict}`);
-}
-
-
-// ============= v2.9:  =============
-function setupTutorialListener() {
-    const closeBtn = document.getElementById('close-tutorial-btn');
-    if (closeBtn) {
-        closeBtn.addEventListener('click', () => {
-            document.getElementById('tutorial-modal').style.display = 'none';
-            localStorage.setItem('tutorial_completed', 'true');
-            try { soundManager.play('button'); } catch (e) { }
-            showNotification('Удачной работы! 🚀', 'success');
-        });
+    function checkTutorial() {
+        const isCompleted = localStorage.getItem('tutorial_completed');
+        // Show only if not completed and user is new (0 rides)
+        if (!isCompleted && userData && (userData.rides_completed || 0) === 0) {
+            setTimeout(() => {
+                const modal = document.getElementById('tutorial-modal');
+                if (modal) {
+                    modal.style.display = 'flex';
+                    try { soundManager.play('button'); } catch (e) { } // Subtle alert
+                }
+            }, 1500); // Small delay for effect
+        }
     }
-}
+    // ============= v3.1: УПРАВЛЕНИЕ ПРОФИЛЕМ =============
+    function setupProfileListeners() {
+        const closeBtn = document.getElementById('close-profile-btn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                document.getElementById('profile-modal').style.display = 'none';
+            });
+        }
 
-function checkTutorial() {
-    const isCompleted = localStorage.getItem('tutorial_completed');
-    // Show only if not completed and user is new (0 rides)
-    if (!isCompleted && userData && (userData.rides_completed || 0) === 0) {
-        setTimeout(() => {
-            const modal = document.getElementById('tutorial-modal');
-            if (modal) {
-                modal.style.display = 'flex';
-                try { soundManager.play('button'); } catch (e) { } // Subtle alert
-            }
-        }, 1500); // Small delay for effect
-    }
-}
-// ============= v3.1: УПРАВЛЕНИЕ ПРОФИЛЕМ =============
-function setupProfileListeners() {
-    const closeBtn = document.getElementById('close-profile-btn');
-    if (closeBtn) {
-        closeBtn.addEventListener('click', () => {
-            document.getElementById('profile-modal').style.display = 'none';
-        });
+        // Buttons inside profile
+        const lootboxBtn = document.getElementById('profile-lootbox-btn');
+        if (lootboxBtn) lootboxBtn.addEventListener('click', () => { showScreen('lootbox'); document.getElementById('profile-modal').style.display = 'none'; });
+
+        const promoBtn = document.getElementById('profile-promo-btn');
+        if (promoBtn) promoBtn.addEventListener('click', () => { document.getElementById('promo-modal').style.display = 'flex'; });
+
+        const bonusBtn = document.getElementById('profile-daily-bonus-btn');
+        if (bonusBtn) bonusBtn.addEventListener('click', claimDailyBonus);
+
+        const tutorialBtn = document.getElementById('profile-tutorial-btn');
+        if (tutorialBtn) tutorialBtn.addEventListener('click', () => { document.querySelectorAll('.modal').forEach(m => m.style.display = 'none'); document.getElementById('tutorial-modal').style.display = 'flex'; });
+
+        const claimStreakBtn = document.getElementById('profile-claim-streak-btn');
+        if (claimStreakBtn) claimStreakBtn.addEventListener('click', claimStreakReward);
     }
 
-    // Buttons inside profile
-    const lootboxBtn = document.getElementById('profile-lootbox-btn');
-    if (lootboxBtn) lootboxBtn.addEventListener('click', () => { showScreen('lootbox'); document.getElementById('profile-modal').style.display = 'none'; });
+    function updateProfileScreen() {
+        if (!userData) return;
 
-    const promoBtn = document.getElementById('profile-promo-btn');
-    if (promoBtn) promoBtn.addEventListener('click', () => { document.getElementById('promo-modal').style.display = 'flex'; });
+        const elements = {
+            name: document.getElementById('profile-name'),
+            level: document.getElementById('profile-level'),
+            totalEarned: document.getElementById('profile-total-earned'),
+            ridesTotal: document.getElementById('profile-rides-total'),
+            totalDistance: document.getElementById('profile-total-distance'),
+            streak: document.getElementById('profile-streak'),
+            jackpot: document.getElementById('jackpot-amount'),
+            streakDays: document.getElementById('profile-streak-days'),
+            avatar: document.getElementById('profile-avatar-img')
+        };
 
-    const bonusBtn = document.getElementById('profile-daily-bonus-btn');
-    if (bonusBtn) bonusBtn.addEventListener('click', claimDailyBonus);
+        if (elements.name) elements.name.textContent = PLAYER_NAME;
+        if (elements.avatar) elements.avatar.src = PLAYER_AVATAR;
+        if (elements.level) elements.level.textContent = userData.level || 1;
+        if (elements.totalEarned) elements.totalEarned.textContent = userData.total_earned?.toFixed(2) || '0.00';
+        if (elements.ridesTotal) elements.ridesTotal.textContent = userData.rides_completed || '0';
+        if (elements.totalDistance) elements.totalDistance.textContent = userData.total_distance?.toFixed(1) || '0.0';
+        if (elements.streak) elements.streak.textContent = userData.rides_streak || '0';
+        if (elements.jackpot && userData.jackpot_pool !== undefined) {
+            elements.jackpot.textContent = userData.jackpot_pool.toFixed(2);
+        }
+        if (elements.streakDays) elements.streakDays.textContent = `${userData.rides_streak || 0} дней`;
 
-    const tutorialBtn = document.getElementById('profile-tutorial-btn');
-    if (tutorialBtn) tutorialBtn.addEventListener('click', () => { document.querySelectorAll('.modal').forEach(m => m.style.display = 'none'); document.getElementById('tutorial-modal').style.display = 'flex'; });
+        // Admin button in profile
+        const adminBtn = document.getElementById('profile-admin-btn');
+        if (adminBtn) {
+            const isAdmin = (TELEGRAM_ID === 123456789 || TELEGRAM_ID === '5275887201' || TELEGRAM_ID === '726693898');
+            adminBtn.style.display = isAdmin ? 'flex' : 'none';
+            adminBtn.onclick = () => window.location.href = '/admin';
+        }
 
-    const claimStreakBtn = document.getElementById('profile-claim-streak-btn');
-    if (claimStreakBtn) claimStreakBtn.addEventListener('click', claimStreakReward);
-}
-
-function updateProfileScreen() {
-    if (!userData) return;
-
-    const elements = {
-        name: document.getElementById('profile-name'),
-        level: document.getElementById('profile-level'),
-        totalEarned: document.getElementById('profile-total-earned'),
-        ridesTotal: document.getElementById('profile-rides-total'),
-        totalDistance: document.getElementById('profile-total-distance'),
-        streak: document.getElementById('profile-streak'),
-        jackpot: document.getElementById('jackpot-amount'),
-        streakDays: document.getElementById('profile-streak-days'),
-        avatar: document.getElementById('profile-avatar-img')
-    };
-
-    if (elements.name) elements.name.textContent = PLAYER_NAME;
-    if (elements.avatar) elements.avatar.src = PLAYER_AVATAR;
-    if (elements.level) elements.level.textContent = userData.level || 1;
-    if (elements.totalEarned) elements.totalEarned.textContent = userData.total_earned?.toFixed(2) || '0.00';
-    if (elements.ridesTotal) elements.ridesTotal.textContent = userData.rides_completed || '0';
-    if (elements.totalDistance) elements.totalDistance.textContent = userData.total_distance?.toFixed(1) || '0.0';
-    if (elements.streak) elements.streak.textContent = userData.rides_streak || '0';
-    if (elements.jackpot && userData.jackpot_pool !== undefined) {
-        elements.jackpot.textContent = userData.jackpot_pool.toFixed(2);
-    }
-    if (elements.streakDays) elements.streakDays.textContent = `${userData.rides_streak || 0} дней`;
-
-    // Admin button in profile
-    const adminBtn = document.getElementById('profile-admin-btn');
-    if (adminBtn) {
-        const isAdmin = (TELEGRAM_ID === 123456789 || TELEGRAM_ID === '5275887201' || TELEGRAM_ID === '726693898');
-        adminBtn.style.display = isAdmin ? 'flex' : 'none';
-        adminBtn.onclick = () => window.location.href = '/admin';
-    }
-
-    // v3.2: Render achievements in profile with labels
-    const achList = document.getElementById('profile-achievements-list');
-    if (achList && userData.achievements) {
-        try {
-            const achievements = Object.values(userData.achievements);
-            if (achievements.length === 0) {
-                achList.innerHTML = '<div class="no-achievements">\ud83c\udfaf \u0412\u044b\u043f\u043e\u043b\u043d\u044f\u0439\u0442\u0435 \u0437\u0430\u043a\u0430\u0437\u044b, \u0447\u0442\u043e\u0431\u044b \u043e\u0442\u043a\u0440\u044b\u0442\u044c \u0434\u043e\u0441\u0442\u0438\u0436\u0435\u043d\u0438\u044f!</div>';
-            } else {
-                achList.innerHTML = achievements.map(ach => {
-                    const done = ach && ach.completed;
-                    return `
+        // v3.2: Render achievements in profile with labels
+        const achList = document.getElementById('profile-achievements-list');
+        if (achList && userData.achievements) {
+            try {
+                const achievements = Object.values(userData.achievements);
+                if (achievements.length === 0) {
+                    achList.innerHTML = '<div class="no-achievements">\ud83c\udfaf \u0412\u044b\u043f\u043e\u043b\u043d\u044f\u0439\u0442\u0435 \u0437\u0430\u043a\u0430\u0437\u044b, \u0447\u0442\u043e\u0431\u044b \u043e\u0442\u043a\u0440\u044b\u0442\u044c \u0434\u043e\u0441\u0442\u0438\u0436\u0435\u043d\u0438\u044f!</div>';
+                } else {
+                    achList.innerHTML = achievements.map(ach => {
+                        const done = ach && ach.completed;
+                        return `
                     <div class="ach-card ${done ? 'ach-done' : 'ach-locked'}">
                         <div class="ach-icon">${ach.icon || (done ? '\ud83c\udfc6' : '\ud83d\udd12')}</div>
                         <div class="ach-info">
@@ -2277,85 +2266,85 @@ function updateProfileScreen() {
                         </div>
                         ${done ? '<div class="ach-badge">\u2705</div>' : ''}
                     </div>`;
-                }).join('');
-            }
-        } catch (e) { console.error('Error rendering profile achievements:', e); }
-    }
-}
-// ============= v3.3: LICENSE PLATE MANAGEMENT =============
-
-function setupPlatesListeners() {
-    const btn = document.getElementById('plates-btn');
-    if (btn) {
-        btn.onclick = () => {
-            document.getElementById('plates-modal').style.display = 'flex';
-            loadPlates();
-            switchPlatesTab('my');
-        };
-    }
-}
-
-function switchPlatesTab(tab, event) {
-    document.querySelectorAll('.plate-tab-content').forEach(el => el.style.display = 'none');
-    document.querySelectorAll('.plates-tabs .tab-btn').forEach(el => el.classList.remove('active'));
-
-    const tabContent = document.getElementById(`plates-tab-${tab}`);
-    if (tabContent) tabContent.style.display = 'block';
-
-    if (event && event.currentTarget) {
-        event.currentTarget.classList.add('active');
-    } else {
-        // Fallback: find the button by its onclick attribute or text if event is missing
-        const buttons = document.querySelectorAll('.plates-tabs .tab-btn');
-        buttons.forEach(btn => {
-            if (btn.getAttribute('onclick')?.includes(`'${tab}'`)) {
-                btn.classList.add('active');
-            }
-        });
-    }
-
-    if (tab === 'market') loadMarketPlates();
-}
-
-function updatePlatePreview() {
-    const input = document.getElementById('custom-plate-input');
-    const preview = document.getElementById('custom-plate-preview');
-    const priceEl = document.getElementById('create-plate-price');
-
-    let text = input.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
-    input.value = text;
-    preview.textContent = text || 'YOUR-NAME';
-
-    // Simple price calc mirror of backend for UI
-    const basePrice = 500000;
-    const charSurcharge = 750000;
-    const baseLength = 4;
-    let price = basePrice;
-    if (text.length > baseLength) {
-        price = Math.min(5000000, basePrice + (text.length - baseLength) * charSurcharge);
-    }
-    priceEl.textContent = `Цена: ${price.toLocaleString()} PLN`;
-}
-
-async function loadPlates() {
-    try {
-        const data = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/plates`);
-        if (data && !data._isError && data.success) {
-            displayPlates(data.plates);
+                    }).join('');
+                }
+            } catch (e) { console.error('Error rendering profile achievements:', e); }
         }
-    } catch (e) { console.error(e); }
-}
+    }
+    // ============= v3.3: LICENSE PLATE MANAGEMENT =============
 
-function displayPlates(plates) {
-    const list = document.getElementById('plates-list');
-    if (!list) return;
-
-    if (plates.length === 0) {
-        list.innerHTML = '<div class="text-center opacity-60 p-4">У вас пока нет уникальных номеров.</div>';
-        return;
+    function setupPlatesListeners() {
+        const btn = document.getElementById('plates-btn');
+        if (btn) {
+            btn.onclick = () => {
+                document.getElementById('plates-modal').style.display = 'flex';
+                loadPlates();
+                switchPlatesTab('my');
+            };
+        }
     }
 
-    list.innerHTML = plates.map(p => `
+    function switchPlatesTab(tab, event) {
+        document.querySelectorAll('.plate-tab-content').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.plates-tabs .tab-btn').forEach(el => el.classList.remove('active'));
+
+        const tabContent = document.getElementById(`plates-tab-${tab}`);
+        if (tabContent) tabContent.style.display = 'block';
+
+        if (event && event.currentTarget) {
+            event.currentTarget.classList.add('active');
+        } else {
+            // Fallback: find the button by its onclick attribute or text if event is missing
+            const buttons = document.querySelectorAll('.plates-tabs .tab-btn');
+            buttons.forEach(btn => {
+                if (btn.getAttribute('onclick')?.includes(`'${tab}'`)) {
+                    btn.classList.add('active');
+                }
+            });
+        }
+
+        if (tab === 'market') loadMarketPlates();
+    }
+
+    function updatePlatePreview() {
+        const input = document.getElementById('custom-plate-input');
+        const preview = document.getElementById('custom-plate-preview');
+        const priceEl = document.getElementById('create-plate-price');
+
+        let text = input.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+        input.value = text;
+        preview.textContent = text || 'YOUR-NAME';
+
+        // Simple price calc mirror of backend for UI
+        const basePrice = 500000;
+        const charSurcharge = 750000;
+        const baseLength = 4;
+        let price = basePrice;
+        if (text.length > baseLength) {
+            price = Math.min(5000000, basePrice + (text.length - baseLength) * charSurcharge);
+        }
+        priceEl.textContent = `Цена: ${price.toLocaleString()} PLN`;
+    }
+
+    async function loadPlates() {
+        try {
+            const data = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/plates`);
+            if (data && !data._isError && data.success) {
+                displayPlates(data.plates);
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    function displayPlates(plates) {
+        const list = document.getElementById('plates-list');
+        if (!list) return;
+
+        if (plates.length === 0) {
+            list.innerHTML = '<div class="text-center opacity-60 p-4">У вас пока нет уникальных номеров.</div>';
+            return;
+        }
+
+        list.innerHTML = plates.map(p => `
         <div class="plate-item-card ${p.rarity}">
             <div class="license-plate ${p.rarity}">${p.plate_number}</div>
             <div class="plate-info">
@@ -2368,81 +2357,81 @@ function displayPlates(plates) {
             </div>
         </div>
     `).join('');
-}
+    }
 
-function formatBuffs(buffs) {
-    let res = [];
-    if (buffs.tip_multiplier > 1) res.push(`+${Math.round((buffs.tip_multiplier - 1) * 100)}% чаевых`);
-    if (buffs.police_resistance < 1) res.push(`-${Math.round((1 - buffs.police_resistance) * 100)}% шанс ГАИ`);
-    return res.join('<br>');
-}
+    function formatBuffs(buffs) {
+        let res = [];
+        if (buffs.tip_multiplier > 1) res.push(`+${Math.round((buffs.tip_multiplier - 1) * 100)}% чаевых`);
+        if (buffs.police_resistance < 1) res.push(`-${Math.round((1 - buffs.police_resistance) * 100)}% шанс ГАИ`);
+        return res.join('<br>');
+    }
 
-async function equipPlate(plateNumber) {
-    try {
-        const data = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/plates/equip`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ plateNumber })
-        });
-        if (data.success) {
-            showNotification('✅ Номер успешно установлен!', 'success');
-            loadUserData(); // Refresh car data
-            loadPlates();
-        } else {
-            showNotification(`❌ ${data.error}`, 'error');
-        }
-    } catch (e) { console.error(e); }
-}
-
-async function rollPlate() {
-    try {
-        const data = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/plates/roll`, { method: 'POST' });
-        if (data.success) {
-            showLevelUpWow('NEW_PLATE');
-            showNotification(`🎉 Вы выбили номер: ${data.plate.plate_number}!`, 'success');
-            userData.balance = data.balance;
-            updateMainScreen();
-            loadPlates();
-        } else {
-            showNotification(`❌ ${data.error}`, 'error');
-        }
-    } catch (e) { console.error(e); }
-}
-
-async function createCustomPlate() {
-    const text = document.getElementById('custom-plate-input').value;
-    if (!text) return;
-
-    try {
-        const data = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/plates/create`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text })
-        });
-        if (data.success) {
-            showNotification(`✨ Номер ${data.plate.plate_number} создан!`, 'success');
-            userData.balance = data.balance;
-            updateMainScreen();
-            loadPlates();
-            switchPlatesTab('my');
-        } else {
-            showNotification(`❌ ${data.error}`, 'error');
-        }
-    } catch (e) { console.error(e); }
-}
-
-async function loadMarketPlates() {
-    const list = document.getElementById('market-plates-list');
-    list.innerHTML = '<div class="loading">Загрузка рынка...</div>';
-
-    try {
-        const data = await safeFetchJson(`${API_BASE_URL}/plates/market`);
-        if (data.success) {
-            if (data.plates.length === 0) {
-                list.innerHTML = '<div class="text-center p-4">На рынке пока нет номеров.</div>';
-                return;
+    async function equipPlate(plateNumber) {
+        try {
+            const data = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/plates/equip`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ plateNumber })
+            });
+            if (data.success) {
+                showNotification('✅ Номер успешно установлен!', 'success');
+                loadUserData(); // Refresh car data
+                loadPlates();
+            } else {
+                showNotification(`❌ ${data.error}`, 'error');
             }
-            list.innerHTML = data.plates.map(p => `
+        } catch (e) { console.error(e); }
+    }
+
+    async function rollPlate() {
+        try {
+            const data = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/plates/roll`, { method: 'POST' });
+            if (data.success) {
+                showLevelUpWow('NEW_PLATE');
+                showNotification(`🎉 Вы выбили номер: ${data.plate.plate_number}!`, 'success');
+                userData.balance = data.balance;
+                updateMainScreen();
+                loadPlates();
+            } else {
+                showNotification(`❌ ${data.error}`, 'error');
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    async function createCustomPlate() {
+        const text = document.getElementById('custom-plate-input').value;
+        if (!text) return;
+
+        try {
+            const data = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/plates/create`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text })
+            });
+            if (data.success) {
+                showNotification(`✨ Номер ${data.plate.plate_number} создан!`, 'success');
+                userData.balance = data.balance;
+                updateMainScreen();
+                loadPlates();
+                switchPlatesTab('my');
+            } else {
+                showNotification(`❌ ${data.error}`, 'error');
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    async function loadMarketPlates() {
+        const list = document.getElementById('market-plates-list');
+        list.innerHTML = '<div class="loading">Загрузка рынка...</div>';
+
+        try {
+            const data = await safeFetchJson(`${API_BASE_URL}/plates/market`);
+            if (data.success) {
+                if (data.plates.length === 0) {
+                    list.innerHTML = '<div class="text-center p-4">На рынке пока нет номеров.</div>';
+                    return;
+                }
+                list.innerHTML = data.plates.map(p => `
                 <div class="market-plate-item ${p.rarity}">
                     <div class="license-plate ${p.rarity}">${p.plate_number}</div>
                     <div class="market-info">
@@ -2452,163 +2441,164 @@ async function loadMarketPlates() {
                     <button class="buy-btn" onclick="buyMarketPlate('${p.plate_number}')">Купить</button>
                 </div>
             `).join('');
-        }
-    } catch (e) { console.error(e); }
-}
-
-async function buyMarketPlate(plateNumber) {
-    try {
-        const data = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/plates/buy`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ plateNumber })
-        });
-        if (data.success) {
-            showNotification(data.message, 'success');
-            userData.balance = data.balance;
-            updateMainScreen();
-            loadMarketPlates();
-        } else {
-            showNotification(`❌ ${data.error}`, 'error');
-        }
-    } catch (e) { console.error(e); }
-}
-
-function listPlatePrompt(plateNumber) {
-    const price = prompt('Введите цену продажи (PLN):');
-    if (!price || isNaN(price)) return;
-
-    listPlateForSale(plateNumber, parseInt(price));
-}
-
-async function listPlateForSale(plateNumber, price) {
-    try {
-        const data = await safeFetchJson(`${API_BASE_URL}/market/list-plate`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ telegramId: TELEGRAM_ID, plate: plateNumber, price })
-        });
-        if (data.success) {
-            showNotification(data.message, 'success');
-            loadPlates();
-        } else {
-            showNotification(`❌ ${data.error}`, 'error');
-        }
-    } catch (e) { console.error(e); }
-}
-
-// v3.4: Global Social Pulse Logic
-async function updateSocialPulse() {
-    try {
-        const data = await safeFetchJson(`${API_BASE_URL}/social/pulse`);
-        if (!data || data._isError) return;
-
-        // 1. Update Community Mission
-        if (data.community) {
-            const fill = document.getElementById('community-fill');
-            const percentEl = document.getElementById('community-percent');
-            const distanceEl = document.getElementById('community-distance');
-            const goalEl = document.getElementById('community-goal');
-
-            if (fill) fill.style.width = `${data.community.percent}%`;
-            if (percentEl) percentEl.textContent = `${data.community.percent}%`;
-            if (distanceEl) distanceEl.textContent = data.community.totalDistance.toLocaleString();
-            if (goalEl) goalEl.textContent = data.community.goal.toLocaleString();
-        }
-
-        // 2. Update Street Feed
-        const content = document.getElementById('street-feed-content');
-        if (content && data.events && data.events.length > 0) {
-            const event = data.events[0]; // Show latest event
-            content.style.opacity = '0';
-            setTimeout(() => {
-                content.textContent = `⚡ ${event.message}`;
-                content.style.opacity = '1';
-            }, 500);
-        }
-
-        // 3. Update District Occupancy (Global variable for use in loadDistricts)
-        window.districtPulse = data.occupancy || {};
-        window.districtSurges = data.surges || {};
-
-        // If currently on orders screen, refresh UI to show tags
-        if (screens.orders.classList.contains('active')) {
-            updateDistrictTags();
-        }
-
-        // 4. Update Jackpot in profile/header if needed
-        if (data.jackpot !== undefined) {
-            const jackpotEl = document.getElementById('jackpot-amount');
-            if (jackpotEl) jackpotEl.textContent = data.jackpot.toFixed(2);
-        }
-
-    } catch (e) {
-        console.error('Pulse update failed:', e);
+            }
+        } catch (e) { console.error(e); }
     }
-}
 
-function initStreetFeed() {
-    updateSocialPulse();
-    setInterval(updateSocialPulse, 30000); // Pulse every 30s
-}
+    async function buyMarketPlate(plateNumber) {
+        try {
+            const data = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/plates/buy`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ plateNumber })
+            });
+            if (data.success) {
+                showNotification(data.message, 'success');
+                userData.balance = data.balance;
+                updateMainScreen();
+                loadMarketPlates();
+            } else {
+                showNotification(`❌ ${data.error}`, 'error');
+            }
+        } catch (e) { console.error(e); }
+    }
 
-function updateDistrictTags() {
-    document.querySelectorAll('.district-card').forEach(btn => {
-        const id = btn.dataset.id;
-        if (!id) return;
+    function listPlatePrompt(plateNumber) {
+        const price = prompt('Введите цену продажи (PLN):');
+        if (!price || isNaN(price)) return;
 
-        // Remove old tags
-        btn.querySelector('.district-pulse')?.remove();
-        btn.querySelector('.district-surge')?.remove();
+        listPlateForSale(plateNumber, parseInt(price));
+    }
 
-        // Add occupancy
-        if (window.districtPulse && window.districtPulse[id]) {
-            const tag = document.createElement('span');
-            tag.className = 'district-pulse';
-            tag.textContent = `👥 ${window.districtPulse[id]} водителей`;
-            btn.appendChild(tag);
-        }
+    async function listPlateForSale(plateNumber, price) {
+        try {
+            const data = await safeFetchJson(`${API_BASE_URL}/market/list-plate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ telegramId: TELEGRAM_ID, plate: plateNumber, price })
+            });
+            if (data.success) {
+                showNotification(data.message, 'success');
+                loadPlates();
+            } else {
+                showNotification(`❌ ${data.error}`, 'error');
+            }
+        } catch (e) { console.error(e); }
+    }
 
-        // Add surge
-        if (window.districtSurges && window.districtSurges[id]) {
-            const surge = document.createElement('span');
-            surge.className = 'district-surge';
-            surge.textContent = `🔥 SURGE x${window.districtSurges[id]}`;
-            btn.appendChild(surge);
-        }
-    });
-}
+    // v3.4: Global Social Pulse Logic
+    async function updateSocialPulse() {
+        try {
+            const data = await safeFetchJson(`${API_BASE_URL}/social/pulse`);
+            if (!data || data._isError) return;
 
-function updatePlatesUI() {
-    const rollBtn = document.querySelector('.roll-plate-box .menu-btn.primary');
-    if (rollBtn && userData) {
-        if (userData.free_plate_rolls > 0) {
-            rollBtn.innerHTML = `🎰 Использовать бесплатный ролл (Доступно: ${userData.free_plate_rolls})`;
-            rollBtn.style.background = 'linear-gradient(45deg, #FFD700, #FFA500)';
-            rollBtn.style.color = '#000';
-            rollBtn.style.fontWeight = '800';
-        } else {
-            rollBtn.innerHTML = `🎰 Выбить номер (50,000 PLN)`;
-            rollBtn.style.background = ''; // Reset to CSS default
-            rollBtn.style.color = '';
-            rollBtn.style.fontWeight = '';
+            // 1. Update Community Mission
+            if (data.community) {
+                const fill = document.getElementById('community-fill');
+                const percentEl = document.getElementById('community-percent');
+                const distanceEl = document.getElementById('community-distance');
+                const goalEl = document.getElementById('community-goal');
+
+                if (fill) fill.style.width = `${data.community.percent}%`;
+                if (percentEl) percentEl.textContent = `${data.community.percent}%`;
+                if (distanceEl) distanceEl.textContent = data.community.totalDistance.toLocaleString();
+                if (goalEl) goalEl.textContent = data.community.goal.toLocaleString();
+            }
+
+            // 2. Update Street Feed
+            const content = document.getElementById('street-feed-content');
+            if (content && data.events && data.events.length > 0) {
+                const event = data.events[0]; // Show latest event
+                content.style.opacity = '0';
+                setTimeout(() => {
+                    content.textContent = `⚡ ${event.message}`;
+                    content.style.opacity = '1';
+                }, 500);
+            }
+
+            // 3. Update District Occupancy (Global variable for use in loadDistricts)
+            window.districtPulse = data.occupancy || {};
+            window.districtSurges = data.surges || {};
+
+            // If currently on orders screen, refresh UI to show tags
+            if (screens.orders.classList.contains('active')) {
+                updateDistrictTags();
+            }
+
+            // 4. Update Jackpot in profile/header if needed
+            if (data.jackpot !== undefined) {
+                const jackpotEl = document.getElementById('jackpot-amount');
+                if (jackpotEl) jackpotEl.textContent = data.jackpot.toFixed(2);
+            }
+
+        } catch (e) {
+            console.error('Pulse update failed:', e);
         }
     }
-}
 
-function updateBalanceDisplay() {
-    if (!userData) return;
-    const balanceEl = document.getElementById('balance');
-    const fuelBalanceEl = document.getElementById('fuel-balance');
-    const casinoBalanceEl = document.getElementById('casino-balance');
-    const skillsBalanceEl = document.getElementById('skills-balance');
-    const pTotalEarnedEl = document.getElementById('profile-total-earned');
+    function initStreetFeed() {
+        updateSocialPulse();
+        setInterval(updateSocialPulse, 30000); // Pulse every 30s
+    }
 
-    const formattedBalance = userData.balance?.toFixed(2) || '0.00';
+    function updateDistrictTags() {
+        document.querySelectorAll('.district-card').forEach(btn => {
+            const id = btn.dataset.id;
+            if (!id) return;
 
-    if (balanceEl) balanceEl.textContent = formattedBalance;
-    if (fuelBalanceEl) fuelBalanceEl.textContent = formattedBalance;
-    if (casinoBalanceEl) casinoBalanceEl.textContent = Math.floor(userData.balance || 0);
-    if (skillsBalanceEl) skillsBalanceEl.textContent = formattedBalance;
-    if (pTotalEarnedEl) pTotalEarnedEl.textContent = userData.total_earned?.toFixed(2) || '0.00';
+            // Remove old tags
+            btn.querySelector('.district-pulse')?.remove();
+            btn.querySelector('.district-surge')?.remove();
+
+            // Add occupancy
+            if (window.districtPulse && window.districtPulse[id]) {
+                const tag = document.createElement('span');
+                tag.className = 'district-pulse';
+                tag.textContent = `👥 ${window.districtPulse[id]} водителей`;
+                btn.appendChild(tag);
+            }
+
+            // Add surge
+            if (window.districtSurges && window.districtSurges[id]) {
+                const surge = document.createElement('span');
+                surge.className = 'district-surge';
+                surge.textContent = `🔥 SURGE x${window.districtSurges[id]}`;
+                btn.appendChild(surge);
+            }
+        });
+    }
+
+    function updatePlatesUI() {
+        const rollBtn = document.querySelector('.roll-plate-box .menu-btn.primary');
+        if (rollBtn && userData) {
+            if (userData.free_plate_rolls > 0) {
+                rollBtn.innerHTML = `🎰 Использовать бесплатный ролл (Доступно: ${userData.free_plate_rolls})`;
+                rollBtn.style.background = 'linear-gradient(45deg, #FFD700, #FFA500)';
+                rollBtn.style.color = '#000';
+                rollBtn.style.fontWeight = '800';
+            } else {
+                rollBtn.innerHTML = `🎰 Выбить номер (50,000 PLN)`;
+                rollBtn.style.background = ''; // Reset to CSS default
+                rollBtn.style.color = '';
+                rollBtn.style.fontWeight = '';
+            }
+        }
+    }
+
+    function updateBalanceDisplay() {
+        if (!userData) return;
+        const balanceEl = document.getElementById('balance');
+        const fuelBalanceEl = document.getElementById('fuel-balance');
+        const casinoBalanceEl = document.getElementById('casino-balance');
+        const skillsBalanceEl = document.getElementById('skills-balance');
+        const pTotalEarnedEl = document.getElementById('profile-total-earned');
+
+        const formattedBalance = userData.balance?.toFixed(2) || '0.00';
+
+        if (balanceEl) balanceEl.textContent = formattedBalance;
+        if (fuelBalanceEl) fuelBalanceEl.textContent = formattedBalance;
+        if (casinoBalanceEl) casinoBalanceEl.textContent = Math.floor(userData.balance || 0);
+        if (skillsBalanceEl) skillsBalanceEl.textContent = formattedBalance;
+        if (pTotalEarnedEl) pTotalEarnedEl.textContent = userData.total_earned?.toFixed(2) || '0.00';
+    }
 }

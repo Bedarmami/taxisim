@@ -55,7 +55,7 @@ app.get('/', (req, res) => {
         res.send(html);
     } catch (e) {
         console.error('Error serving index.html:', e);
-        res.status(500).send(`Server Error: ${e.message}\nStack: ${e.stack}`);
+        res.status(500).json({ error: e.message });
     }
 });
 
@@ -1912,14 +1912,14 @@ app.post('/api/user/:telegramId/rest', async (req, res) => {
         }
 
         // Восстанавливаем выносливость
-        user.stamina = Math.min(100, (user.stamina || 0) + 30);
+        user.stamina = 100;
         user.rides_streak = 0;
         user.rides_today = 0; // New day resets daily rides
 
         await saveUser(user);
 
         // Формируем ответ
-        let message = '😴 Вы отдохнули и восстановили 30% выносливости!';
+        let message = '😴 Вы отлично выспались и полностью восстановили выносливость!';
         let day_info = `📅 День: ${user.days_passed} (${user.week_days}/7)`;
 
         if (week_completed) {
@@ -2073,14 +2073,14 @@ app.post('/api/user/:telegramId/fuel', async (req, res) => {
         // Commission payout for owned stations
         if (station && station.owner_id) {
             // Fuel cost for the owner (base price they paid or standard cost)
-            // Let's assume a fixed base price for the owner's stock: Petrol 5.0, Gas 2.5
-            const basePrice = type === 'gas' ? 2.5 : 5.0;
+            const fuelStockPrice = parseFloat(await getConfig('fuel_stock_price', '4.0'));
+            const basePrice = type === 'gas' ? (fuelStockPrice * 0.6) : fuelStockPrice;
             const profit = Number((actualLitersRounded * (pricePerLitre - basePrice)).toFixed(2));
 
             if (profit > 0) {
-                // Add to uncollected revenue and reduce stock
-                await db.run('UPDATE gas_stations SET uncollected_revenue = uncollected_revenue + ?, fuel_stock = fuel_stock - ? WHERE id = ?',
-                    [profit, actualLitersRounded, station.id]);
+                // Add to uncollected revenue, revenue_total and reduce stock
+                await db.run('UPDATE gas_stations SET uncollected_revenue = uncollected_revenue + ?, revenue_total = revenue_total + ?, fuel_stock = fuel_stock - ? WHERE id = ?',
+                    [profit, profit, actualLitersRounded, station.id]);
 
                 console.log(`[Investment] Profit ${profit} PLN added to ${station.name} (${station.owner_id}). Stock left: ${station.fuel_stock - actualLitersRounded}L`);
             } else {
@@ -2963,6 +2963,28 @@ app.post('/api/investments/buy', async (req, res) => {
     }
 });
 
+app.post('/api/investments/sell-to-state', rateLimitMiddleware, async (req, res) => {
+    try {
+        const { telegramId, stationId } = req.body;
+        const user = await getUser(telegramId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const station = await db.get('SELECT * FROM gas_stations WHERE id = ? AND owner_id = ?', [stationId, telegramId]);
+        if (!station) return res.status(404).json({ error: 'Station not found or not owned by you' });
+
+        const refund = Math.floor(station.purchase_price * 0.7); // 70% refund
+        user.balance += refund;
+
+        await saveUser(user);
+        await db.run('UPDATE gas_stations SET owner_id = NULL, uncollected_revenue = 0, fuel_stock = 0 WHERE id = ?', [stationId]);
+
+        logSocialActivity(`🏦 ${user.username || telegramId} продал АЗС "${station.name}" государству за ${refund} PLN.`);
+        res.json({ success: true, message: `АЗС продана! Вам возвращено ${refund} PLN.` });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // v3.5: Move car from Garage to Fleet
 app.post('/api/user/:telegramId/fleet/move-from-garage', async (req, res) => {
     try {
@@ -3070,10 +3092,8 @@ app.post('/api/investments/buy-stock', async (req, res) => {
         const station = await db.get('SELECT * FROM gas_stations WHERE id = ? AND owner_id = ?', [stationId, telegramId]);
         if (!station) return res.status(404).json({ error: 'Station not found or not owned by you' });
 
-        // Base price for stock: 5.0 pentru Petrol, let's assume average or allow choice? 
-        // For simplicity, let's say owner buys "Generic Fuel Stock" at 4.0 PLN/L
-        const STOCK_PRICE_PER_LITER = 4.0;
-        const cost = liters * STOCK_PRICE_PER_LITER;
+        const fuelStockPrice = parseFloat(await getConfig('fuel_stock_price', '4.0'));
+        const cost = liters * fuelStockPrice;
 
         if (user.balance < cost) return res.status(400).json({ error: `Недостаточно средств. Нужно ${cost.toFixed(2)} PLN` });
 
@@ -4095,6 +4115,51 @@ app.get('/api/admin/users', adminAuth, async (req, res) => {
         console.error('Admin users error:', error);
         res.status(500).json({ error: 'Server error' });
     }
+});
+
+// v3.5: Admin - Gas Stations management
+app.get('/api/admin/gas-stations', adminAuth, async (req, res) => {
+    try {
+        const sql = `
+            SELECT gs.*, u.username as owner_name 
+            FROM gas_stations gs 
+            LEFT JOIN users u ON gs.owner_id = u.telegram_id
+        `;
+        const stations = await db.query(sql);
+        res.json(stations);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/gas-stations/take-away', adminAuth, async (req, res) => {
+    try {
+        const { stationId } = req.body;
+        await db.run('UPDATE gas_stations SET owner_id = NULL, uncollected_revenue = 0, fuel_stock = 0 WHERE id = ?', [stationId]);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/gas-stations/give-stock', adminAuth, async (req, res) => {
+    try {
+        const { stationId, liters } = req.body;
+        await db.run('UPDATE gas_stations SET fuel_stock = fuel_stock + ? WHERE id = ?', [liters, stationId]);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// v3.5: Admin - Player Fleet Info
+app.get('/api/admin/user/:telegramId/fleet-info', adminAuth, async (req, res) => {
+    try {
+        const user = await getUser(req.params.telegramId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const business = user.business || { fleet: [] };
+        // We can add more stats here if needed
+        res.json({
+            fleet: business.fleet || [],
+            uncollected_fleet_revenue: user.uncollected_fleet_revenue || 0,
+            total_earned: user.total_earned || 0
+        });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/admin/update-user', adminAuth, async (req, res) => {

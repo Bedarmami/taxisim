@@ -34,23 +34,18 @@ async function checkAuth() {
     }
 
     try {
-        const response = await fetch('/api/admin/stats', {
+        const response = await safeFetchJson('/api/admin/stats', {
             headers: { 'x-admin-password': adminPassword }
         });
 
-        if (response.ok) {
+        if (response && !response._isError) {
             document.getElementById('login-section').style.display = 'none';
             document.getElementById('admin-info').style.display = 'block';
             document.getElementById('main-content').style.display = 'block';
             document.getElementById('maintenance-control').style.display = 'flex';
 
-            // Sync maintenance state
-            const stats = await response.json(); // Re-read stats for maintenance info?
-            // Wait, the /api/admin/stats response doesn't have maintenance mode. 
-            // I should get it from a separate check or include it in stats.
-            const mRes = await fetch('/api/admin/maintenance-status', { headers: { 'x-admin-password': adminPassword } });
-            if (mRes.ok) {
-                const mData = await mRes.json();
+            const mData = await safeFetchJson('/api/admin/maintenance-status', { headers: { 'x-admin-password': adminPassword } });
+            if (mData && !mData._isError) {
                 document.getElementById('maintenance-toggle').checked = mData.maintenanceMode;
             }
             // Broadcast logic
@@ -60,14 +55,17 @@ async function checkAuth() {
                 if (!confirm('Вы уверены, что хотите отправить это сообщение ВСЕМ пользователям?')) return;
 
                 try {
-                    const res = await fetch(`/api/admin/broadcast`, {
+                    const data = await safeFetchJson(`/api/admin/broadcast`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
                         body: JSON.stringify({ message: msg })
                     });
-                    const data = await res.json();
-                    alert(data.message || 'Рассылка завершена');
-                    e.target.reset();
+                    if (data && !data._isError) {
+                        alert(data.message || 'Рассылка завершена');
+                        e.target.reset();
+                    } else {
+                        alert('Ошибка при рассылке: ' + (data?.error || 'Unknown'));
+                    }
                 } catch (e) {
                     alert('Ошибка при рассылке');
                 }
@@ -103,13 +101,73 @@ async function loadData() {
     await loadStats();
     await loadAnalytics();
     await loadDebugInfo();
+    loadAdminGasStations();
+}
+
+async function loadAdminGasStations() {
+    const table = document.getElementById('admin-gas-stations-tbody');
+    if (!table) return;
+    table.innerHTML = '<tr><td colspan="8">Загрузка...</td></tr>';
+
+    try {
+        const stations = await safeFetchJson('/api/admin/gas-stations', {
+            headers: { 'x-admin-password': adminPassword }
+        });
+        if (!stations || stations._isError) return;
+
+        table.innerHTML = '';
+        stations.forEach(s => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${s.id}</td>
+                <td>${s.name}</td>
+                <td>${s.owner_name ? `<b>${s.owner_name}</b> (${s.owner_id})` : '<i style="color:#888;">Нет владельца</i>'}</td>
+                <td>${s.fuel_stock.toFixed(1)}</td>
+                <td>${s.uncollected_revenue.toFixed(2)}</td>
+                <td>${s.revenue_total.toFixed(2)}</td>
+                <td>${s.price_petrol} / ${s.price_gas}</td>
+                <td>
+                    ${s.owner_id ? `<button onclick="takeAwayStation(${s.id})" class="danger-btn" style="padding:4px 8px; font-size:0.8em;">Забрать</button>` : ''}
+                    <button onclick="giveStationStock(${s.id})" class="edit-btn" style="padding:4px 8px; font-size:0.8em;">+ Топливо</button>
+                </td>
+            `;
+            table.appendChild(tr);
+        });
+    } catch (e) {
+        console.error(e);
+        table.innerHTML = '<tr><td colspan="8">Ошибка загрузки</td></tr>';
+    }
+}
+
+async function takeAwayStation(stationId) {
+    if (!confirm('Вы уверены, что хотите забрать эту АЗС у владельца? Все доходы и топливо будут сброшены.')) return;
+    try {
+        const res = await safeFetchJson('/api/admin/gas-stations/take-away', {
+            method: 'POST',
+            headers: { 'x-admin-password': adminPassword, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ stationId })
+        });
+        if (res.success) loadAdminGasStations();
+    } catch (e) { alert('Ошибка'); }
+}
+
+async function giveStationStock(stationId) {
+    const liters = prompt('Сколько литров добавить?');
+    if (!liters || isNaN(liters)) return;
+    try {
+        const res = await safeFetchJson('/api/admin/gas-stations/give-stock', {
+            method: 'POST',
+            headers: { 'x-admin-password': adminPassword, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ stationId, liters: parseFloat(liters) })
+        });
+        if (res.success) loadAdminGasStations();
+    } catch (e) { alert('Ошибка'); }
 }
 
 async function loadDebugInfo() {
     try {
-        const res = await fetch('/api/admin/debug-info', { headers: { 'x-admin-password': adminPassword } });
-        if (!res.ok) return;
-        const data = await res.json();
+        const data = await safeFetchJson('/api/admin/debug-info', { headers: { 'x-admin-password': adminPassword } });
+        if (!data || data._isError) return;
 
         document.getElementById('debug-users').textContent = data.database.users;
         document.getElementById('debug-bot').textContent = data.bot.tokenPresent ? '✅ OK' : '❌ NO TOKEN';
@@ -170,8 +228,9 @@ function initBarChart(id, label, data) {
 }
 
 async function loadActivities() {
-    const res = await fetch('/api/admin/activities', { headers: { 'x-admin-password': adminPassword } });
-    const activities = await res.json();
+    const activities = await safeFetchJson('/api/admin/activities', { headers: { 'x-admin-password': adminPassword } });
+    if (!activities || activities._isError) return;
+
     const tbody = document.getElementById('activities-tbody');
     tbody.innerHTML = '';
     activities.forEach(a => {
@@ -221,17 +280,22 @@ function initChart(id, label, data, color) {
 }
 
 async function toggleMaintenance(active) {
-    const res = await fetch('/api/admin/maintenance', {
+    const data = await safeFetchJson('/api/admin/maintenance', {
         method: 'POST',
         headers: { 'x-admin-password': adminPassword, 'Content-Type': 'application/json' },
         body: JSON.stringify({ active })
     });
-    if (res.ok) alert(`Режим техработ ${active ? 'ВКЛЮЧЕН' : 'ВЫКЛЮЧЕН'}`);
+    if (data && !data._isError) {
+        alert(`Режим техработ ${active ? 'ВКЛЮЧЕН' : 'ВЫКЛЮЧЕН'}`);
+    } else {
+        alert('Ошибка переключения режима');
+    }
 }
 
 async function loadUsers() {
-    const res = await fetch('/api/admin/users', { headers: { 'x-admin-password': adminPassword } });
-    const users = await res.json();
+    const users = await safeFetchJson('/api/admin/users', { headers: { 'x-admin-password': adminPassword } });
+    if (!users || users._isError) return;
+
     const tbody = document.getElementById('user-tbody');
     tbody.innerHTML = '';
     users.forEach(u => {
@@ -258,8 +322,9 @@ async function loadUsers() {
 
 // Promo logic
 async function loadPromos() {
-    const res = await fetch('/api/admin/promo', { headers: { 'x-admin-password': adminPassword } });
-    const promos = await res.json();
+    const promos = await safeFetchJson('/api/admin/promo', { headers: { 'x-admin-password': adminPassword } });
+    if (!promos || promos._isError) return;
+
     const tbody = document.getElementById('promo-tbody');
     tbody.innerHTML = '';
     promos.forEach(p => {
@@ -302,32 +367,31 @@ document.getElementById('promo-form').addEventListener('submit', async (e) => {
         maxUses: parseInt(document.getElementById('promo-max-uses').value) || 0,
         expiresAt: document.getElementById('promo-expiry').value
     };
-    const res = await fetch('/api/admin/promo', {
+    const data = await safeFetchJson('/api/admin/promo', {
         method: 'POST',
         headers: { 'x-admin-password': adminPassword, 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
     });
 
-    if (res.ok) {
+    if (data && !data._isError) {
         alert('Промокод создан');
         e.target.reset();
         loadPromos();
     } else {
-        const error = await res.json();
-        alert('Ошибка: ' + (error.error || 'Неизвестная ошибка'));
+        alert('Ошибка: ' + (data?.error || 'Неизвестная ошибка'));
     }
 });
 
 async function deletePromo(id) {
     if (!confirm('Удалить промокод?')) return;
-    await fetch(`/api/admin/promo/${id}`, { method: 'DELETE', headers: { 'x-admin-password': adminPassword } });
+    await safeFetchJson(`/api/admin/promo/${id}`, { method: 'DELETE', headers: { 'x-admin-password': adminPassword } });
     loadPromos();
 }
 
 // Logs logic
 async function loadLogs() {
-    const res = await fetch('/api/admin/logs', { headers: { 'x-admin-password': adminPassword } });
-    const logs = await res.json();
+    const logs = await safeFetchJson('/api/admin/logs', { headers: { 'x-admin-password': adminPassword } });
+    if (!logs || logs._isError) return;
     const container = document.getElementById('logs-container');
     container.innerHTML = logs.map(l => `
         <div class="log-entry">
@@ -340,7 +404,7 @@ async function loadLogs() {
 
 async function testLog() {
     try {
-        const res = await fetch('/api/error-report', {
+        const data = await safeFetchJson('/api/error-report', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -350,7 +414,7 @@ async function testLog() {
                 screen: 'Admin Diagnostics'
             })
         });
-        if (res.ok) {
+        if (data && !data._isError) {
             alert('Тестовый лог отправлен! Сейчас список обновится.');
             setTimeout(loadLogs, 500);
         } else {
@@ -362,17 +426,17 @@ window.testLog = testLog;
 
 async function clearLogs() {
     if (!confirm('Очистить все логи?')) return;
-    await fetch('/api/admin/logs/clear', { method: 'POST', headers: { 'x-admin-password': adminPassword } });
+    await safeFetchJson('/api/admin/logs/clear', { method: 'POST', headers: { 'x-admin-password': adminPassword } });
     loadLogs();
 }
 
 let currentUserToEdit = null;
 
 async function openEditModal(telegramId) {
-    const response = await fetch('/api/admin/users', {
+    const users = await safeFetchJson('/api/admin/users', {
         headers: { 'x-admin-password': adminPassword }
     });
-    const users = await response.json();
+    if (!users || users._isError) return;
     const user = users.find(u => u.telegram_id === telegramId);
 
     if (!user) return;
@@ -389,6 +453,45 @@ async function openEditModal(telegramId) {
     document.getElementById('edit-lb-silver').value = user.lootboxes?.silver || 0;
     document.getElementById('edit-lb-gold').value = user.lootboxes?.gold || 0;
     document.getElementById('edit-lb-legendary').value = user.lootboxes?.legendary || 0;
+
+    // Load Fleet Info
+    const fleetList = document.getElementById('edit-fleet-list');
+    const totalEarnedSpan = document.getElementById('fleet-total-earned');
+    const uncollectedSpan = document.getElementById('fleet-uncollected');
+
+    if (fleetList) {
+        fleetList.innerHTML = '<div class="loading">Загрузка флота...</div>';
+        try {
+            const fleetInfo = await safeFetchJson(`/api/admin/user/${telegramId}/fleet-info`, {
+                headers: { 'x-admin-password': adminPassword }
+            });
+
+            if (fleetInfo && !fleetInfo._isError) {
+                totalEarnedSpan.textContent = (fleetInfo.total_earned || 0).toFixed(2);
+                uncollectedSpan.textContent = (fleetInfo.uncollected_profit || 0).toFixed(2);
+
+                if (fleetInfo.cars && fleetInfo.cars.length > 0) {
+                    fleetList.innerHTML = fleetInfo.cars.map(c => `
+                        <div style="background:rgba(0,0,0,0.2); padding:8px; border-radius:6px; margin-bottom:5px; font-size:0.85em; border:1px solid rgba(255,255,255,0.05);">
+                            <div style="display:flex; justify-content:space-between;">
+                                <span>🚕 <b>${c.name}</b></span>
+                                <span style="color:#2ecc71;">+${(c.earned || 0).toFixed(2)} PLN</span>
+                            </div>
+                            <div style="color:#888; font-size:0.9em;">
+                                Водитель: ${c.driver_id ? `ID ${c.driver_id}` : '🚫 Нет'} | Состояние: ${c.condition}%
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    fleetList.innerHTML = '<div style="opacity:0.5; text-align:center;">Нет машин во флоте</div>';
+                }
+            } else {
+                fleetList.innerHTML = '<div style="color:#ff4444;">Ошибка загрузки</div>';
+            }
+        } catch (e) {
+            fleetList.innerHTML = '<div style="color:#ff4444;">Ошибка сети</div>';
+        }
+    }
 
     document.getElementById('edit-modal').style.display = 'block';
 }
@@ -414,7 +517,7 @@ document.getElementById('edit-form').addEventListener('submit', async (e) => {
         }
     };
 
-    const response = await fetch('/api/admin/update-user', {
+    const response = await safeFetchJson('/api/admin/update-user', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -423,12 +526,12 @@ document.getElementById('edit-form').addEventListener('submit', async (e) => {
         body: JSON.stringify({ telegramId: currentUserToEdit, updates })
     });
 
-    if (response.ok) {
+    if (response && !response._isError) {
         alert('Данные обновлены');
         closeModal();
         loadUsers();
     } else {
-        alert('Ошибка при обновлении');
+        alert('Ошибка при обновлении: ' + (response?.error || 'Unknown'));
     }
 });
 
@@ -442,7 +545,7 @@ async function resetUserProgress() {
     if (!confirm2) return;
 
     try {
-        const response = await fetch('/api/admin/reset-user', {
+        const response = await safeFetchJson('/api/admin/reset-user', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -451,13 +554,12 @@ async function resetUserProgress() {
             body: JSON.stringify({ telegramId: currentUserToEdit })
         });
 
-        if (response.ok) {
+        if (response && !response._isError) {
             alert('🚀 Прогресс игрока успешно сброшен!');
             closeModal();
             loadUsers();
         } else {
-            const err = await response.json();
-            alert('Ошибка: ' + (err.error || 'Не удалось сбросить прогресс'));
+            alert('Ошибка: ' + (response?.error || 'Не удалось сбросить прогресс'));
         }
     } catch (e) {
         console.error(e);
@@ -469,9 +571,8 @@ checkAuth();
 
 // Announcement logic
 async function loadAnnouncement() {
-    const res = await fetch('/api/announcement');
-    const data = await res.json();
-    if (data.active) {
+    const data = await safeFetchJson('/api/announcement');
+    if (data && data.active) {
         document.getElementById('ann-title').value = data.data.title;
         document.getElementById('ann-message').value = data.data.message;
         document.getElementById('ann-type').value = data.data.type;
@@ -537,37 +638,35 @@ async function clearAnnouncement() {
 // ============= JACKPOT & FLEET MANAGEMENT =============
 
 async function loadJackpotTab() {
-    // Load jackpot info
     try {
-        const res = await fetch('/api/admin/jackpot', { headers: { 'x-admin-password': adminPassword } });
-        if (!res.ok) { console.error('Jackpot API error:', res.status); return; }
-        const data = await res.json();
-        const pool = data.pool || 0;
-        document.getElementById('jackpot-pool').textContent = pool.toFixed(2) + ' PLN';
+        const data = await safeFetchJson('/api/admin/jackpot', { headers: { 'x-admin-password': adminPassword } });
+        if (data && !data._isError) {
+            const pool = data.pool || 0;
+            document.getElementById('jackpot-pool').textContent = pool.toFixed(2) + ' PLN';
 
-        // Show history
-        const historyDiv = document.getElementById('jackpot-history');
-        if (data.history && data.history.length > 0) {
-            historyDiv.innerHTML = '<h4 style="color:#888; margin-bottom: 10px;">Последние выигрыши:</h4>' +
-                data.history.map(h => `
-                    <div style="padding: 8px 12px; margin-bottom: 5px; background: rgba(255,255,255,0.05); border-radius: 8px; font-size: 13px;">
-                        🏆 <b>${h.telegram_id}</b> — ${h.amount} PLN
-                        <span style="opacity:0.5; float:right;">${new Date(h.won_at).toLocaleString()}</span>
-                    </div>
-                `).join('');
-        } else {
-            historyDiv.innerHTML = '<p style="opacity:0.5; font-size:13px;">Выигрышей пока не было</p>';
+            const historyDiv = document.getElementById('jackpot-history');
+            if (data.history && data.history.length > 0) {
+                historyDiv.innerHTML = '<h4 style="color:#888; margin-bottom: 10px;">Последние выигрыши:</h4>' +
+                    data.history.map(h => `
+                        <div style="padding: 8px 12px; margin-bottom: 5px; background: rgba(255,255,255,0.05); border-radius: 8px; font-size: 13px;">
+                            🏆 <b>${h.telegram_id}</b> — ${h.amount} PLN
+                            <span style="opacity:0.5; float:right;">${new Date(h.won_at).toLocaleString()}</span>
+                        </div>
+                    `).join('');
+            } else {
+                historyDiv.innerHTML = '<p style="opacity:0.5; font-size:13px;">Выигрышей пока не было</p>';
+            }
         }
     } catch (e) {
         console.error(e);
     }
 
-    // Load cars for fleet dropdown
     try {
-        const res = await fetch('/api/admin/cars', { headers: { 'x-admin-password': adminPassword } });
-        const cars = await res.json();
-        const select = document.getElementById('fleet-car-id');
-        select.innerHTML = cars.map(c => `<option value="${c.id}">${c.name} (${c.purchase_price} PLN)</option>`).join('');
+        const cars = await safeFetchJson('/api/admin/cars', { headers: { 'x-admin-password': adminPassword } });
+        if (cars && !cars._isError) {
+            const select = document.getElementById('fleet-car-id');
+            select.innerHTML = cars.map(c => `<option value="${c.id}">${c.name} (${c.purchase_price} PLN)</option>`).join('');
+        }
     } catch (e) {
         console.error(e);
     }
@@ -652,20 +751,17 @@ async function addFleetCar() {
 
 async function loadContainersTab() {
     try {
-        // Load cars for reward dropdown
-        const carsRes = await fetch('/api/admin/cars', { headers: { 'x-admin-password': adminPassword } });
-        const cars = await carsRes.json();
-        const rewardSelect = document.getElementById('admin-container-reward');
+        const cars = await safeFetchJson('/api/admin/cars', { headers: { 'x-admin-password': adminPassword } });
+        if (!cars || cars._isError) return;
 
-        // Save current selection
+        const rewardSelect = document.getElementById('admin-container-reward');
         const currentVal = rewardSelect.value;
         rewardSelect.innerHTML = '<option value="">🎲 Случайное авто (Random)</option>' +
             cars.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
         rewardSelect.value = currentVal;
 
-        // Load current config and state
-        const res = await fetch('/api/admin/containers/config', { headers: { 'x-admin-password': adminPassword } });
-        const data = await res.json();
+        const data = await safeFetchJson('/api/admin/containers/config', { headers: { 'x-admin-password': adminPassword } });
+        if (!data || data._isError) return;
 
         const config = data.config;
         const state = data.state;
@@ -675,7 +771,6 @@ async function loadContainersTab() {
         document.getElementById('admin-container-interval').value = config.interval / 60000;
         rewardSelect.value = config.manualReward || "";
 
-        // Status info
         const statusInfo = document.getElementById('admin-container-status-info');
         statusInfo.innerHTML = `
             <div><b>Статус:</b> ${state.active ? '🟢 Идет аукцион' : '🟡 Ожидание'}</div>
@@ -685,7 +780,6 @@ async function loadContainersTab() {
             <br>
             <div><b>Награда в очереди:</b> ${config.manualReward || 'Random'}</div>
         `;
-
     } catch (e) {
         console.error('Error loading containers admin:', e);
     }
@@ -722,8 +816,8 @@ document.getElementById('container-admin-form')?.addEventListener('submit', asyn
 
 // Car Definitions
 async function loadCarDefinitions() {
-    const res = await fetch('/api/admin/cars', { headers: { 'x-admin-password': adminPassword } });
-    const cars = await res.json();
+    const cars = await safeFetchJson('/api/admin/cars', { headers: { 'x-admin-password': adminPassword } });
+    if (!cars || cars._isError) return;
     const tbody = document.getElementById('cars-tbody');
     tbody.innerHTML = '';
 
@@ -763,8 +857,8 @@ async function editCar(id) {
 
 // Settings
 async function loadGlobalSettings() {
-    const res = await fetch('/api/admin/configs', { headers: { 'x-admin-password': adminPassword } });
-    const configs = await res.json();
+    const configs = await safeFetchJson('/api/admin/configs', { headers: { 'x-admin-password': adminPassword } });
+    if (!configs || configs._isError) return;
     const list = document.getElementById('settings-list');
     list.innerHTML = '';
 
@@ -784,30 +878,30 @@ async function updateConfig(key) {
     const val = prompt(`Enter new value for ${key}:`);
     if (val === null) return;
 
-    const res = await fetch('/api/admin/configs', {
+    const result = await safeFetchJson('/api/admin/configs', {
         method: 'POST',
         headers: { 'x-admin-password': adminPassword, 'Content-Type': 'application/json' },
         body: JSON.stringify({ key, value: val })
     });
-    if (res.ok) loadGlobalSettings();
+    if (result && !result._isError) loadGlobalSettings();
 }
 
 // Banning
 async function banUser(tid) {
     if (!confirm(`Ban user ${tid}?`)) return;
-    const res = await fetch(`/api/admin/user/${tid}/ban`, {
+    const result = await safeFetchJson(`/api/admin/user/${tid}/ban`, {
         method: 'POST',
         headers: { 'x-admin-password': adminPassword }
     });
-    if (res.ok) loadUsers();
+    if (result && !result._isError) loadUsers();
 }
 
 async function unbanUser(tid) {
-    const res = await fetch(`/api/admin/user/${tid}/unban`, {
+    const result = await safeFetchJson(`/api/admin/user/${tid}/unban`, {
         method: 'POST',
         headers: { 'x-admin-password': adminPassword }
     });
-    if (res.ok) loadUsers();
+    if (result && !result._isError) loadUsers();
 }
 
 // ============= SUPPORT SYSTEM =============
@@ -815,8 +909,9 @@ let allSupportMessages = [];
 
 async function loadSupportMessages() {
     try {
-        const res = await fetch('/api/admin/support', { headers: { 'x-admin-password': adminPassword } });
-        allSupportMessages = await res.json();
+        const data = await safeFetchJson('/api/admin/support', { headers: { 'x-admin-password': adminPassword } });
+        if (!data || data._isError) return;
+        allSupportMessages = data;
 
         // Group messages by user_id to show only one row per player
         const userGroups = {};
@@ -945,7 +1040,7 @@ document.getElementById('support-reply-form')?.addEventListener('submit', async 
     const text = document.getElementById('support-reply-text').value;
 
     try {
-        const res = await fetch('/api/admin/support/reply', {
+        const result = await safeFetchJson('/api/admin/support/reply', {
             method: 'POST',
             headers: {
                 'x-admin-password': adminPassword,
@@ -954,13 +1049,12 @@ document.getElementById('support-reply-form')?.addEventListener('submit', async 
             body: JSON.stringify({ telegramId, text })
         });
 
-        const result = await res.json();
-        if (result.success) {
+        if (result && !result._isError) {
             alert('Ответ отправлен!');
             closeSupportModal();
             loadSupportMessages();
         } else {
-            alert('Ошибка: ' + result.message);
+            alert('Ошибка: ' + (result?.message || result?.error || 'Unknown'));
         }
     } catch (e) {
         console.error('Reply error:', e);
@@ -970,13 +1064,13 @@ document.getElementById('support-reply-form')?.addEventListener('submit', async 
 async function saveOnlineOffset() {
     const val = document.getElementById('online-offset-input').value;
     try {
-        const res = await fetch('/api/admin/settings', {
+        const result = await safeFetchJson('/api/admin/settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
             body: JSON.stringify({ key: 'online_offset', value: val })
         });
-        if (res.ok) alert('Смещение онлайна сохранено');
-        else alert('Ошибка сохранения');
+        if (result && !result._isError) alert('Смещение онлайна сохранено');
+        else alert('Ошибка сохранения: ' + (result?.error || 'Unknown'));
     } catch (e) {
         alert('Ошибка сети');
     }
@@ -984,10 +1078,11 @@ async function saveOnlineOffset() {
 
 async function loadAdminPlates() {
     try {
-        const response = await fetch('/api/admin/plates', {
+        const data = await safeFetchJson('/api/admin/plates', {
             headers: { 'x-admin-password': adminPassword }
         });
-        const plates = await response.json();
+        if (!data || data._isError) return;
+        const plates = data;
         const tbody = document.getElementById('plates-tbody');
         tbody.innerHTML = '';
 
@@ -1051,7 +1146,7 @@ async function emergencyResetUser(inputId = 'emergency-target-id') {
     }
 
     try {
-        const response = await fetch('/api/admin/emergency/reset-user', {
+        const result = await safeFetchJson('/api/admin/emergency/reset-user', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1060,14 +1155,13 @@ async function emergencyResetUser(inputId = 'emergency-target-id') {
             body: JSON.stringify({ targetId })
         });
 
-        const data = await response.json();
-        if (response.ok) {
-            alert('✅ ' + data.message);
+        if (result && !result._isError) {
+            alert('✅ ' + (result.message || 'Action completed'));
             targetIdInput.value = '';
             if (typeof loadUsers === 'function') loadUsers();
             if (typeof loadActivities === 'function') loadActivities();
         } else {
-            alert('❌ Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+            alert('❌ Ошибка: ' + (result?.error || 'Неизвестная ошибка'));
         }
     } catch (e) {
         console.error(e);
