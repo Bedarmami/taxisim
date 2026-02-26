@@ -2153,14 +2153,15 @@ app.post('/api/user/:telegramId/skip-week', async (req, res) => {
     }
 });
 
-// v6.0.2: Collect Fleet Earnings (Withdraw)
+// Снятие дохода автопарка ( Fleet )
 app.post('/api/user/:telegramId/withdraw-fleet', async (req, res) => {
     try {
-        const user = await getUser(req.params.telegramId);
+        const { telegramId } = req.params;
+        const user = await getUser(telegramId);
         if (!user) return res.status(404).json({ error: 'User not found' });
 
         const amount = Number(user.uncollected_fleet_revenue) || 0;
-        if (amount <= 0) return res.status(400).json({ error: 'Нет доступной выручки для сбора' });
+        if (amount <= 0) return res.status(400).json({ error: 'Нет дохода для вывода' });
 
         user.balance += amount;
         user.uncollected_fleet_revenue = 0;
@@ -2168,40 +2169,37 @@ app.post('/api/user/:telegramId/withdraw-fleet', async (req, res) => {
 
         res.json({
             success: true,
-            amount: Number(amount.toFixed(2)),
-            new_balance: Number(user.balance.toFixed(2))
+            amount: amount,
+            newBalance: user.balance
         });
     } catch (e) {
-        console.error('Collect fleet error:', e);
-        res.status(500).json({ error: 'Server error' });
+        res.status(500).json({ error: e.message });
     }
 });
 
-// v6.0.2: Toggle Autonomous Mode
+// Переключение автопилота для Tesla
 app.post('/api/user/:telegramId/toggle-autonomous', async (req, res) => {
     try {
-        const user = await getUser(req.params.telegramId);
+        const { telegramId } = req.params;
+        const user = await getUser(telegramId);
         if (!user) return res.status(404).json({ error: 'User not found' });
 
-        const carDef = CARS[user.car_id];
-        if (!carDef || !carDef.is_autonomous) {
-            return res.status(400).json({ error: 'Эта машина не поддерживает автономный режим' });
+        if (!user.car || !user.car.is_autonomous) {
+            return res.status(400).json({ error: 'Ваша машина не поддерживает полную автономию' });
         }
 
         user.is_autonomous_active = user.is_autonomous_active ? 0 : 1;
-        if (user.is_autonomous_active) {
-            user.last_autonomous_update = new Date().toISOString();
-        }
+        user.last_autonomous_update = new Date().toISOString();
 
         await saveUser(user);
 
         res.json({
             success: true,
-            active: !!user.is_autonomous_active
+            isActive: !!user.is_autonomous_active,
+            message: user.is_autonomous_active ? 'Автопилот активирован' : 'Автопилот выключен'
         });
     } catch (e) {
-        console.error('Toggle autonomous error:', e);
-        res.status(500).json({ error: 'Server error' });
+        res.status(500).json({ error: e.message });
     }
 });
 
@@ -5085,7 +5083,7 @@ app.get('*', (req, res) => {
 // Start Server
 app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`\n🚖 TAXI SIMULATOR PRO`);
+    console.log(`\nv6.0.2 with SQLite Persistence - ELITE Edition `);
     console.log(`📡 Сервер запущен: http://localhost:${PORT}`);
-    console.log(`\nv2.0 with SQLite Persistence `);
+    console.log(`🚖 TAXI SIMULATOR PRO initialized successfully.\n`);
 });

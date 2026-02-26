@@ -2677,3 +2677,50 @@ function updateBalanceDisplay() {
     if (skillsBalanceEl) skillsBalanceEl.textContent = formattedBalance;
     if (pTotalEarnedEl) pTotalEarnedEl.textContent = userData.total_earned?.toFixed(2) || '0.00';
 }
+
+/**
+ * v6.0.2: Paid Rest (Skip Cooldown)
+ */
+async function paidRest() {
+    try {
+        const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/paid-rest`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (result && !result._isError && result.success) {
+            userData.balance = result.newBalance;
+            userData.stamina = 100;
+            updateMainScreen();
+            showNotification(result.message, 'success');
+        } else {
+            showNotification(`❌ ${result?.error || 'Ошибка оплаты'}`, 'error');
+        }
+    } catch (e) {
+        console.error('Paid rest failed:', e);
+        showNotification('❌ Ошибка соединения', 'error');
+    }
+}
+
+/**
+ * v6.0.2: Toggle Autonomous Mode (Tesla)
+ */
+async function toggleAutonomous() {
+    try {
+        const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/toggle-autonomous`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (result && !result._isError && result.success) {
+            userData.is_autonomous_active = result.isActive ? 1 : 0;
+            showNotification(result.message, result.isActive ? 'success' : 'info');
+            updateGarageScreen(); // Refresh toggle button state
+        } else {
+            showNotification(`❌ ${result?.error || 'Ошибка'}`, 'error');
+        }
+    } catch (e) {
+        console.error('Toggle autonomous failed:', e);
+        showNotification('❌ Ошибка соединения', 'error');
+    }
+}

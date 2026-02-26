@@ -94,139 +94,58 @@ function initDB() {
 
             // v3.6: Car Profitability Matrix - Add car_id to orders_history
             db.run(`ALTER TABLE orders_history ADD COLUMN car_id TEXT`, (err) => {
-                if (err && !err.message.includes('duplicate column name')) {
-                    console.error('Migration error (orders_history car_id):', err.message);
-                }
+                // Ignore duplicate column errors
             });
 
             console.log('Database tables initialized.');
 
-            // Migration: Add last_daily_bonus column if it doesn't exist
-            db.run(`ALTER TABLE users ADD COLUMN last_daily_bonus TEXT`, (err) => {
-                if (err && !err.message.includes('duplicate column name')) {
-                    console.error('Migration error (last_daily_bonus):', err.message);
-                }
+            const migrations = [
+                `ALTER TABLE users ADD COLUMN last_daily_bonus TEXT`,
+                `ALTER TABLE users ADD COLUMN mileage REAL DEFAULT 0`,
+                `ALTER TABLE users ADD COLUMN last_stamina_update TEXT`,
+                `ALTER TABLE users ADD COLUMN login_streak INTEGER DEFAULT 0`,
+                `ALTER TABLE users ADD COLUMN last_login_date TEXT`,
+                `ALTER TABLE users ADD COLUMN lootboxes_data TEXT DEFAULT '{}'`,
+                `ALTER TABLE users ADD COLUMN lootboxes_given_data TEXT DEFAULT '{}'`,
+                `ALTER TABLE users ADD COLUMN casino_spins_today INTEGER DEFAULT 0`,
+                `ALTER TABLE users ADD COLUMN casino_last_reset TEXT`,
+                `ALTER TABLE users ADD COLUMN casino_stats TEXT DEFAULT '{}'`,
+                `ALTER TABLE users ADD COLUMN tutorial_completed INTEGER DEFAULT 0`,
+                `ALTER TABLE users ADD COLUMN pending_auction_rewards TEXT DEFAULT '[]'`,
+                `ALTER TABLE users ADD COLUMN free_plate_rolls INTEGER DEFAULT 0`,
+                `ALTER TABLE users ADD COLUMN username TEXT`,
+                `ALTER TABLE users ADD COLUMN current_district TEXT DEFAULT 'suburbs'`,
+                `ALTER TABLE users ADD COLUMN uncollected_fleet_revenue REAL DEFAULT 0`,
+                `ALTER TABLE users ADD COLUMN is_autonomous_active INTEGER DEFAULT 0`,
+                `ALTER TABLE users ADD COLUMN paid_rests_today INTEGER DEFAULT 0`,
+                `ALTER TABLE users ADD COLUMN last_autonomous_update TEXT`,
+                `ALTER TABLE support_messages ADD COLUMN sender_type TEXT DEFAULT 'user'`,
+                `ALTER TABLE car_definitions ADD COLUMN has_autopilot INTEGER DEFAULT 0`,
+                `ALTER TABLE car_definitions ADD COLUMN is_autonomous INTEGER DEFAULT 0`,
+                `ALTER TABLE jackpot_history ADD COLUMN winner_id TEXT`,
+                `ALTER TABLE users ADD COLUMN skills TEXT DEFAULT '{"charisma":0,"mechanic":0,"navigator":0}'`,
+                `ALTER TABLE users ADD COLUMN cleanliness REAL DEFAULT 100.0`,
+                `ALTER TABLE users ADD COLUMN tire_condition REAL DEFAULT 100.0`,
+                `ALTER TABLE orders_history ADD COLUMN district_id TEXT`,
+                `ALTER TABLE gas_stations ADD COLUMN price_petrol REAL DEFAULT 6.80`,
+                `ALTER TABLE gas_stations ADD COLUMN price_gas REAL DEFAULT 3.60`,
+                `ALTER TABLE gas_stations ADD COLUMN fuel_stock REAL DEFAULT 0`,
+                `ALTER TABLE gas_stations ADD COLUMN uncollected_revenue REAL DEFAULT 0`
+            ];
+
+            migrations.forEach(sql => {
+                db.run(sql, (err) => {
+                    if (err && !err.message.includes('duplicate column name')) {
+                        console.error(`Migration error (${sql}):`, err.message);
+                    }
+                });
             });
 
-            db.run(`ALTER TABLE users ADD COLUMN mileage REAL DEFAULT 0`, (err) => {
-                if (err && !err.message.includes('duplicate column name')) {
-                    console.error('Migration error (mileage):', err.message);
-                }
-            });
+            // Update existing rows for support_messages sender_type if migration was successful
+            db.run(`UPDATE support_messages SET sender_type = 'admin' WHERE is_from_admin = 1 AND sender_type = 'user'`);
+            db.run(`UPDATE support_messages SET sender_type = 'user' WHERE is_from_admin = 0 AND sender_type = 'user'`);
 
-            // v2.3 Migrations
-            db.run(`ALTER TABLE users ADD COLUMN last_stamina_update TEXT`, (err) => {
-                if (err && !err.message.includes('duplicate column name')) {
-                    console.error('Migration error (last_stamina_update):', err.message);
-                }
-            });
 
-            db.run(`ALTER TABLE users ADD COLUMN login_streak INTEGER DEFAULT 0`, (err) => {
-                if (err && !err.message.includes('duplicate column name')) {
-                    console.error('Migration error (login_streak):', err.message);
-                }
-            });
-
-            db.run(`ALTER TABLE users ADD COLUMN last_login_date TEXT`, (err) => {
-                if (err && !err.message.includes('duplicate column name')) {
-                    console.error('Migration error (last_login_date):', err.message);
-                }
-            });
-
-            // v2.4 Migrations
-            db.run(`ALTER TABLE users ADD COLUMN lootboxes_data TEXT DEFAULT '{}'`, (err) => {
-                if (err && !err.message.includes('duplicate column name')) {
-                    console.error('Migration error (lootboxes_data):', err.message);
-                }
-            });
-
-            db.run(`ALTER TABLE users ADD COLUMN lootboxes_given_data TEXT DEFAULT '{}'`, (err) => {
-                if (err && !err.message.includes('duplicate column name')) {
-                    console.error('Migration error (lootboxes_given_data):', err.message);
-                }
-            });
-
-            db.run(`ALTER TABLE users ADD COLUMN casino_spins_today INTEGER DEFAULT 0`, (err) => {
-                if (err && !err.message.includes('duplicate column name')) {
-                    console.error('Migration error (casino_spins_today):', err.message);
-                }
-            });
-
-            db.run(`ALTER TABLE users ADD COLUMN casino_last_reset TEXT`, (err) => {
-                if (err && !err.message.includes('duplicate column name')) {
-                    console.error('Migration error (casino_last_reset):', err.message);
-                }
-            });
-
-            db.run(`ALTER TABLE users ADD COLUMN casino_stats TEXT DEFAULT '{}'`, (err) => {
-                if (err && !err.message.includes('duplicate column name')) {
-                    console.error('Migration error (casino_stats):', err.message);
-                }
-            });
-
-            // v2.9: Tutorial flag
-            db.run(`ALTER TABLE users ADD COLUMN tutorial_completed INTEGER DEFAULT 0`, (err) => {
-                if (err && !err.message.includes('duplicate column name')) {
-                    console.error('Migration error (tutorial_completed):', err.message);
-                }
-            });
-
-            // v3.0: Auction pending rewards
-            db.run(`ALTER TABLE users ADD COLUMN pending_auction_rewards TEXT DEFAULT '[]'`, (err) => {
-                if (err && !err.message.includes('duplicate column name')) {
-                    console.error('Migration error (pending_auction_rewards):', err.message);
-                }
-            });
-
-            db.run(`ALTER TABLE users ADD COLUMN is_banned INTEGER DEFAULT 0`, (err) => {
-                if (err && !err.message.includes('duplicate column name')) {
-                    console.error('Migration error (is_banned):', err.message);
-                }
-            });
-
-            db.run(`ALTER TABLE users ADD COLUMN free_plate_rolls INTEGER DEFAULT 0`, (err) => {
-                if (err && !err.message.includes('duplicate column name')) {
-                    console.error('Migration error (free_plate_rolls):', err.message);
-                }
-            });
-
-            db.run(`ALTER TABLE users ADD COLUMN username TEXT`, (err) => {
-                if (err && !err.message.includes('duplicate column name')) {
-                    console.error('Migration error (username):', err.message);
-                }
-            });
-
-            db.run(`ALTER TABLE users ADD COLUMN current_district TEXT DEFAULT 'suburbs'`, (err) => {
-                if (err && !err.message.includes('duplicate column name')) {
-                    console.error('Migration error (current_district):', err.message);
-                }
-            });
-
-            db.run(`ALTER TABLE users ADD COLUMN uncollected_fleet_revenue REAL DEFAULT 0`, (err) => {
-                if (err && !err.message.includes('duplicate column name')) {
-                    console.error('Migration error (uncollected_fleet_revenue):', err.message);
-                }
-            });
-
-            db.run(`ALTER TABLE users ADD COLUMN is_autonomous_active INTEGER DEFAULT 0`, (err) => {
-                if (err && !err.message.includes('duplicate column name')) {
-                    console.error('Migration error (is_autonomous_active):', err.message);
-                }
-            });
-
-            db.run(`ALTER TABLE users ADD COLUMN paid_rests_today INTEGER DEFAULT 0`, (err) => {
-                if (err && !err.message.includes('duplicate column name')) {
-                    console.error('Migration error (paid_rests_today):', err.message);
-                }
-            });
-
-            db.run(`ALTER TABLE users ADD COLUMN last_autonomous_update TEXT`, (err) => {
-                if (err && !err.message.includes('duplicate column name')) {
-                    console.error('Migration error (last_autonomous_update):', err.message);
-                }
-            });
-
-            // v2.5 Admin Expansion Tables
             // v2.5 Admin Expansion Tables
             db.run(`CREATE TABLE IF NOT EXISTS promo_codes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -288,15 +207,6 @@ function initDB() {
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
             )`);
 
-            // Migration: Add sender_type if it doesn't exist
-            db.run(`ALTER TABLE support_messages ADD COLUMN sender_type TEXT DEFAULT 'user'`, (err) => {
-                if (!err) {
-                    // Update existing rows based on is_from_admin
-                    db.run(`UPDATE support_messages SET sender_type = 'admin' WHERE is_from_admin = 1`);
-                    db.run(`UPDATE support_messages SET sender_type = 'user' WHERE is_from_admin = 0`);
-                }
-            });
-
             // v3.1: Car definitions (dynamic content)
             db.run(`CREATE TABLE IF NOT EXISTS car_definitions (
                 id TEXT PRIMARY KEY,
@@ -339,20 +249,6 @@ function initDB() {
                 won_at TEXT,
                 FOREIGN KEY(winner_id) REFERENCES users(id)
             )`);
-
-            // Migration: Ensure jackpot_history has winner_id if it was created with user_id
-            db.run(`ALTER TABLE jackpot_history ADD COLUMN winner_id TEXT`, (err) => {
-                if (err && !err.message.includes('duplicate column name')) {
-                    // If winner_id is missing, we might need to map user_id to it, 
-                    // but usually ADD COLUMN is enough for new writes.
-                }
-            });
-
-            db.run(`ALTER TABLE car_definitions ADD COLUMN is_autonomous INTEGER DEFAULT 0`, (err) => {
-                if (err && !err.message.includes('duplicate column name')) {
-                    console.error('Migration error (car_definitions is_autonomous):', err.message);
-                }
-            });
 
             // v3.3: License Plates Table
             db.run(`CREATE TABLE IF NOT EXISTS license_plates (
@@ -486,8 +382,32 @@ async function seedDB() {
         ];
 
         for (const car of cars) {
-            await run(`INSERT OR IGNORE INTO car_definitions(id, name, model, image, description, purchase_price, rent_price, tank_capacity, fuel_consumption, has_gas, gas_tank_capacity, gas_consumption, is_premium, has_autopilot, is_autonomous) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [car.id, car.name, car.model, car.image, car.description, car.purchase_price, car.rent_price, car.tank_capacity, car.fuel_consumption, car.has_gas, car.gas_tank_capacity || 0, car.gas_consumption || 0, car.is_premium || 0, car.has_autopilot || 0, car.is_autonomous || 0]);
+            // First try to insert, if fails (duplicate id), update the properties
+            const sql = `INSERT INTO car_definitions(id, name, model, image, description, purchase_price, rent_price, tank_capacity, fuel_consumption, has_gas, gas_tank_capacity, gas_consumption, is_premium, has_autopilot, is_autonomous)
+                         VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         ON CONFLICT(id) DO UPDATE SET
+                         name=excluded.name,
+                         model=excluded.model,
+                         image=excluded.image,
+                         description=excluded.description,
+                         purchase_price=excluded.purchase_price,
+                         rent_price=excluded.rent_price,
+                         tank_capacity=excluded.tank_capacity,
+                         fuel_consumption=excluded.fuel_consumption,
+                         has_gas=excluded.has_gas,
+                         gas_tank_capacity=excluded.gas_tank_capacity,
+                         gas_consumption=excluded.gas_consumption,
+                         is_premium=excluded.is_premium,
+                         has_autopilot=excluded.has_autopilot,
+                         is_autonomous=excluded.is_autonomous`;
+
+            await run(sql, [
+                car.id, car.name, car.model, car.image, car.description,
+                car.purchase_price, car.rent_price, car.tank_capacity,
+                car.fuel_consumption, car.has_gas || 0, car.gas_tank_capacity || 0,
+                car.gas_consumption || 0, car.is_premium || 0,
+                car.has_autopilot || 0, car.is_autonomous || 0
+            ]);
         }
 
         // 3. Seed Gas Stations
