@@ -607,30 +607,32 @@
                         </div>
                     </div>
                 </section>
-                <div id="tab-car-profit" class="tab-content">
-                    <div class="section-header">
-                        <h2>📊 Матрица прибыльности автопарка</h2>
-                        <button onclick="loadCarProfitability()">🔄 Обновить данные</button>
-                    </div>
-                    <div class="section-desc">
-                        Статистика дохода по каждой модели автомобиля (включая личные авто и работу водителей).
-                    </div>
-                    <div class="table-container">
-                        <table id="profitability-table" class="admin-table">
-                            <thead>
-                                <tr>
-                                    <th>Модель автомобиля</th>
-                                    <th>Всего поездок</th>
-                                    <th>Общий доход</th>
-                                    <th>Средний доход (PLN/Рейс)</th>
-                                </tr>
-                            </thead>
-                            <tbody id="profitability-tbody">
-                                <!-- Данные будут загружены сюда -->
-                            </tbody>
-                        </table>
-                    </div>
+            </div>
+
+            <div id="tab-car-profit" class="tab-content">
+                <div class="section-header">
+                    <h2>📊 Матрица прибыльности автопарка</h2>
+                    <button onclick="loadCarProfitability()">🔄 Обновить данные</button>
                 </div>
+                <div class="section-desc">
+                    Статистика дохода по каждой модели автомобиля (включая личные авто и работу водителей).
+                </div>
+                <div class="table-container">
+                    <table id="profitability-table" class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Модель автомобиля</th>
+                                <th>Всего поездок</th>
+                                <th>Общий доход</th>
+                                <th>Средний доход (PLN/Рейс)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="profitability-tbody">
+                            <!-- Данные будут загружены сюда -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </main>
 
         <!-- Модальное окно: Досье игрока (Timeline) -->
