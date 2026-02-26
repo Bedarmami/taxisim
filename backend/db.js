@@ -348,7 +348,11 @@ function initDB() {
                 }
             });
 
-            db.run(`ALTER TABLE car_definitions ADD COLUMN is_autonomous INTEGER DEFAULT 0`);
+            db.run(`ALTER TABLE car_definitions ADD COLUMN is_autonomous INTEGER DEFAULT 0`, (err) => {
+                if (err && !err.message.includes('duplicate column name')) {
+                    console.error('Migration error (car_definitions is_autonomous):', err.message);
+                }
+            });
 
             // v3.3: License Plates Table
             db.run(`CREATE TABLE IF NOT EXISTS license_plates (
