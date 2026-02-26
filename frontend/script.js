@@ -1246,40 +1246,7 @@ function updateGarageScreen() {
     }
 }
 
-// v6.0.2: New Autonomous/Paid features
-async function toggleAutonomous() {
-    try {
-        const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/toggle-autonomous`, { method: 'POST' });
-        if (result && result.success) {
-            userData.is_autonomous_active = result.active;
-            showNotification(result.active ? '🚀 Автономный режим запущен!' : '🛑 Автономный режим остановлен.', 'success');
-            updateGarageScreen();
-        } else {
-            showNotification(result?.error || 'Ошибка активации', 'error');
-        }
-    } catch (e) {
-        showNotification('Ошибка сети', 'error');
-    }
-}
-
-async function paidRest() {
-    if (!confirm('Пропустить ожидание за 1500 PLN?')) return;
-    try {
-        const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/paid-rest`, { method: 'POST' });
-        if (result && result.success) {
-            userData.balance = result.new_balance;
-            userData.stamina = result.stamina;
-            userData.paid_rests_today = result.paid_today;
-            updateMainScreen();
-            showNotification('⚡ Сил хоть отбавляй! Погнали!', 'success');
-            // Re-run rest to apply actual rest logic if needed, or just let it be
-        } else {
-            showNotification(result?.error || 'Ошибка оплаты', 'error');
-        }
-    } catch (e) {
-        showNotification('Ошибка сети', 'error');
-    }
-}
+// v6.0.2: Autonomous toggle and Paid rest are now at the end of the file for better organization.
 
 // ============= ЗАГРУЗКА МОИХ МАШИН (ГАРАЖ) =============
 async function loadMyCars() {
@@ -2780,6 +2747,32 @@ async function toggleAutonomous() {
         }
     } catch (e) {
         console.error('Toggle autonomous failed:', e);
+        showNotification('❌ Ошибка соединения', 'error');
+    }
+}
+
+/**
+ * v6.0.2: Skip 7 Days (Time Jump)
+ */
+async function skipWeek() {
+    if (!confirm('🎡 Пропустить 7 дней за 1500 PLN?\nБудут начислены доходы и списана аренда за неделю.')) return;
+
+    try {
+        const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/skip-week`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (result && !result._isError && result.success) {
+            // Fully reload user data to sync all changes (revenue, rent, days, stamina)
+            await loadUserData();
+            showNotification(result.message, 'success');
+            showScreen('main');
+        } else {
+            showNotification(`❌ ${result?.error || 'Ошибка пропуска'}`, 'error');
+        }
+    } catch (e) {
+        console.error('Skip week failed:', e);
         showNotification('❌ Ошибка соединения', 'error');
     }
 }
