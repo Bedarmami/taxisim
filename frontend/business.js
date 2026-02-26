@@ -236,8 +236,8 @@ class BusinessManager {
                 div.style.cssText = 'background:#252525; margin-bottom:10px; padding:12px 15px; border-radius:12px; display:flex; justify-content:space-between; align-items:center; border:1px solid #333;';
 
                 div.innerHTML = `
-                    <div style="display:flex; align-items:center;">
-                        <span style="font-size:1.8em; margin-right:12px;">${carDef.image}</span>
+<div style="display:flex; align-items:center;">
+    <span style="font-size:1.8em; margin-right:12px; display:flex; align-items:center; justify-content:center; width:40px; height:40px;">${typeof renderCarImage === 'function' ? renderCarImage(carDef) : carDef.image}</span>
                         <div>
                             <div style="font-weight:bold; color:#fff;">${carDef.name}</div>
                             <div style="font-size:0.75em; color:#777;">
@@ -444,8 +444,8 @@ class BusinessManager {
 
             div.innerHTML = `
                 <div style="flex:1;">
-                    <div style="font-weight:bold; color:#e0e0e0;">
-                        <span style="font-size:1.2em; margin-right:6px;">${car.image}</span>
+                    <div style="font-weight:bold; color:#e0e0e0; display:flex; align-items:center;">
+                        <span style="font-size:1.2em; margin-right:10px; display:flex; align-items:center; justify-content:center; width:30px; height:30px;">${typeof renderCarImage === 'function' ? renderCarImage(car, '30px') : car.image}</span>
                         ${car.name}
                     </div>
                     <div style="font-size:0.8em; color:#888; margin-top:4px;">${car.description}</div>

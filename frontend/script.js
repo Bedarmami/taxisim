@@ -1166,10 +1166,13 @@ function updateFuelCost() {
 // ============= ОБНОВЛЕНИЕ ЭКРАНА ГАРАЖА =============
 // Helper to render car icon (emoji or image)
 function renderCarImage(car, size = '40px') {
-    if (car.image && (car.image.includes('assets/') || car.image.includes('http') || car.image.includes('.png'))) {
-        return `<img src="${car.image}" class="car-asset-img" style="max-height: ${size}; vertical-align: middle; border-radius: 4px;">`;
+    if (!car || !car.image) return '🚗';
+    const img = car.image.toString();
+    if (img.includes('/') || img.includes('assets') || img.includes('http') || img.includes('.png') || img.includes('.webp')) {
+        const src = img.startsWith('/') ? img : `/${img}`;
+        return `<img src="${src}" class="car-asset-img" style="max-height: ${size}; vertical-align: middle; border-radius: 4px;" onerror="this.src='assets/cars/fabia.png'">`;
     }
-    return car.image || '🚗';
+    return car.image;
 }
 
 function updateGarageScreen() {
@@ -2677,6 +2680,62 @@ function updateBalanceDisplay() {
     if (skillsBalanceEl) skillsBalanceEl.textContent = formattedBalance;
     if (pTotalEarnedEl) pTotalEarnedEl.textContent = userData.total_earned?.toFixed(2) || '0.00';
 }
+
+/**
+ * v6.0.2: Real-time Autonomous Ride Execution
+ */
+let autonomousTimer = null;
+function checkAutonomousRides() {
+    if (!userData || !userData.is_autonomous_active) {
+        if (autonomousTimer) {
+            clearInterval(autonomousTimer);
+            autonomousTimer = null;
+        }
+        return;
+    }
+
+    if (!autonomousTimer) {
+        // Run a ride every 30 seconds when online for better visualization
+        autonomousTimer = setInterval(async () => {
+            if (!userData.is_autonomous_active) return;
+
+            try {
+                const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/autonomous-ride`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                if (result && !result._isError && result.success) {
+                    userData.balance = result.newBalance;
+                    userData.fuel = result.fuel;
+                    updateMainScreen();
+                    showNotification(`🤖 Автопилот: +${result.earnings} PLN`, 'info');
+
+                    // Update Street Feed
+                    const feed = document.getElementById('street-feed-content');
+                    if (feed) {
+                        feed.innerHTML = `🚕 Тесла ${userData.username} выполнила автономный заказ: +${result.earnings} PLN`;
+                    }
+                } else if (result && result.outOfFuel) {
+                    userData.is_autonomous_active = 0;
+                    showNotification('🔌 Тесла разряжена. Автопилот выключен.', 'warning');
+                    updateGarageScreen();
+                    clearInterval(autonomousTimer);
+                    autonomousTimer = null;
+                }
+            } catch (e) {
+                console.error('Autonomous ride failed:', e);
+            }
+        }, 30000);
+    }
+}
+
+// Update the Pulse to call this check
+const originalUpdateSocialPulse = updateSocialPulse;
+updateSocialPulse = async function () {
+    await originalUpdateSocialPulse();
+    checkAutonomousRides();
+};
 
 /**
  * v6.0.2: Paid Rest (Skip Cooldown)

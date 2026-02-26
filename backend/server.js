@@ -2169,8 +2169,55 @@ app.post('/api/user/:telegramId/withdraw-fleet', async (req, res) => {
 
         res.json({
             success: true,
-            amount: amount,
-            newBalance: user.balance
+            newBalance: user.balance,
+            message: 'Отдых завершен! Энергия восстановлена.'
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+/**
+ * v6.0.2: Real-time Autonomous Ride
+ */
+app.post('/api/user/:telegramId/autonomous-ride', async (req, res) => {
+    try {
+        const { telegramId } = req.params;
+        const user = await getUser(telegramId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        if (!user.is_autonomous_active || !user.car || !user.car.is_autonomous) {
+            return res.status(400).json({ error: 'Автономный режим не активен' });
+        }
+
+        const fuelNeeded = (user.car.fuel_consumption || 0.1) * 8;
+        if (user.fuel < fuelNeeded) {
+            user.is_autonomous_active = 0;
+            await saveUser(user);
+            return res.status(400).json({ error: 'Топливо закончилось!', outOfFuel: true });
+        }
+
+        // Execute ride
+        user.fuel -= fuelNeeded;
+        const earnings = 20 + Math.floor(Math.random() * 10); // 20-30 PLN
+        user.balance += earnings;
+        user.total_earned += earnings;
+        user.rides_completed++;
+        user.total_distance += 8;
+        user.last_autonomous_update = new Date().toISOString();
+
+        await saveUser(user);
+
+        // Notify Social Pulse (randomly to prevent spam)
+        if (Math.random() > 0.7) {
+            logSocialActivity(`🤖 Тесла ${user.username} выполнила автономный заказ: +${earnings} PLN`);
+        }
+
+        res.json({
+            success: true,
+            earnings: earnings,
+            newBalance: user.balance,
+            fuel: user.fuel
         });
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -4366,9 +4413,9 @@ app.get('/api/admin/support/media/:fileId', adminAuth, async (req, res) => {
 app.post('/api/admin/cars', adminAuth, async (req, res) => {
     try {
         const car = req.body;
-        await db.run(`INSERT INTO car_definitions (id, name, model, image, description, purchase_price, rent_price, tank_capacity, fuel_consumption, has_gas, gas_tank_capacity, gas_consumption, is_premium)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [car.id, car.name, car.model, car.image, car.description, car.purchase_price, car.rent_price, car.tank_capacity, car.fuel_consumption, car.has_gas ? 1 : 0, car.gas_tank_capacity || 0, car.gas_consumption || 0, car.is_premium ? 1 : 0]);
+        await db.run(`INSERT INTO car_definitions (id, name, model, image, description, purchase_price, rent_price, tank_capacity, fuel_consumption, has_gas, gas_tank_capacity, gas_consumption, is_premium, has_autopilot, is_autonomous)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [car.id, car.name, car.model, car.image, car.description, car.purchase_price, car.rent_price, car.tank_capacity, car.fuel_consumption, car.has_gas ? 1 : 0, car.gas_tank_capacity || 0, car.gas_consumption || 0, car.is_premium ? 1 : 0, car.has_autopilot ? 1 : 0, car.is_autonomous ? 1 : 0]);
         await syncCarsFromDB();
         res.json({ success: true, message: 'Car added' });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -4377,8 +4424,8 @@ app.post('/api/admin/cars', adminAuth, async (req, res) => {
 app.put('/api/admin/cars/:id', adminAuth, async (req, res) => {
     try {
         const car = req.body;
-        await db.run(`UPDATE car_definitions SET name=?, model=?, image=?, description=?, purchase_price=?, rent_price=?, tank_capacity=?, fuel_consumption=?, has_gas=?, gas_tank_capacity=?, gas_consumption=?, is_premium=? WHERE id=?`,
-            [car.name, car.model, car.image, car.description, car.purchase_price, car.rent_price, car.tank_capacity, car.fuel_consumption, row.has_gas ? 1 : 0, car.gas_tank_capacity || 0, car.gas_consumption || 0, car.is_premium ? 1 : 0, req.params.id]);
+        await db.run(`UPDATE car_definitions SET name=?, model=?, image=?, description=?, purchase_price=?, rent_price=?, tank_capacity=?, fuel_consumption=?, has_gas=?, gas_tank_capacity=?, gas_consumption=?, is_premium=?, has_autopilot=?, is_autonomous=? WHERE id=?`,
+            [car.name, car.model, car.image, car.description, car.purchase_price, car.rent_price, car.tank_capacity, car.fuel_consumption, car.has_gas ? 1 : 0, car.gas_tank_capacity || 0, car.gas_consumption || 0, car.is_premium ? 1 : 0, car.has_autopilot ? 1 : 0, car.is_autonomous ? 1 : 0, req.params.id]);
         await syncCarsFromDB();
         res.json({ success: true, message: 'Car updated' });
     } catch (e) { res.status(500).json({ error: e.message }); }
