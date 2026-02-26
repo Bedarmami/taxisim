@@ -51,6 +51,10 @@ if (tg) {
     }
 }
 
+/**
+ * Taxi Simulator PRO - v6.0.2
+ * Recently added: Autonomous Tesla Model 3 Performance, Paid Rest, Fleet Withdraw
+ */
 // ============= ГЛОБАЛЬНОЕ СОСТОЯНИЕ =============
 let userData = null;
 let orders = [];
