@@ -301,7 +301,8 @@ async function syncCarsFromDB() {
                 type: row.has_gas ? 'dual' : 'petrol',
                 condition: 100,
                 is_premium: !!row.is_premium,
-                has_autopilot: !!row.has_autopilot
+                has_autopilot: !!row.has_autopilot,
+                is_autonomous: !!row.is_autonomous
             };
         });
 
@@ -1149,20 +1150,23 @@ async function getUser(telegramId) {
         row.achievements = row.achievements_data ? JSON.parse(row.achievements_data) : {};
         row.business = row.business_data ? JSON.parse(row.business_data) : { rented_cars: {}, fleet: [] };
 
-        // v3.6: Fleet revenue accumulation logic
+        const now = Date.now();
+
+        // v3.6: Fleet revenue accumulation logic (Autonomous Fleet)
         if (row.business.fleet && row.business.fleet.length > 0) {
-            const now = Date.now();
             const lastCollection = row.business.last_fleet_update || now;
             const hoursPassed = (now - lastCollection) / (1000 * 60 * 60);
 
-            if (hoursPassed > 0) {
+            if (hoursPassed > 0.01) { // 36 seconds minimum delta
                 let hourlyFleetIncome = 0;
                 row.business.fleet.forEach(item => {
                     const modelId = typeof item === 'string' ? item : item.modelId;
-                    const car = item.modelId ? CARS[item.modelId] : CARS[item];
+                    const car = CARS[modelId];
                     if (car && car.purchase_price > 0) {
-                        // 5% weekly = 5% / 168 hours
-                        hourlyFleetIncome += (car.purchase_price * 0.05) / 168;
+                        // Standard fleet: 5% weekly
+                        let rate = 0.05 / 168;
+                        // Autonomous fleet extra? Maybe not yet.
+                        hourlyFleetIncome += car.purchase_price * rate;
                     }
                 });
 
@@ -1172,8 +1176,40 @@ async function getUser(telegramId) {
                 }
                 row.business.last_fleet_update = now;
             }
-        } else {
-            row.business.last_fleet_update = Date.now();
+        }
+
+        // v6.0.2: Personal Autonomous Mode Logic
+        if (row.is_autonomous_active && row.car && row.car.is_autonomous) {
+            const lastAutoUpdate = row.last_autonomous_update ? new Date(row.last_autonomous_update).getTime() : now;
+            const minutesPassed = (now - lastAutoUpdate) / (1000 * 60);
+
+            if (minutesPassed >= 5) { // Every 5 minutes = 1 ride
+                const ridesToSimulate = Math.floor(minutesPassed / 5);
+                let totalEarnings = 0;
+                let totalFuelUsed = 0;
+
+                for (let i = 0; i < ridesToSimulate; i++) {
+                    const fuelNeeded = (row.car.fuel_consumption || 0.1) * 8; // Avg 8km distance
+                    if (row.fuel >= fuelNeeded) {
+                        row.fuel -= fuelNeeded;
+                        totalFuelUsed += fuelNeeded;
+                        // Avg earnings per 8km ride ~ 20 PLN
+                        totalEarnings += 20;
+                        row.rides_completed++;
+                        row.total_distance += 8;
+                    } else {
+                        row.is_autonomous_active = 0; // Out of juice
+                        logSocialActivity(`🔌 Tesla ${row.username} разрядилась и остановилась.`);
+                        break;
+                    }
+                }
+
+                if (totalEarnings > 0) {
+                    row.balance += totalEarnings;
+                    row.total_earned += totalEarnings;
+                }
+                row.last_autonomous_update = new Date(now).toISOString();
+            }
         }
 
         row.lootboxes = row.lootboxes_data ? JSON.parse(row.lootboxes_data) : { wooden: 0, silver: 0, gold: 0, legendary: 0 };
@@ -1302,7 +1338,8 @@ async function saveUser(user) {
         lootboxes_data = ?, lootboxes_given_data = ?, casino_spins_today = ?, casino_last_reset = ?, casino_stats = ?, last_login = ?,
         skills = ?, cleanliness = ?, tire_condition = ?,
         tutorial_completed = ?, pending_auction_rewards = ?, free_plate_rolls = ?, is_banned = ?,
-        current_district = ?, mileage = ?, uncollected_fleet_revenue = ?
+        current_district = ?, mileage = ?, uncollected_fleet_revenue = ?,
+        is_autonomous_active = ?, last_autonomous_update = ?, paid_rests_today = ?
         WHERE telegram_id = ?`;
 
     const params = [
@@ -1335,6 +1372,9 @@ async function saveUser(user) {
         user.current_district || 'suburbs',
         user.car?.mileage || 0,
         user.uncollected_fleet_revenue || 0,
+        user.is_autonomous_active || 0,
+        user.last_autonomous_update,
+        user.paid_rests_today || 0,
         user.telegram_id
     ];
 
@@ -1586,7 +1626,10 @@ app.get('/api/user/:telegramId', async (req, res) => {
             pending_auction_rewards: user.pending_auction_rewards || [],
             tutorial_completed: user.tutorial_completed || 0,
             current_district: user.current_district || 'suburbs',
-            jackpot_pool: Number(JACKPOT_POOL.toFixed(2))
+            jackpot_pool: Number(JACKPOT_POOL.toFixed(2)),
+            is_autonomous_active: !!user.is_autonomous_active,
+            paid_rests_today: user.paid_rests_today || 0,
+            uncollected_fleet_revenue: Number(user.uncollected_fleet_revenue || 0).toFixed(2)
         });
 
     } catch (error) {
@@ -1793,7 +1836,12 @@ app.post('/api/user/:telegramId/ride', rateLimitMiddleware, async (req, res) => 
         user.rides_today++;
         user.rides_streak++;
         user.rating += Math.floor(order.distance);
-        if (!isAutopilotActive) {
+
+        // Fix: Use has_autopilot from CARS definition to be sure it's up to date
+        const carDef = CARS[user.car_id];
+        const hasAutopilot = carDef?.has_autopilot || user.car.has_autopilot;
+
+        if (!isAutopilotActive || !hasAutopilot) {
             user.stamina = Math.max(0, user.stamina - 15);
         }
         user.experience += Math.floor(order.distance);
@@ -1901,7 +1949,10 @@ app.post('/api/user/:telegramId/rest', async (req, res) => {
         const now = Date.now();
         if (now - lastRest < REST_COOLDOWN_MS) {
             const waitMin = Math.ceil((REST_COOLDOWN_MS - (now - lastRest)) / 60000);
-            return res.status(429).json({ error: `Вы недавно отдыхали! Подождите еще ${waitMin} мин.` });
+            return res.status(429).json({
+                error: `Вы недавно отдыхали! Подождите еще ${waitMin} мин.`,
+                canSkip: true
+            });
         }
         LAST_REST_TIME.set(telegramId, now);
 
@@ -2098,6 +2149,95 @@ app.post('/api/user/:telegramId/skip-week', async (req, res) => {
 
     } catch (e) {
         console.error('Skip week error:', e);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// v6.0.2: Collect Fleet Earnings (Withdraw)
+app.post('/api/user/:telegramId/withdraw-fleet', async (req, res) => {
+    try {
+        const user = await getUser(req.params.telegramId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const amount = Number(user.uncollected_fleet_revenue) || 0;
+        if (amount <= 0) return res.status(400).json({ error: 'Нет доступной выручки для сбора' });
+
+        user.balance += amount;
+        user.uncollected_fleet_revenue = 0;
+        await saveUser(user);
+
+        res.json({
+            success: true,
+            amount: Number(amount.toFixed(2)),
+            new_balance: Number(user.balance.toFixed(2))
+        });
+    } catch (e) {
+        console.error('Collect fleet error:', e);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// v6.0.2: Toggle Autonomous Mode
+app.post('/api/user/:telegramId/toggle-autonomous', async (req, res) => {
+    try {
+        const user = await getUser(req.params.telegramId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const carDef = CARS[user.car_id];
+        if (!carDef || !carDef.is_autonomous) {
+            return res.status(400).json({ error: 'Эта машина не поддерживает автономный режим' });
+        }
+
+        user.is_autonomous_active = user.is_autonomous_active ? 0 : 1;
+        if (user.is_autonomous_active) {
+            user.last_autonomous_update = new Date().toISOString();
+        }
+
+        await saveUser(user);
+
+        res.json({
+            success: true,
+            active: !!user.is_autonomous_active
+        });
+    } catch (e) {
+        console.error('Toggle autonomous error:', e);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// v6.0.2: Paid Rest (Skip Cooldown)
+app.post('/api/user/:telegramId/paid-rest', async (req, res) => {
+    try {
+        const user = await getUser(req.params.telegramId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        if ((user.paid_rests_today || 0) >= 4) {
+            return res.status(400).json({ error: 'Лимит платного отдыха на сегодня исчерпан (4/4)' });
+        }
+
+        const cost = 1500;
+        if (user.balance < cost) {
+            return res.status(400).json({ error: 'Недостаточно средств (нужно 1500 PLN)' });
+        }
+
+        user.balance -= cost;
+        user.paid_rests_today = (user.paid_rests_today || 0) + 1;
+        user.stamina = 100;
+
+        // Reset cooldown
+        LAST_REST_TIME.delete(req.params.telegramId);
+
+        await saveUser(user);
+
+        res.json({
+            success: true,
+            new_balance: Number(user.balance.toFixed(2)),
+            stamina: user.stamina,
+            paid_today: user.paid_rests_today
+        });
+
+    } catch (e) {
+        console.error('Paid rest error:', e);
         res.status(500).json({ error: 'Server error' });
     }
 });

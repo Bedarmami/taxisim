@@ -1215,6 +1215,63 @@ function updateGarageScreen() {
 
     loadMyCars();
     loadAvailableCars();
+
+    // v6.0.2: Autonomous toggle for Tesla 3 Perf
+    const autoToggleContainer = document.getElementById('garage-autonomous-controls');
+    if (autoToggleContainer) {
+        if (userData.car && userData.car.is_autonomous) {
+            autoToggleContainer.style.display = 'block';
+            autoToggleContainer.innerHTML = `
+                <div style="background:rgba(88, 86, 214, 0.1); border:1px solid #5856d644; border-radius:12px; padding:15px; margin-top:15px; display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <div style="font-weight:bold; color:#fff;">🤖 Автономный режим</div>
+                        <div style="font-size:0.75em; color:#aaa;">Будет зарабатывать даже оффлайн!</div>
+                    </div>
+                    <button class="action-btn ${userData.is_autonomous_active ? 'error' : 'success'}" 
+                            onclick="toggleAutonomous()">
+                        ${userData.is_autonomous_active ? 'Остановить' : 'Запустить'}
+                    </button>
+                </div>
+            `;
+        } else {
+            autoToggleContainer.style.display = 'none';
+        }
+    }
+}
+
+// v6.0.2: New Autonomous/Paid features
+async function toggleAutonomous() {
+    try {
+        const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/toggle-autonomous`, { method: 'POST' });
+        if (result && result.success) {
+            userData.is_autonomous_active = result.active;
+            showNotification(result.active ? '🚀 Автономный режим запущен!' : '🛑 Автономный режим остановлен.', 'success');
+            updateGarageScreen();
+        } else {
+            showNotification(result?.error || 'Ошибка активации', 'error');
+        }
+    } catch (e) {
+        showNotification('Ошибка сети', 'error');
+    }
+}
+
+async function paidRest() {
+    if (!confirm('Пропустить ожидание за 1500 PLN?')) return;
+    try {
+        const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/paid-rest`, { method: 'POST' });
+        if (result && result.success) {
+            userData.balance = result.new_balance;
+            userData.stamina = result.stamina;
+            userData.paid_rests_today = result.paid_today;
+            updateMainScreen();
+            showNotification('⚡ Сил хоть отбавляй! Погнали!', 'success');
+            // Re-run rest to apply actual rest logic if needed, or just let it be
+        } else {
+            showNotification(result?.error || 'Ошибка оплаты', 'error');
+        }
+    } catch (e) {
+        showNotification('Ошибка сети', 'error');
+    }
 }
 
 // ============= ЗАГРУЗКА МОИХ МАШИН (ГАРАЖ) =============
@@ -1664,7 +1721,16 @@ async function rest() {
 
         } else {
             const errorMsg = result?.error || 'Ошибка отдыха';
-            showNotification(`❌ ${errorMsg}`, 'error');
+            if (result && result.canSkip) {
+                showNotification(`${errorMsg} ⚡ Можно пропустить за 1500 PLN (4/день)`, 'warning');
+                // Optionally show a special button in the notification UI if possible, 
+                // but since notification is simple, I'll add paidRest call to a global handler or prompt
+                if (confirm(`${errorMsg}\n\nПропустить ожидание за 1500 PLN?`)) {
+                    paidRest();
+                }
+            } else {
+                showNotification(`❌ ${errorMsg}`, 'error');
+            }
         }
 
     } catch (error) {

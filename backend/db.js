@@ -208,6 +208,24 @@ function initDB() {
                 }
             });
 
+            db.run(`ALTER TABLE users ADD COLUMN is_autonomous_active INTEGER DEFAULT 0`, (err) => {
+                if (err && !err.message.includes('duplicate column name')) {
+                    console.error('Migration error (is_autonomous_active):', err.message);
+                }
+            });
+
+            db.run(`ALTER TABLE users ADD COLUMN paid_rests_today INTEGER DEFAULT 0`, (err) => {
+                if (err && !err.message.includes('duplicate column name')) {
+                    console.error('Migration error (paid_rests_today):', err.message);
+                }
+            });
+
+            db.run(`ALTER TABLE users ADD COLUMN last_autonomous_update TEXT`, (err) => {
+                if (err && !err.message.includes('duplicate column name')) {
+                    console.error('Migration error (last_autonomous_update):', err.message);
+                }
+            });
+
             // v2.5 Admin Expansion Tables
             // v2.5 Admin Expansion Tables
             db.run(`CREATE TABLE IF NOT EXISTS promo_codes (
@@ -295,7 +313,8 @@ function initDB() {
                 gas_consumption REAL,
                 is_premium INTEGER DEFAULT 0,
                 is_container_exclusive INTEGER DEFAULT 0,
-                has_autopilot INTEGER DEFAULT 0
+                has_autopilot INTEGER DEFAULT 0,
+                is_autonomous INTEGER DEFAULT 0
             )`);
 
             // v2.6 Retention Features
@@ -328,6 +347,8 @@ function initDB() {
                     // but usually ADD COLUMN is enough for new writes.
                 }
             });
+
+            db.run(`ALTER TABLE car_definitions ADD COLUMN is_autonomous INTEGER DEFAULT 0`);
 
             // v3.3: License Plates Table
             db.run(`CREATE TABLE IF NOT EXISTS license_plates (
@@ -414,6 +435,12 @@ function initDB() {
 
                 // Seed database with initial content
                 seedDB().then(() => {
+                    // v6.0.2: Clean up license plates without owners requested by user
+                    db.run("DELETE FROM license_plates WHERE plate_number IN ('01', 'BOSS', 'II-105-BU') AND owner_id IS NULL", function (err) {
+                        if (err) console.error('Error cleaning up license plates:', err.message);
+                        else if (this && this.changes > 0) console.log(`Cleaned up ${this.changes} license plates.`);
+                    });
+
                     dbReadyResolve();
                     resolve();
                 });
@@ -450,12 +477,13 @@ async function seedDB() {
             // New Cars
             { id: 'tesla_3', name: '🔋 Tesla Model 3', model: 'Tesla Model 3', image: '/assets/cars/tesla.png', description: 'Полностью электрический седан будущего', purchase_price: 180000, rent_price: 2500, tank_capacity: 100, fuel_consumption: 0.1, has_gas: 0, is_premium: 1, has_autopilot: 0 },
             { id: 'tesla_s_plaid', name: '🚀 Tesla Model S Plaid', model: 'Tesla Model S Plaid', image: '/assets/cars/tesla_plaid.png', description: 'Самый быстрый седан в мире с автопилотом', purchase_price: 2500000, rent_price: 15000, tank_capacity: 120, fuel_consumption: 0.1, has_gas: 0, is_premium: 1, has_autopilot: 1 },
+            { id: 'tesla_3_perf', name: '🚀 Tesla Model 3 Performance', model: 'Tesla Model 3 Performance', image: '/assets/cars/tesla_plaid.png', description: 'Максимальная мощь и поддержка полной автономии', purchase_price: 320000, rent_price: 4500, tank_capacity: 100, fuel_consumption: 0.1, has_gas: 0, is_premium: 1, has_autopilot: 1, is_autonomous: 1 },
             { id: 'mercedes_s', name: '🤵 Mercedes S-Class', model: 'Mercedes-Benz W223', image: '🤵', description: 'Максимальный комфорт и статус', purchase_price: 450000, rent_price: 5000, tank_capacity: 80, fuel_consumption: 12.0, has_gas: 0, is_premium: 1, has_autopilot: 0 }
         ];
 
         for (const car of cars) {
-            await run(`INSERT OR IGNORE INTO car_definitions(id, name, model, image, description, purchase_price, rent_price, tank_capacity, fuel_consumption, has_gas, gas_tank_capacity, gas_consumption, is_premium, has_autopilot) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [car.id, car.name, car.model, car.image, car.description, car.purchase_price, car.rent_price, car.tank_capacity, car.fuel_consumption, car.has_gas, car.gas_tank_capacity || 0, car.gas_consumption || 0, car.is_premium || 0, car.has_autopilot || 0]);
+            await run(`INSERT OR IGNORE INTO car_definitions(id, name, model, image, description, purchase_price, rent_price, tank_capacity, fuel_consumption, has_gas, gas_tank_capacity, gas_consumption, is_premium, has_autopilot, is_autonomous) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [car.id, car.name, car.model, car.image, car.description, car.purchase_price, car.rent_price, car.tank_capacity, car.fuel_consumption, car.has_gas, car.gas_tank_capacity || 0, car.gas_consumption || 0, car.is_premium || 0, car.has_autopilot || 0, car.is_autonomous || 0]);
         }
 
         // 3. Seed Gas Stations
