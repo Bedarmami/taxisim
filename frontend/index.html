@@ -4,11 +4,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#1a1a1a">
-    <title>🚖 Taxi Simulator ELITE | v6.0.3</title>
-    <link rel="stylesheet" href="style.css?v=6.0.3">
-    <link rel="stylesheet" href="casino-styles.css?v=6.0.3">
-    <link rel="stylesheet" href="retention_styles.css?v=6.0.3">
+    <meta name="theme-color" content="#0a0a0f">
+    <title>🚖 Taxi Simulator ELITE | v6.1.2</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=6.1.2">
+    <link rel="stylesheet" href="casino-styles.css?v=6.1.2">
+    <link rel="stylesheet" href="retention_styles.css?v=6.1.2">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="api-utils.js?v=6.0.3"></script>
     <script src="managers.js?v=6.0.3" defer></script>
@@ -940,6 +942,31 @@
         </div>
     </div>
     </div>
+
+    <!-- ============= BOTTOM NAVIGATION BAR (v6.1.2) ============= -->
+    <nav class="bottom-nav" id="bottom-nav">
+        <button class="nav-item active" id="nav-home" onclick="showScreen('main')">
+            <span class="nav-icon">🏠</span>
+            <span class="nav-label">Главная</span>
+        </button>
+        <button class="nav-item" id="nav-orders" onclick="showScreen('orders')">
+            <span class="nav-icon">🚖</span>
+            <span class="nav-label">Заказы</span>
+        </button>
+        <button class="nav-item" id="nav-garage" onclick="showScreen('garage')">
+            <span class="nav-icon">🔧</span>
+            <span class="nav-label">Гараж</span>
+        </button>
+        <button class="nav-item" id="nav-business" onclick="showScreen('business')">
+            <span class="nav-icon">💼</span>
+            <span class="nav-label">Бизнес</span>
+        </button>
+        <button class="nav-item" id="nav-profile" onclick="showScreen('profile')">
+            <span class="nav-icon">👤</span>
+            <span class="nav-label">Профиль</span>
+        </button>
+    </nav>
+
 </body>
 
 </html>

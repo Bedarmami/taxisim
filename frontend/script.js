@@ -1930,6 +1930,21 @@ async function showScreen(screenName) {
     } else if (screenName === 'skills') {
         if (window.skillsManager) window.skillsManager.loadData();
     }
+
+    // v6.1.2: Sync Bottom Nav Bar active state
+    const navMap = {
+        'main': 'nav-home',
+        'orders': 'nav-orders',
+        'garage': 'nav-garage',
+        'business': 'nav-business',
+        'profile': 'nav-profile'
+    };
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    const activeNavId = navMap[screenName];
+    if (activeNavId) {
+        const activeNav = document.getElementById(activeNavId);
+        if (activeNav) activeNav.classList.add('active');
+    }
 }
 
 // ============= v2.1: ЕЖЕДНЕВНЫЙ БОНУС =============
