@@ -672,12 +672,21 @@ function displayOrders() {
 
     ordersList.innerHTML = filteredOrders.map((order) => {
         const canTake = canTakeOrder(order);
-        const orderClass = order.class || 'economy';
+        const price = order.prices?.yodex?.price || order.price || 0;
+        // v6.1.2: classify card tier by price
+        let orderClass = order.class || 'economy';
+        const isVip = order.is_vip || price > 600;
+        if (isVip) orderClass = 'vip';
+        else if (price > 400) orderClass = 'business';
+        else if (price > 250) orderClass = 'comfort';
+
         const passenger = order.passenger || { name: 'Клиент', avatar: '👤', rating: '5.0' };
 
         // Find current aggregator choice or use default
         const aggId = 'yodex'; // In a real app we'd track selected app
         const aggInfo = order.prices[aggId] || { price: order.price, color: '#f3a000', commission: 0.2 };
+
+        const vipBadge = isVip ? `<span class="vip-badge">⭐ VIP</span>` : '';
 
         return `
             <div class="order-card ${orderClass}" id="order-${order.id}">
@@ -685,7 +694,7 @@ function displayOrders() {
                     <div class="passenger-meta">
                         <div class="passenger-avatar">${passenger.avatar}</div>
                         <div class="user-meta">
-                            <span class="passenger-name">${passenger.name}</span>
+                            <span class="passenger-name">${passenger.name}${vipBadge}</span>
                             <span class="passenger-rating">⭐ ${passenger.rating}</span>
                         </div>
                     </div>
@@ -2937,3 +2946,19 @@ async function skipWeek() {
         showNotification('❌ Ошибка соединения', 'error');
     }
 }
+
+// ============= v6.1.2: GLOBAL RIPPLE EFFECT =============
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    if (btn.classList.contains('nav-item')) return;
+    const ripple = document.createElement('span');
+    ripple.classList.add('ripple');
+    const rect = btn.getBoundingClientRect();
+    ripple.style.left = (e.clientX - rect.left) + 'px';
+    ripple.style.top  = (e.clientY - rect.top) + 'px';
+    if (!btn.style.position || btn.style.position === 'static') btn.style.position = 'relative';
+    btn.style.overflow = 'hidden';
+    btn.appendChild(ripple);
+    ripple.addEventListener('animationend', () => ripple.remove());
+}, { passive: true });
