@@ -4632,15 +4632,25 @@ app.get('/api/admin/analytics', adminAuth, async (req, res) => {
         // Since sqlite might not have JSON functions enabled by default in all environments, 
         // we will fetch recent logs and process in JS or use approximate metrics.
 
+        // Earnings per day (14 days)
+        const earnings = await db.query(`
+            SELECT SUBSTR(completed_at, 1, 10) as date, ROUND(SUM(price), 2) as count
+            FROM orders_history
+            WHERE completed_at >= ?
+            GROUP BY date
+            ORDER BY date ASC
+        `, [fourteenDaysAgo]);
+
         res.json({
             registrations,
             rides,
+            earnings,
             dau: dau.total || 0,
             wau: wau.total || 0,
             districtPopularity: districts,
             economy: {
                 inflow7d: (inflow.total || 0).toFixed(2),
-                healthScore: 85 // Placeholder for now
+                healthScore: 85
             },
             summary: {
                 totalEarned: (await db.get('SELECT SUM(total_earned) as total FROM users')).total || 0,

@@ -245,6 +245,7 @@ async function loadAnalytics() {
         try {
             if (data.registrations) initChart('regChart', 'Регистрации', data.registrations, '#0088cc');
             if (data.rides) initChart('ridesChart', 'Поездки', data.rides, '#34b545');
+            if (data.earnings) initChart('earningsChart', 'Доход PLN', data.earnings, '#FFD700');
         } catch (chartErr) { console.error('Chart init error:', chartErr); }
 
         // Retention / Active Users
