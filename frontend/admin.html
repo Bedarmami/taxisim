@@ -64,6 +64,8 @@
                     style="background: #e67e22; color: white;">💰 Прибыльность</button>
                 <button class="tab-link" onclick="openTab(event, 'tab-events')"
                     style="background: #e74c3c; color: white;">🌪️ События</button>
+                <button class="tab-link" onclick="openTab(event, 'tab-crypto')"
+                    style="background: #f1c40f; color: white; color: #000;">🪙 Крипто</button>
             </nav>
 
             <!-- Вкладка: Дашборд -->
@@ -140,6 +142,73 @@
                 <div class="section-header">
                     <h2>Управление пользователями</h2>
                     <button onclick="loadUsers()">🔄 Обновить</button>
+                </div>
+
+                <!-- Вкладка: События -->
+                <div id="tab-events" class="tab-content" style="display: none;">
+                    <div class="section-header">
+                        <h2>🌪️ Глобальные события</h2>
+                        <button onclick="loadEvents()">🔄 Обновить</button>
+                    </div>
+                    <div class="admin-card"
+                        style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px;">
+                        <p>Активируйте событие, чтобы изменить экономику для всех игроков в реальном времени.</p>
+                        <div id="events-list" class="events-grid">
+                            <!-- Events loaded here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Вкладка: Крипто -->
+                <div id="tab-crypto" class="tab-content" style="display: none;">
+                    <div class="section-header">
+                        <h2>🪙 Управление Криптовалютой ($TAXI)</h2>
+                        <button onclick="loadCryptoAdmin()">🔄 Обновить</button>
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <h3>Текущий курс</h3>
+                            <div id="admin-crypto-price" class="stat-value" style="color: #f1c40f;">- PLN</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Всего монет у игроков</h3>
+                            <div id="admin-crypto-total-supply" class="stat-value">- $TAXI</div>
+                        </div>
+                    </div>
+
+                    <div class="admin-card"
+                        style="margin-top: 20px; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px;">
+                        <h3>Настройки крипто-рынка</h3>
+                        <div class="config-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                            <div class="form-group">
+                                <label>Минимальная цена (PLN):</label>
+                                <input type="number" id="crypto-min-price" step="0.0001" value="0.5">
+                            </div>
+                            <div class="form-group">
+                                <label>Максимальная цена (PLN):</label>
+                                <input type="number" id="crypto-max-price" step="0.0001" value="5.0">
+                            </div>
+                        </div>
+                        <button onclick="saveCryptoSettings()" class="btn-primary" style="margin-top: 15px;">💾
+                            Сохранить
+                            настройки</button>
+                    </div>
+
+                    <div class="table-container" style="margin-top: 20px;">
+                        <h3>📊 Держатели криптовалюты</h3>
+                        <table id="crypto-holders-table">
+                            <thead>
+                                <tr>
+                                    <th>Игрок</th>
+                                    <th>Баланс $TAXI</th>
+                                    <th>Экв. в PLN</th>
+                                </tr>
+                            </thead>
+                            <tbody id="crypto-holders-tbody">
+                                <!-- Загружается из JS -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
                 <div class="table-container">
                     <table id="user-table">

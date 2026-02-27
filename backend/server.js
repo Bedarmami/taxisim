@@ -138,10 +138,28 @@ let GLOBAL_ACTIVE_EVENT = null;
 let CURRENT_TAXI_PRICE = 1.0;
 let TAXI_PRICE_HISTORY = [];
 
+// Crypto settings with defaults
+let CRYPTO_SETTINGS = {
+    minFluctuation: -0.05,
+    maxFluctuation: 0.055,
+    intervalMs: 5 * 60 * 1000
+};
+
+async function updateCryptoSettings() {
+    try {
+        const minRow = await db.get('SELECT value FROM global_settings WHERE key = "crypto_min_fluctuation"');
+        const maxRow = await db.get('SELECT value FROM global_settings WHERE key = "crypto_max_fluctuation"');
+        if (minRow) CRYPTO_SETTINGS.minFluctuation = parseFloat(minRow.value);
+        if (maxRow) CRYPTO_SETTINGS.maxFluctuation = parseFloat(maxRow.value);
+    } catch (e) { console.error('Error loading crypto settings:', e); }
+}
+
 async function updateTaxiPrice() {
-    // Random fluctuation between -5% and +5.5% (slight upward bias)
-    const change = (Math.random() * 0.105) - 0.05;
-    CURRENT_TAXI_PRICE = Math.max(0.1, Number((CURRENT_TAXI_PRICE * (1 + change)).toFixed(4)));
+    await updateCryptoSettings();
+    const range = CRYPTO_SETTINGS.maxFluctuation - CRYPTO_SETTINGS.minFluctuation;
+    const change = (Math.random() * range) + CRYPTO_SETTINGS.minFluctuation;
+
+    CURRENT_TAXI_PRICE = Math.max(0.0001, Number((CURRENT_TAXI_PRICE * (1 + change)).toFixed(4)));
 
     TAXI_PRICE_HISTORY.push({ price: CURRENT_TAXI_PRICE, timestamp: new Date().toISOString() });
     if (TAXI_PRICE_HISTORY.length > 20) TAXI_PRICE_HISTORY.shift();
@@ -149,10 +167,15 @@ async function updateTaxiPrice() {
     await db.run('INSERT INTO crypto_prices (symbol, price, timestamp) VALUES (?, ?, ?)',
         ['TAXI', CURRENT_TAXI_PRICE, new Date().toISOString()]);
 }
+
+// Global reference for admin to trigger update
+global.updateCryptoPriceFluctuationSettings = updateCryptoSettings;
+
 // Start crypto updates every 5 mins
 setInterval(updateTaxiPrice, 5 * 60 * 1000);
 // Initial price from DB or default
 db.dbReady.then(async () => {
+    await updateCryptoSettings();
     const lastPrice = await db.get('SELECT price FROM crypto_prices ORDER BY id DESC LIMIT 1');
     if (lastPrice) CURRENT_TAXI_PRICE = lastPrice.price;
     else updateTaxiPrice();
@@ -4476,6 +4499,68 @@ app.post('/api/admin/cars', adminAuth, async (req, res) => {
             [car.id, car.name, car.model, car.image, car.description, car.purchase_price, car.rent_price, car.tank_capacity, car.fuel_consumption, car.has_gas ? 1 : 0, car.gas_tank_capacity || 0, car.gas_consumption || 0, car.is_premium ? 1 : 0, car.has_autopilot ? 1 : 0, car.is_autonomous ? 1 : 0]);
         await syncCarsFromDB();
         res.json({ success: true, message: 'Car added' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// --- Admin Crypto Management ---
+app.get('/api/admin/crypto/stats', adminAuth, async (req, res) => {
+    try {
+        const stats = await db.get('SELECT SUM(CAST(crypto_taxi_balance AS REAL)) as totalSupply FROM users');
+        res.json({
+            currentPrice: CURRENT_TAXI_PRICE,
+            totalSupply: stats.totalSupply || 0,
+            symbol: 'TAXI'
+        });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/admin/crypto/holders', adminAuth, async (req, res) => {
+    try {
+        const holders = await db.all(`
+            SELECT telegram_id, first_name, crypto_taxi_balance 
+            FROM users 
+            WHERE CAST(crypto_taxi_balance AS REAL) > 0 
+            ORDER BY CAST(crypto_taxi_balance AS REAL) DESC 
+            LIMIT 50
+        `);
+        res.json(holders);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/admin/crypto/settings', adminAuth, async (req, res) => {
+    try {
+        const minFluctuation = await db.get('SELECT value FROM global_settings WHERE key = "crypto_min_fluctuation"');
+        const maxFluctuation = await db.get('SELECT value FROM global_settings WHERE key = "crypto_max_fluctuation"');
+        const fluctuationInterval = await db.get('SELECT value FROM global_settings WHERE key = "crypto_fluctuation_interval_ms"');
+
+        res.json({
+            minFluctuation: minFluctuation ? parseFloat(minFluctuation.value) : 0.001,
+            maxFluctuation: maxFluctuation ? parseFloat(maxFluctuation.value) : 0.01,
+            fluctuationInterval: fluctuationInterval ? parseInt(fluctuationInterval.value) : 60000
+        });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/crypto/settings', adminAuth, async (req, res) => {
+    try {
+        const { minFluctuation, maxFluctuation, fluctuationInterval } = req.body;
+
+        if (minFluctuation !== undefined) {
+            await db.run('INSERT OR REPLACE INTO global_settings (key, value) VALUES (?, ?)', ['crypto_min_fluctuation', minFluctuation.toString()]);
+        }
+        if (maxFluctuation !== undefined) {
+            await db.run('INSERT OR REPLACE INTO global_settings (key, value) VALUES (?, ?)', ['crypto_max_fluctuation', maxFluctuation.toString()]);
+        }
+        if (fluctuationInterval !== undefined) {
+            await db.run('INSERT OR REPLACE INTO global_settings (key, value) VALUES (?, ?)', ['crypto_fluctuation_interval_ms', fluctuationInterval.toString()]);
+        }
+
+        // Update in-memory variables if they exist and are used
+        if (typeof updateCryptoPriceFluctuationSettings === 'function') {
+            await updateCryptoPriceFluctuationSettings();
+        }
+
+        res.json({ success: true, message: 'Crypto settings updated' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

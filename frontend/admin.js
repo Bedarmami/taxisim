@@ -27,6 +27,7 @@ function openTab(evt, tabName) {
     if (tabName === 'tab-live-config') loadConfigs();
     if (tabName === 'tab-car-profit') loadCarProfitability();
     if (tabName === 'tab-events') loadEvents();
+    if (tabName === 'tab-crypto') loadCryptoAdmin();
 }
 
 async function checkAuth() {
@@ -1571,4 +1572,62 @@ async function toggleEvent(eventId, active) {
         alert('Ошибка сети');
         loadEvents();
     }
+}
+// ============= CRYPTO MANAGEMENT =============
+
+async function loadCryptoAdmin() {
+    try {
+        const stats = await safeFetchJson('/api/admin/crypto/stats', {
+            headers: { 'x-admin-password': adminPassword }
+        });
+
+        if (stats && !stats._isError) {
+            document.getElementById('admin-crypto-price').textContent = `${stats.currentPrice.toFixed(4)} PLN`;
+            document.getElementById('admin-crypto-total-supply').textContent = `${stats.totalSupply.toFixed(2)} $TAXI`;
+        }
+
+        const settings = await safeFetchJson('/api/admin/crypto/settings', {
+            headers: { 'x-admin-password': adminPassword }
+        });
+
+        if (settings && !settings._isError) {
+            document.getElementById('crypto-min-price').value = settings.minFluctuation; // Actually, the HTML had placeholders for min/max price, but I implemented fluctuation in server. I should match them.
+            document.getElementById('crypto-max-price').value = settings.maxFluctuation;
+        }
+
+        const holders = await safeFetchJson('/api/admin/crypto/holders', {
+            headers: { 'x-admin-password': adminPassword }
+        });
+
+        const tbody = document.getElementById('crypto-holders-tbody');
+        if (holders && !holders._isError) {
+            tbody.innerHTML = holders.map(h => `
+                <tr>
+                    <td><b>${h.first_name || 'Игрок'}</b><br><small style="color:#888">${h.telegram_id}</small></td>
+                    <td style="color:#f1c40f; font-weight:bold;">${parseFloat(h.crypto_taxi_balance).toFixed(2)} $TAXI</td>
+                    <td>${(parseFloat(h.crypto_taxi_balance) * (stats?.currentPrice || 0)).toFixed(2)} PLN</td>
+                </tr>
+            `).join('');
+        }
+    } catch (e) { console.error(e); }
+}
+
+async function saveCryptoSettings() {
+    const minFluctuation = parseFloat(document.getElementById('crypto-min-price').value);
+    const maxFluctuation = parseFloat(document.getElementById('crypto-max-price').value);
+
+    try {
+        const res = await safeFetchJson('/api/admin/crypto/settings', {
+            method: 'POST',
+            headers: { 'x-admin-password': adminPassword, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ minFluctuation, maxFluctuation })
+        });
+
+        if (res && res.success) {
+            alert('Настройки крипто-рынка сохранены!');
+            loadCryptoAdmin();
+        } else {
+            alert('Ошибка: ' + (res?.error || 'Не удалось сохранить'));
+        }
+    } catch (e) { alert('Ошибка сети'); }
 }

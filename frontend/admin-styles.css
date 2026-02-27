@@ -745,3 +745,11 @@ td .status-badge {
 .event-controls {
     margin-left: 20px;
 }
+
+.admin-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    margin-bottom: 20px;
+}
