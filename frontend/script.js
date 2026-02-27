@@ -998,6 +998,23 @@ function updateMainScreen() {
         elements.jackpotAmount.textContent = userData.jackpot_pool.toFixed(2);
     }
     if (elements.carModel) elements.carModel.textContent = userData.car?.name || userData.car || '🚗 Неизвестно';
+
+    // v6.1.2: Update city hero car emoji & name
+    const heroEmoji = document.getElementById('car-hero-emoji');
+    const heroName = document.getElementById('car-hero-name');
+    if (heroEmoji && userData.car) {
+        const carId = userData.car?.id || '';
+        if (carId.includes('tesla')) {
+            heroEmoji.textContent = '🔋';
+        } else if (userData.car?.is_premium) {
+            heroEmoji.textContent = '🚗';
+        } else {
+            heroEmoji.textContent = '🚕';
+        }
+    }
+    if (heroName && userData.car) {
+        heroName.textContent = userData.car?.name || '';
+    }
     if (elements.fuel) elements.fuel.textContent = userData.fuel?.toFixed(1) || '0.0';
     if (elements.maxFuel) elements.maxFuel.textContent = userData.max_fuel || '45';
     if (elements.stamina) elements.stamina.textContent = Math.floor(userData.stamina || 0);

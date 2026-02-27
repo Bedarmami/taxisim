@@ -91,90 +91,95 @@
                 <!-- Event info will be displayed here -->
             </div>
 
-            <div class="dashboard-grid">
-                <!-- Status Dashboard -->
-                <div class="status-card">
-                    <div class="status-header">
-                        <span id="car-model">🚗 Loading...</span>
-                        <div id="main-car-plate" class="main-plate-container"></div>
-                        <div class="district-badge-wrap"
-                            style="display: flex; align-items: center; gap: 4px; background: rgba(255,160,0,0.1); padding: 2px 8px; border-radius: 6px; font-size: 0.75em; border: 1px solid rgba(255,160,0,0.2);">
-                            <span>📍</span>
-                            <span id="current-district-name"
-                                style="font-weight: bold; color: var(--accent-color);">...</span>
-                        </div>
-                        <span class="level-badge" id="level">LVL 1</span>
+            <!-- v6.1.2: City Skyline Hero Banner -->
+            <div class="city-hero">
+                <div class="city-skyline">
+                    <div class="city-buildings"></div>
+                    <div class="city-glow"></div>
+                </div>
+                <div class="car-hero-wrap">
+                    <div class="car-hero-emoji" id="car-hero-emoji">🚕</div>
+                    <div class="car-hero-glow"></div>
+                </div>
+                <div class="car-hero-name" id="car-model">🚗 Загрузка...</div>
+            </div>
+
+            <!-- v2.3: Event Banner -->
+            <div class="event-banner" id="event-banner" style="display: none;"></div>
+
+            <!-- Status Card (glassmorphism) -->
+            <div class="status-card-premium">
+                <div class="status-top-row">
+                    <div id="main-car-plate" class="main-plate-container"></div>
+                    <div class="district-badge-wrap"
+                        style="display:flex;align-items:center;gap:4px;background:rgba(255,160,0,0.1);padding:2px 10px;border-radius:20px;font-size:0.78em;border:1px solid rgba(255,160,0,0.25);">
+                        <span>📍</span>
+                        <span id="current-district-name" style="font-weight:700;color:#FF9500;">...</span>
                     </div>
+                    <span class="level-badge-neo" id="level">LVL 1</span>
+                </div>
 
-                    <div class="status-bars">
-                        <div class="bar-item">
-                            <div class="bar-labels">
-                                <span>⛽ Топливо</span>
-                                <span><span id="fuel">0.0</span>/<span id="max-fuel">45</span></span>
-                            </div>
-                            <div class="progress-bar">
-                                <div id="fuel-fill" class="fill fuel"></div>
-                            </div>
+                <div class="status-bars">
+                    <div class="bar-item">
+                        <div class="bar-labels">
+                            <span>⛽ Топливо</span>
+                            <span><span id="fuel">0.0</span>/<span id="max-fuel">45</span></span>
                         </div>
-
-                        <div class="bar-item">
-                            <div class="bar-labels">
-                                <span>⚡ Энергия</span>
-                                <span id="stamina">100</span>
-                            </div>
-                            <div class="progress-bar">
-                                <div id="stamina-fill" class="fill stamina"></div>
-                            </div>
-                        </div>
-
-                        <div id="gas-bar-container" class="bar-item" style="display: none;">
-                            <div class="bar-labels">
-                                <span>💧 Газ</span>
-                                <span><span id="gas-fuel">0.0</span>/<span id="gas-max-fuel">0</span></span>
-                            </div>
-                            <div class="progress-bar">
-                                <div id="gas-fill" class="fill gas"></div>
-                            </div>
+                        <div class="progress-bar">
+                            <div id="fuel-fill" class="fill fuel"></div>
                         </div>
                     </div>
-
-                    <div class="quick-stats">
-                        <div class="q-stat" id="condition-stat">
-                            <span class="q-label">🔧 Сост.</span>
-                            <span class="q-value"><span id="car-condition">100</span>%</span>
+                    <div class="bar-item">
+                        <div class="bar-labels">
+                            <span>⚡ Энергия</span>
+                            <span id="stamina">100</span>
                         </div>
-                        <div class="q-stat">
-                            <span class="q-label">🚕 Заказы</span>
-                            <span class="q-value"><span id="rides-total">0</span></span>
+                        <div class="progress-bar">
+                            <div id="stamina-fill" class="fill stamina"></div>
                         </div>
-                        <div class="q-stat">
-                            <span class="q-label">⛽ Расход</span>
-                            <span class="q-value"><span id="fuel-consumption-display">0.0</span>
-                                <small>л/100</small></span>
+                    </div>
+                    <div id="gas-bar-container" class="bar-item" style="display: none;">
+                        <div class="bar-labels">
+                            <span>💧 Газ</span>
+                            <span><span id="gas-fuel">0.0</span>/<span id="gas-max-fuel">0</span></span>
+                        </div>
+                        <div class="progress-bar">
+                            <div id="gas-fill" class="fill gas"></div>
                         </div>
                     </div>
                 </div>
 
-                <!-- v3.4: Community Mission Card -->
-                <div class="status-card community-card">
-                    <div class="community-header">
-                        <span class="c-title">🌍 Глобальная цель</span>
-                        <span class="c-percent" id="community-percent">0%</span>
+                <div class="quick-stats">
+                    <div class="q-stat" id="condition-stat">
+                        <span class="q-label">🔧 Сост.</span>
+                        <span class="q-value"><span id="car-condition">100</span>%</span>
                     </div>
-                    <div class="status-bars">
-                        <div class="bar-item">
-                            <div class="progress-bar">
-                                <div id="community-fill" class="fill gas" style="width: 0%"></div>
-                            </div>
-                        </div>
+                    <div class="q-stat">
+                        <span class="q-label">🚕 Заказы</span>
+                        <span class="q-value"><span id="rides-total">0</span></span>
                     </div>
-                    <div class="community-stats">
-                        <span id="community-distance">0.0</span> / <span id="community-goal">50000</span> км
+                    <div class="q-stat">
+                        <span class="q-label">⛽ Расход</span>
+                        <span class="q-value"><span id="fuel-consumption-display">0.0</span><small>л/100</small></span>
                     </div>
                 </div>
             </div>
 
-            <!-- v2.8: Online Action -->
+            <!-- Community Goal (compact) -->
+            <div class="community-card-neo">
+                <div class="community-header">
+                    <span class="c-title">🌍 Глобальная цель</span>
+                    <span class="c-percent" id="community-percent">0%</span>
+                </div>
+                <div class="progress-bar" style="margin-top:6px;">
+                    <div id="community-fill" class="fill gas" style="width: 0%"></div>
+                </div>
+                <div class="community-stats" style="margin-top:4px;">
+                    <span id="community-distance">0.0</span> / <span id="community-goal">50000</span> км
+                </div>
+            </div>
+
+            <!-- CTA Button -->
             <div class="online-container">
                 <button id="online-btn" class="main-cta">🚕 ВЫЙТИ В ОНЛАЙН</button>
             </div>
