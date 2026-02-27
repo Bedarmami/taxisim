@@ -740,7 +740,7 @@ function displayOrders() {
                 ${userData.car && userData.car.has_autopilot ? `
                 <button class="btn-autopilot" 
                         onclick="takeOrder('${order.id}', event, true)"
-                        ${userData.fuel >= ((userData.fuel_consumption / 100) * order.distance) ? '' : 'disabled'}>
+                        ${userData.fuel >= (((userData.car?.fuel_consumption || userData.fuel_consumption || 8) / 100) * order.distance) ? '' : 'disabled'}>
                     <span class="icon">🤖</span> К автопилоту
                 </button>` : ''}
             </div>
@@ -2833,6 +2833,28 @@ async function paidRest() {
         console.error('Paid rest failed:', e);
         showNotification('❌ Ошибка соединения', 'error');
     }
+}
+
+/**
+ * v6.1.2: Navigate to Garage and highlight Autopilot controls
+ * Called from order list "К автопилоту" button
+ */
+async function goToAutopilot() {
+    await showScreen('garage');
+    // After screen loads, scroll to and highlight the autonomous controls
+    setTimeout(() => {
+        const autoSection = document.getElementById('garage-autonomous-controls');
+        if (autoSection && autoSection.style.display !== 'none') {
+            autoSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Brief highlight pulse animation
+            autoSection.style.transition = 'box-shadow 0.3s ease';
+            autoSection.style.boxShadow = '0 0 0 3px #5856D6, 0 0 20px rgba(88, 86, 214, 0.5)';
+            autoSection.style.borderRadius = '12px';
+            setTimeout(() => {
+                autoSection.style.boxShadow = '';
+            }, 2000);
+        }
+    }, 300);
 }
 
 /**
