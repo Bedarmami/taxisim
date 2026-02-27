@@ -2045,8 +2045,9 @@ app.post('/api/user/:telegramId/rest', async (req, res) => {
             }
 
             if (fleetIncome > 0) {
-                user.uncollected_fleet_revenue = (user.uncollected_fleet_revenue || 0) + fleetIncome;
-                message += `\n💼 Начислен доход автопарка: +${fleetIncome} PLN (в кассу)`;
+                user.balance += fleetIncome;
+                user.total_earned += fleetIncome;
+                message += `\n💼 Начислен доход автопарка: +${fleetIncome} PLN (на баланс)`;
             }
             // --------------------------------
         }
@@ -2129,8 +2130,9 @@ app.post('/api/user/:telegramId/skip-week', async (req, res) => {
         }
 
         if (fleetIncome > 0) {
-            user.uncollected_fleet_revenue = (user.uncollected_fleet_revenue || 0) + fleetIncome;
-            message += `\n💼 Доход автопарка: +${fleetIncome} PLN`;
+            user.balance += fleetIncome;
+            user.total_earned += fleetIncome;
+            message += `\n💼 Доход автопарка: +${fleetIncome} PLN (на баланс)`;
         }
 
         user.stamina = 100;
@@ -5130,7 +5132,7 @@ app.get('*', (req, res) => {
 // Start Server
 app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`\nv6.0.2 with SQLite Persistence - ELITE Edition `);
+    console.log(`\nv6.0.3 with SQLite Persistence - ELITE Edition `);
     console.log(`📡 Сервер запущен: http://localhost:${PORT}`);
     console.log(`🚖 TAXI SIMULATOR PRO initialized successfully.\n`);
 });
