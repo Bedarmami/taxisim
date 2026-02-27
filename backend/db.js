@@ -31,54 +31,64 @@ const dbReady = new Promise((resolve) => {
 function initDB() {
     return new Promise((resolve) => {
         db.serialize(() => {
-            // Users table
+            // 1. CREATE ALL TABLES FIRST
             db.run(`CREATE TABLE IF NOT EXISTS users (
                 id TEXT PRIMARY KEY,
                 telegram_id TEXT UNIQUE,
                 balance REAL DEFAULT 0,
                 total_earned REAL DEFAULT 0,
-                
                 car_id TEXT,
-                car_data TEXT, -- JSON string
-                owned_cars_data TEXT, -- JSON string
-                
+                car_data TEXT,
+                owned_cars_data TEXT,
                 fuel REAL DEFAULT 45.0,
                 gas_fuel REAL DEFAULT 0,
-                
                 partner_id INTEGER DEFAULT 1,
                 partner_contract_date TEXT,
-                
                 stamina INTEGER DEFAULT 100,
                 experience INTEGER DEFAULT 0,
                 level INTEGER DEFAULT 1,
                 rating INTEGER DEFAULT 0,
-                
                 rides_completed INTEGER DEFAULT 0,
                 rides_total INTEGER DEFAULT 0,
                 rides_today INTEGER DEFAULT 0,
                 rides_streak INTEGER DEFAULT 0,
                 night_rides INTEGER DEFAULT 0,
                 total_distance REAL DEFAULT 0,
-                is_banned INTEGER DEFAULT 0, -- 0 for normal, 1 for banned
-                
+                is_banned INTEGER DEFAULT 0,
                 days_passed INTEGER DEFAULT 0,
                 week_days INTEGER DEFAULT 0,
                 weeks_passed INTEGER DEFAULT 0,
-                
-                business_data TEXT, -- JSON string for rented cars
-                
-                achievements_data TEXT, -- JSON string
-                last_daily_bonus TEXT, -- ISO Date string
+                business_data TEXT,
+                achievements_data TEXT,
+                last_daily_bonus TEXT,
                 created_at TEXT,
                 last_login TEXT,
                 free_plate_rolls INTEGER DEFAULT 0,
                 username TEXT,
                 current_district TEXT DEFAULT 'suburbs',
                 uncollected_fleet_revenue REAL DEFAULT 0,
-                mileage REAL DEFAULT 0
+                mileage REAL DEFAULT 0,
+                last_stamina_update TEXT,
+                login_streak INTEGER DEFAULT 0,
+                last_login_date TEXT,
+                lootboxes_data TEXT DEFAULT '{}',
+                lootboxes_given_data TEXT DEFAULT '{}',
+                casino_spins_today INTEGER DEFAULT 0,
+                casino_last_reset TEXT,
+                casino_stats TEXT DEFAULT '{}',
+                tutorial_completed INTEGER DEFAULT 0,
+                pending_auction_rewards TEXT DEFAULT '[]',
+                is_autonomous_active INTEGER DEFAULT 0,
+                paid_rests_today INTEGER DEFAULT 0,
+                last_autonomous_update TEXT,
+                skills TEXT DEFAULT '{"charisma":0,"mechanic":0,"navigator":0}',
+                cleanliness REAL DEFAULT 100.0,
+                tire_condition REAL DEFAULT 100.0,
+                referred_by TEXT,
+                referred_count INTEGER DEFAULT 0,
+                crypto_taxi_balance REAL DEFAULT 0
             )`);
 
-            // Orders history table
             db.run(`CREATE TABLE IF NOT EXISTS orders_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id TEXT,
@@ -91,11 +101,6 @@ function initDB() {
                 district_id TEXT,
                 FOREIGN KEY(user_id) REFERENCES users(id)
             )`);
-
-            // v6.1.0: Advanced Features Migration
-            db.run(`ALTER TABLE users ADD COLUMN referred_by TEXT`, (err) => { });
-            db.run(`ALTER TABLE users ADD COLUMN referred_count INTEGER DEFAULT 0`, (err) => { });
-            db.run(`ALTER TABLE users ADD COLUMN crypto_taxi_balance REAL DEFAULT 0`, (err) => { });
 
             db.run(`CREATE TABLE IF NOT EXISTS crypto_prices (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -113,64 +118,10 @@ function initDB() {
                 expires_at TEXT
             )`);
 
-            // Seed initial event if not exists
-            db.run(`INSERT OR IGNORE INTO global_events (id, name, multiplier, is_active, description) 
-                    VALUES ('heavy_rain', 'Сильный ливень', 1.5, 0, 'Повышенный спрос из-за непогоды!')`);
-
-            console.log('Database tables initialized.');
-
-            const migrations = [
-                `ALTER TABLE users ADD COLUMN last_daily_bonus TEXT`,
-                `ALTER TABLE users ADD COLUMN mileage REAL DEFAULT 0`,
-                `ALTER TABLE users ADD COLUMN last_stamina_update TEXT`,
-                `ALTER TABLE users ADD COLUMN login_streak INTEGER DEFAULT 0`,
-                `ALTER TABLE users ADD COLUMN last_login_date TEXT`,
-                `ALTER TABLE users ADD COLUMN lootboxes_data TEXT DEFAULT '{}'`,
-                `ALTER TABLE users ADD COLUMN lootboxes_given_data TEXT DEFAULT '{}'`,
-                `ALTER TABLE users ADD COLUMN casino_spins_today INTEGER DEFAULT 0`,
-                `ALTER TABLE users ADD COLUMN casino_last_reset TEXT`,
-                `ALTER TABLE users ADD COLUMN casino_stats TEXT DEFAULT '{}'`,
-                `ALTER TABLE users ADD COLUMN tutorial_completed INTEGER DEFAULT 0`,
-                `ALTER TABLE users ADD COLUMN pending_auction_rewards TEXT DEFAULT '[]'`,
-                `ALTER TABLE users ADD COLUMN free_plate_rolls INTEGER DEFAULT 0`,
-                `ALTER TABLE users ADD COLUMN username TEXT`,
-                `ALTER TABLE users ADD COLUMN current_district TEXT DEFAULT 'suburbs'`,
-                `ALTER TABLE users ADD COLUMN uncollected_fleet_revenue REAL DEFAULT 0`,
-                `ALTER TABLE users ADD COLUMN is_autonomous_active INTEGER DEFAULT 0`,
-                `ALTER TABLE users ADD COLUMN paid_rests_today INTEGER DEFAULT 0`,
-                `ALTER TABLE users ADD COLUMN last_autonomous_update TEXT`,
-                `ALTER TABLE support_messages ADD COLUMN sender_type TEXT DEFAULT 'user'`,
-                `ALTER TABLE car_definitions ADD COLUMN has_autopilot INTEGER DEFAULT 0`,
-                `ALTER TABLE car_definitions ADD COLUMN is_autonomous INTEGER DEFAULT 0`,
-                `ALTER TABLE jackpot_history ADD COLUMN winner_id TEXT`,
-                `ALTER TABLE users ADD COLUMN skills TEXT DEFAULT '{"charisma":0,"mechanic":0,"navigator":0}'`,
-                `ALTER TABLE users ADD COLUMN cleanliness REAL DEFAULT 100.0`,
-                `ALTER TABLE users ADD COLUMN tire_condition REAL DEFAULT 100.0`,
-                `ALTER TABLE orders_history ADD COLUMN district_id TEXT`,
-                `ALTER TABLE gas_stations ADD COLUMN price_petrol REAL DEFAULT 6.80`,
-                `ALTER TABLE gas_stations ADD COLUMN price_gas REAL DEFAULT 3.60`,
-                `ALTER TABLE gas_stations ADD COLUMN fuel_stock REAL DEFAULT 0`,
-                `ALTER TABLE gas_stations ADD COLUMN uncollected_revenue REAL DEFAULT 0`
-            ];
-
-            migrations.forEach(sql => {
-                db.run(sql, (err) => {
-                    if (err && !err.message.includes('duplicate column name')) {
-                        console.error(`Migration error (${sql}):`, err.message);
-                    }
-                });
-            });
-
-            // Update existing rows for support_messages sender_type if migration was successful
-            db.run(`UPDATE support_messages SET sender_type = 'admin' WHERE is_from_admin = 1 AND sender_type = 'user'`);
-            db.run(`UPDATE support_messages SET sender_type = 'user' WHERE is_from_admin = 0 AND sender_type = 'user'`);
-
-
-            // v2.5 Admin Expansion Tables
             db.run(`CREATE TABLE IF NOT EXISTS promo_codes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 code TEXT UNIQUE,
-                reward TEXT, -- JSON string
+                reward TEXT,
                 max_uses INTEGER,
                 current_uses INTEGER DEFAULT 0,
                 expires_at TEXT
@@ -198,17 +149,15 @@ function initDB() {
                 value TEXT
             )`);
 
-            // v3.1: User activity for anti-cheat
             db.run(`CREATE TABLE IF NOT EXISTS user_activity (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id TEXT,
                 action TEXT,
-                details TEXT, -- JSON
+                details TEXT,
                 timestamp TEXT,
                 FOREIGN KEY(user_id) REFERENCES users(id)
             )`);
 
-            // v3.1: Global configs (prices, modifiers)
             db.run(`CREATE TABLE IF NOT EXISTS global_configs (
                 key TEXT PRIMARY KEY,
                 value TEXT,
@@ -216,7 +165,6 @@ function initDB() {
                 description TEXT
             )`);
 
-            // v3.2: Support tickets
             db.run(`CREATE TABLE IF NOT EXISTS support_messages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id TEXT NOT NULL,
@@ -227,7 +175,6 @@ function initDB() {
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
             )`);
 
-            // v3.1: Car definitions (dynamic content)
             db.run(`CREATE TABLE IF NOT EXISTS car_definitions (
                 id TEXT PRIMARY KEY,
                 name TEXT,
@@ -247,7 +194,6 @@ function initDB() {
                 is_autonomous INTEGER DEFAULT 0
             )`);
 
-            // v2.6 Retention Features
             db.run(`CREATE TABLE IF NOT EXISTS drivers (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id TEXT,
@@ -255,7 +201,7 @@ function initDB() {
                 skill INTEGER DEFAULT 1,
                 trust INTEGER DEFAULT 50,
                 salary INTEGER DEFAULT 100,
-                state TEXT DEFAULT 'idle', -- idle, working, resting
+                state TEXT DEFAULT 'idle',
                 car_id TEXT,
                 hired_at TEXT,
                 last_collection TEXT,
@@ -270,26 +216,24 @@ function initDB() {
                 FOREIGN KEY(winner_id) REFERENCES users(id)
             )`);
 
-            // v3.3: License Plates Table
             db.run(`CREATE TABLE IF NOT EXISTS license_plates (
                 plate_number TEXT PRIMARY KEY,
-                owner_id TEXT, -- telegram_id
-                rarity TEXT DEFAULT 'common', -- common, rare, legendary
+                owner_id TEXT,
+                rarity TEXT DEFAULT 'common',
                 style TEXT DEFAULT 'standard',
-                buffs TEXT DEFAULT '{}', -- JSON: { tip_multiplier: 1.1, police_resistance: 0.5 }
+                buffs TEXT DEFAULT '{}',
                 market_price REAL DEFAULT NULL,
                 is_equipped INTEGER DEFAULT 0,
-                car_id TEXT, -- ID of the car it's currently on
+                car_id TEXT,
                 created_at TEXT,
                 FOREIGN KEY(owner_id) REFERENCES users(telegram_id)
             )`);
 
-            // v3.4: Gas Stations Investment
             db.run(`CREATE TABLE IF NOT EXISTS gas_stations (
                 id TEXT PRIMARY KEY,
                 name TEXT,
                 district_id TEXT,
-                owner_id TEXT, -- telegram_id
+                owner_id TEXT,
                 purchase_price REAL,
                 revenue_total REAL DEFAULT 0,
                 price_petrol REAL DEFAULT 6.80,
@@ -301,69 +245,81 @@ function initDB() {
 
             db.run(`CREATE TABLE IF NOT EXISTS market_listings (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                type TEXT, -- 'gas_station' or 'license_plate'
+                type TEXT,
                 item_id TEXT,
-                seller_id TEXT, -- telegram_id or 'SYSTEM'
+                seller_id TEXT,
                 price REAL,
                 created_at TEXT
             )`);
 
-            db.run(`ALTER TABLE gas_stations ADD COLUMN price_petrol REAL DEFAULT 6.80`, (err) => { });
-            db.run(`ALTER TABLE gas_stations ADD COLUMN price_gas REAL DEFAULT 3.60`, (err) => { });
-            db.run(`ALTER TABLE gas_stations ADD COLUMN fuel_stock REAL DEFAULT 0`, (err) => { });
-            db.run(`ALTER TABLE gas_stations ADD COLUMN uncollected_revenue REAL DEFAULT 0`, (err) => { });
+            // 2. RUN ALL MIGRATIONS
+            const migrations = [
+                `ALTER TABLE users ADD COLUMN referred_by TEXT`,
+                `ALTER TABLE users ADD COLUMN referred_count INTEGER DEFAULT 0`,
+                `ALTER TABLE users ADD COLUMN crypto_taxi_balance REAL DEFAULT 0`,
+                `ALTER TABLE users ADD COLUMN last_daily_bonus TEXT`,
+                `ALTER TABLE users ADD COLUMN mileage REAL DEFAULT 0`,
+                `ALTER TABLE users ADD COLUMN last_stamina_update TEXT`,
+                `ALTER TABLE users ADD COLUMN login_streak INTEGER DEFAULT 0`,
+                `ALTER TABLE users ADD COLUMN last_login_date TEXT`,
+                `ALTER TABLE users ADD COLUMN lootboxes_data TEXT DEFAULT '{}'`,
+                `ALTER TABLE users ADD COLUMN lootboxes_given_data TEXT DEFAULT '{}'`,
+                `ALTER TABLE users ADD COLUMN casino_spins_today INTEGER DEFAULT 0`,
+                `ALTER TABLE users ADD COLUMN casino_last_reset TEXT`,
+                `ALTER TABLE users ADD COLUMN casino_stats TEXT DEFAULT '{}'`,
+                `ALTER TABLE users ADD COLUMN tutorial_completed INTEGER DEFAULT 0`,
+                `ALTER TABLE users ADD COLUMN pending_auction_rewards TEXT DEFAULT '[]'`,
+                `ALTER TABLE users ADD COLUMN free_plate_rolls INTEGER DEFAULT 0`,
+                `ALTER TABLE users ADD COLUMN username TEXT`,
+                `ALTER TABLE users ADD COLUMN current_district TEXT DEFAULT 'suburbs'`,
+                `ALTER TABLE users ADD COLUMN uncollected_fleet_revenue REAL DEFAULT 0`,
+                `ALTER TABLE users ADD COLUMN is_autonomous_active INTEGER DEFAULT 0`,
+                `ALTER TABLE users ADD COLUMN paid_rests_today INTEGER DEFAULT 0`,
+                `ALTER TABLE users ADD COLUMN last_autonomous_update TEXT`,
+                `ALTER TABLE users ADD COLUMN skills TEXT DEFAULT '{"charisma":0,"mechanic":0,"navigator":0}'`,
+                `ALTER TABLE users ADD COLUMN cleanliness REAL DEFAULT 100.0`,
+                `ALTER TABLE users ADD COLUMN tire_condition REAL DEFAULT 100.0`,
+                `ALTER TABLE support_messages ADD COLUMN sender_type TEXT DEFAULT 'user'`,
+                `ALTER TABLE car_definitions ADD COLUMN has_autopilot INTEGER DEFAULT 0`,
+                `ALTER TABLE car_definitions ADD COLUMN is_autonomous INTEGER DEFAULT 0`,
+                `ALTER TABLE jackpot_history ADD COLUMN winner_id TEXT`,
+                `ALTER TABLE orders_history ADD COLUMN district_id TEXT`,
+                `ALTER TABLE gas_stations ADD COLUMN price_petrol REAL DEFAULT 6.80`,
+                `ALTER TABLE gas_stations ADD COLUMN price_gas REAL DEFAULT 3.60`,
+                `ALTER TABLE gas_stations ADD COLUMN fuel_stock REAL DEFAULT 0`,
+                `ALTER TABLE gas_stations ADD COLUMN uncollected_revenue REAL DEFAULT 0`
+            ];
 
-            // Migration: Skills and Hardcore Stats
-            db.run(`ALTER TABLE users ADD COLUMN skills TEXT DEFAULT '{"charisma":0,"mechanic":0,"navigator":0}'`, (err) => {
-                if (err && !err.message.includes('duplicate column name')) console.error('Migration error (skills):', err.message);
+            migrations.forEach(sql => {
+                db.run(sql, (err) => {
+                    // Ignore errors if column already exists
+                    if (err && !err.message.includes('duplicate column name')) {
+                        // console.error(`Safe migration message (${sql}):`, err.message);
+                    }
+                });
             });
 
-            db.run(`ALTER TABLE users ADD COLUMN cleanliness REAL DEFAULT 100.0`, (err) => {
-                if (err && !err.message.includes('duplicate column name')) console.error('Migration error (cleanliness):', err.message);
-            });
+            // 3. SEED INITIAL DATA
+            db.run(`INSERT OR IGNORE INTO global_events (id, name, multiplier, is_active, description) 
+                    VALUES ('heavy_rain', 'Сильный ливень', 1.5, 0, 'Повышенный спрос из-за непогоды!')`);
 
-            db.run(`ALTER TABLE users ADD COLUMN tire_condition REAL DEFAULT 100.0`, (err) => {
-                if (err && !err.message.includes('duplicate column name')) console.error('Migration error (tire_condition):', err.message);
-            });
+            db.run(`INSERT OR IGNORE INTO global_settings(key, value) VALUES('jackpot_pool', '0')`);
 
-            db.run(`ALTER TABLE orders_history ADD COLUMN district_id TEXT`, (err) => {
-                if (err && !err.message.includes('duplicate column name')) console.error('Migration error (district_id):', err.message);
-            });
+            // 4. INDEXES & FINALIZE
+            db.run(`CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id)`);
+            db.run(`CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders_history(user_id)`);
+            db.run(`CREATE INDEX IF NOT EXISTS idx_orders_completed_at ON orders_history(completed_at)`);
+            db.run(`CREATE INDEX IF NOT EXISTS idx_drivers_user_id ON drivers(user_id)`);
+            db.run(`CREATE INDEX IF NOT EXISTS idx_promo_usages_user ON promo_usages(user_id, promo_id)`);
+            db.run(`CREATE INDEX IF NOT EXISTS idx_plates_owner ON license_plates(owner_id)`);
 
-            // Initialize Jackpot setting
-            db.run(`INSERT OR IGNORE INTO global_settings(key, value) VALUES('jackpot_pool', '0')`, () => {
-                // Performance: Add indexes for frequent queries
-                db.run(`CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id)`, (err) => {
-                    if (err && !err.message.includes('already exists')) console.error('Index error:', err.message);
-                });
-                db.run(`CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders_history(user_id)`, (err) => {
-                    if (err && !err.message.includes('already exists')) console.error('Index error:', err.message);
-                });
-                db.run(`CREATE INDEX IF NOT EXISTS idx_orders_completed_at ON orders_history(completed_at)`, (err) => {
-                    if (err && !err.message.includes('already exists')) console.error('Index error:', err.message);
-                });
-                db.run(`CREATE INDEX IF NOT EXISTS idx_drivers_user_id ON drivers(user_id)`, (err) => {
-                    if (err && !err.message.includes('already exists')) console.error('Index error:', err.message);
-                });
-                db.run(`CREATE INDEX IF NOT EXISTS idx_promo_usages_user ON promo_usages(user_id, promo_id)`, (err) => {
-                    if (err && !err.message.includes('already exists')) console.error('Index error:', err.message);
-                });
-                db.run(`CREATE INDEX IF NOT EXISTS idx_plates_owner ON license_plates(owner_id)`);
+            console.log('Database initialization and migrations check completed.');
 
-                console.log('Migrations and initial settings check completed.');
-                console.log('📊 Database indexes verified.');
-
-                // Seed database with initial content
-                seedDB().then(() => {
-                    // v6.0.2: Clean up license plates without owners requested by user
-                    db.run("DELETE FROM license_plates WHERE plate_number IN ('01', 'BOSS', 'II-105-BU') AND owner_id IS NULL", function (err) {
-                        if (err) console.error('Error cleaning up license plates:', err.message);
-                        else if (this && this.changes > 0) console.log(`Cleaned up ${this.changes} license plates.`);
-                    });
-
-                    dbReadyResolve();
-                    resolve();
-                });
+            seedDB().then(() => {
+                // v6.0.2: Clean up license plates without owners
+                db.run("DELETE FROM license_plates WHERE plate_number IN ('01', 'BOSS', 'II-105-BU') AND owner_id IS NULL");
+                dbReadyResolve();
+                resolve();
             });
         });
     });

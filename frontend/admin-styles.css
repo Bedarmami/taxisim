@@ -753,3 +753,39 @@ td .status-badge {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
     margin-bottom: 20px;
 }
+
+/* Event & Crypto Management Styles */
+.event-admin-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.event-admin-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s ease;
+}
+
+.event-admin-card.active {
+    border-color: #e74c3c;
+    background: rgba(231, 76, 60, 0.1);
+    box-shadow: 0 0 15px rgba(231, 76, 60, 0.2);
+}
+
+.event-info h3 {
+    margin: 0 0 5px 0;
+    color: #fff;
+}
+
+.event-info p {
+    margin: 0;
+    font-size: 0.9em;
+    color: #aaa;
+}
