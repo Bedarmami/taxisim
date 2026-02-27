@@ -4582,3 +4582,204 @@ button {
         transform: translateY(0);
     }
 }
+
+/* ============= v6.2: SKELETON LOADING ============= */
+@keyframes skeletonShimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position:  200% 0; }
+}
+
+.skeleton {
+    background: linear-gradient(90deg,
+        rgba(255,255,255,0.04) 25%,
+        rgba(255,255,255,0.10) 50%,
+        rgba(255,255,255,0.04) 75%);
+    background-size: 200% 100%;
+    animation: skeletonShimmer 1.4s infinite;
+    border-radius: 10px;
+}
+
+.skeleton-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 20px;
+    padding: 18px 20px;
+    margin-bottom: 12px;
+}
+
+.skeleton-line {
+    height: 11px;
+    border-radius: 6px;
+    margin-bottom: 10px;
+}
+.skeleton-line.s { width: 38%; }
+.skeleton-line.m { width: 62%; }
+.skeleton-line.l { width: 88%; }
+.skeleton-line.f { width: 100%; }
+
+.skeleton-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.skeleton-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.skeleton-btn {
+    height: 40px;
+    border-radius: 12px;
+    margin-top: 12px;
+}
+
+/* ============= v6.2: ORDER SUCCESS OVERLAY ============= */
+.order-success-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    border-radius: 20px;
+    gap: 8px;
+    animation: overlayIn 0.3s ease;
+}
+
+@keyframes overlayIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to   { opacity: 1; transform: scale(1); }
+}
+
+.order-success-checkmark {
+    font-size: 40px;
+    animation: checkPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes checkPop {
+    0%   { transform: scale(0) rotate(-30deg); }
+    100% { transform: scale(1) rotate(0deg); }
+}
+
+.order-success-text {
+    font-size: 18px;
+    font-weight: 900;
+    color: #2ecc71;
+    letter-spacing: 0.5px;
+}
+
+.order-success-amount {
+    font-size: 22px;
+    font-weight: 900;
+    color: #FFD700;
+    text-shadow: 0 0 12px rgba(255,215,0,0.6);
+}
+
+
+/* ============= v6.2: SKELETON LOADING ============= */
+@keyframes skeletonShimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position:  200% 0; }
+}
+
+.skeleton {
+    background: linear-gradient(90deg,
+        rgba(255,255,255,0.04) 25%,
+        rgba(255,255,255,0.10) 50%,
+        rgba(255,255,255,0.04) 75%);
+    background-size: 200% 100%;
+    animation: skeletonShimmer 1.4s infinite;
+    border-radius: 10px;
+}
+
+.skeleton-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 20px;
+    padding: 18px 20px;
+    margin-bottom: 12px;
+}
+
+.skeleton-line {
+    height: 11px;
+    border-radius: 6px;
+    margin-bottom: 10px;
+}
+.skeleton-line.s { width: 38%; }
+.skeleton-line.m { width: 62%; }
+.skeleton-line.l { width: 88%; }
+.skeleton-line.f { width: 100%; }
+
+.skeleton-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.skeleton-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.skeleton-btn {
+    height: 40px;
+    border-radius: 12px;
+    margin-top: 12px;
+}
+
+/* ============= v6.2: ORDER SUCCESS OVERLAY ============= */
+.order-success-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    border-radius: 20px;
+    gap: 8px;
+    animation: overlayIn 0.3s ease;
+}
+
+@keyframes overlayIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to   { opacity: 1; transform: scale(1); }
+}
+
+.order-success-checkmark {
+    font-size: 40px;
+    animation: checkPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes checkPop {
+    0%   { transform: scale(0) rotate(-30deg); }
+    100% { transform: scale(1) rotate(0deg); }
+}
+
+.order-success-text {
+    font-size: 18px;
+    font-weight: 900;
+    color: #2ecc71;
+    letter-spacing: 0.5px;
+}
+
+.order-success-amount {
+    font-size: 22px;
+    font-weight: 900;
+    color: #FFD700;
+    text-shadow: 0 0 12px rgba(255,215,0,0.6);
+}

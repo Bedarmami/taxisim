@@ -511,8 +511,23 @@ async function loadOrders() {
     try {
         const ordersList = document.getElementById('orders-list');
         if (ordersList) {
-            ordersList.innerHTML = '<div class="loading">⏳ Загрузка заказов...</div>';
+            // v6.2: Skeleton loading instead of spinner
+            ordersList.innerHTML = [1, 2, 3].map(() => `
+                <div class="skeleton-card">
+                    <div class="skeleton-header">
+                        <div class="skeleton skeleton-circle"></div>
+                        <div style="flex:1">
+                            <div class="skeleton skeleton-line m"></div>
+                            <div class="skeleton skeleton-line s"></div>
+                        </div>
+                    </div>
+                    <div class="skeleton skeleton-line l"></div>
+                    <div class="skeleton skeleton-line m"></div>
+                    <div class="skeleton skeleton-btn"></div>
+                </div>
+            `).join('');
         }
+
 
         const url = `${API_BASE_URL}/orders/${TELEGRAM_ID}?district=${currentDistrict}`;
         const data = await safeFetchJson(url);
@@ -813,6 +828,21 @@ async function takeOrder(orderId, event, useAutopilot = false) {
         // Wait for animation to finish
         await animationPromise;
 
+        // v6.2: Show success overlay before removing/updating order card
+        if (result.success && card) {
+            const overlay = document.createElement('div');
+            overlay.className = 'order-success-overlay';
+            overlay.innerHTML = `
+                <div class="order-success-checkmark">✅</div>
+                <div class="order-success-text">ПРИНЯТО</div>
+                <div class="order-success-amount">+${result.earnings?.toFixed(2) || result.earnings.toFixed(2)} PLN</div>
+            `;
+            card.appendChild(overlay);
+
+            // Wait 1.2s to enjoy the success screen before loading new orders
+            await new Promise(r => setTimeout(r, 1200));
+        }
+
         if (result.success) {
             const oldLevel = userData.level;
             userData.balance = result.new_balance;
@@ -845,30 +875,22 @@ async function takeOrder(orderId, event, useAutopilot = false) {
                 showNotification(`${result.event.message}`, 'info');
             }
 
-            // Remove order
-            const idx = orders.findIndex(o => o.id === orderId);
-            if (idx !== -1) orders.splice(idx, 1);
-
-            updateMainScreen();
-            displayOrders();
-
-            if (orders.length < 2) {
-                setTimeout(() => loadOrders(), 1500);
-            }
-
-            if (result.earnings) {
-                showNotification(`✅ Заказ выполнен! +${result.earnings.toFixed(2)} PLN`, 'success');
-                try { soundManager.play('coin'); } catch (e) { }
-            }
+            setTimeout(() => loadOrders(), 1500);
         }
 
-    } catch (error) {
-        console.error('Error:', error);
-        showNotification(error.message, 'error');
-        if (card) card.classList.remove('in-progress');
-    } finally {
-        isProcessingOrder = false;
+        if (result.earnings) {
+            showNotification(`✅ Заказ выполнен! +${result.earnings.toFixed(2)} PLN`, 'success');
+            try { soundManager.play('coin'); } catch (e) { }
+        }
     }
+
+    } catch (error) {
+    console.error('Error:', error);
+    showNotification(error.message, 'error');
+    if (card) card.classList.remove('in-progress');
+} finally {
+    isProcessingOrder = false;
+}
 }
 
 function animateRide(orderId, duration) {
@@ -2948,7 +2970,7 @@ async function skipWeek() {
 }
 
 // ============= v6.1.2: GLOBAL RIPPLE EFFECT =============
-document.addEventListener('click', function(e) {
+document.addEventListener('click', function (e) {
     const btn = e.target.closest('button');
     if (!btn) return;
     if (btn.classList.contains('nav-item')) return;
@@ -2956,9 +2978,59 @@ document.addEventListener('click', function(e) {
     ripple.classList.add('ripple');
     const rect = btn.getBoundingClientRect();
     ripple.style.left = (e.clientX - rect.left) + 'px';
-    ripple.style.top  = (e.clientY - rect.top) + 'px';
+    ripple.style.top = (e.clientY - rect.top) + 'px';
     if (!btn.style.position || btn.style.position === 'static') btn.style.position = 'relative';
     btn.style.overflow = 'hidden';
     btn.appendChild(ripple);
     ripple.addEventListener('animationend', () => ripple.remove());
 }, { passive: true });
+
+
+// ============= v6.2: WEBSOCKET LIVE BALANCE UPDATES =============
+(function initWebSocket() {
+    if (!window.TELEGRAM_ID && typeof TELEGRAM_ID === 'undefined') return;
+
+    const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = ${ wsProto }//;
+    let ws = null;
+    let reconnectTimer = null;
+
+    function connect() {
+        try {
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                const id = typeof TELEGRAM_ID !== 'undefined' ? TELEGRAM_ID : null;
+                if (id) ws.send(JSON.stringify({ type: 'auth', telegramId: id }));
+                if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+            };
+
+            ws.onmessage = (evt) => {
+                try {
+                    const msg = JSON.parse(evt.data);
+                    if (msg.type === 'balance_update') {
+                        // Update balance in userData silently
+                        if (typeof userData !== 'undefined' && userData) {
+                            userData.balance = msg.balance;
+                            if (msg.stamina !== undefined) userData.stamina = msg.stamina;
+                            if (msg.fuel !== undefined) userData.fuel = msg.fuel;
+                        }
+                        // Update displayed balance
+                        if (typeof updateBalanceDisplay === 'function') updateBalanceDisplay();
+                        if (typeof updateMainScreen === 'function') updateMainScreen();
+                    }
+                } catch (e) { }
+            };
+
+            ws.onclose = () => {
+                // Auto-reconnect after 5s
+                reconnectTimer = setTimeout(connect, 5000);
+            };
+
+            ws.onerror = () => ws.close();
+        } catch (e) { }
+    }
+
+    // Wait until app is initialized then connect
+    setTimeout(connect, 2000);
+})();

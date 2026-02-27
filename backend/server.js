@@ -1984,6 +1984,26 @@ app.post('/api/user/:telegramId/ride', rateLimitMiddleware, async (req, res) => 
             fuel_type: fuelType
         });
 
+        // v6.2: Live balance broadcast via WebSocket
+        try {
+            if (global.broadcastBalance) {
+                global.broadcastBalance(telegramId, Number(user.balance.toFixed(2)), {
+                    stamina: user.stamina,
+                    fuel: Number(user.fuel.toFixed(3))
+                });
+            }
+        } catch (wsErr) { }
+
+        // v6.2: Telegram push for autopilot earnings
+        const isAutopilot = req.body && req.body.autopilot;
+        if (isAutopilot && earnings > 0) {
+            try {
+                await sendNotification(telegramId,
+                    `🤖 <b>Автопилот заработал!</b>\n\n💰 <b>+${earnings.toFixed(2)} PLN</b>\n📍 ${order.from || '?'} → ${order.to || '?'}\n💼 Баланс: ${user.balance.toFixed(2)} PLN`
+                );
+            } catch (e) { }
+        }
+
         res.json({
             success: true,
             new_balance: Number(user.balance.toFixed(2)),
@@ -5380,10 +5400,104 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/index.html'));
 });
 
+// ============= v6.2: WEBSOCKET LIVE UPDATES =============
+const http_server = require('http').createServer(app);
+let WebSocketServer;
+try {
+    const WSLib = require('ws');
+    WebSocketServer = WSLib.WebSocketServer || WSLib.Server;
+} catch (e) {
+    console.warn('⚠️ ws package not installed. Run: npm install ws in /backend. WebSocket disabled.');
+}
+
+// Map of telegramId → WebSocket client
+const wsClients = new Map();
+
+if (WebSocketServer) {
+    const wss = new WebSocketServer({ server: http_server });
+
+    wss.on('connection', (ws, req) => {
+        let clientId = null;
+
+        ws.on('message', (raw) => {
+            try {
+                const msg = JSON.parse(raw.toString());
+                if (msg.type === 'auth' && msg.telegramId) {
+                    clientId = String(msg.telegramId);
+                    wsClients.set(clientId, ws);
+                    ws.send(JSON.stringify({ type: 'auth_ok' }));
+                    console.log(`🔌 WS client connected: ${clientId}`);
+                }
+            } catch (e) { }
+        });
+
+        ws.on('close', () => {
+            if (clientId) wsClients.delete(clientId);
+        });
+    });
+
+    console.log('✅ WebSocket server ready');
+}
+
+// Helper: broadcast balance update to a user
+function broadcastBalance(telegramId, balance, extra = {}) {
+    const ws = wsClients.get(String(telegramId));
+    if (ws && ws.readyState === 1) {
+        ws.send(JSON.stringify({ type: 'balance_update', balance, ...extra }));
+    }
+}
+global.broadcastBalance = broadcastBalance;
+
+// ============= v6.2: TELEGRAM PUSH NOTIFICATIONS =============
+// Daily rental expiry check (runs once per day)
+function scheduleDailyRentalCheck() {
+    const checkRentals = async () => {
+        try {
+            const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+            const expiring = await db.query(`
+                SELECT telegram_id, car FROM users
+                WHERE car IS NOT NULL
+                  AND JSON_EXTRACT(car, '$.rental_expires') IS NOT NULL
+                  AND JSON_EXTRACT(car, '$.rental_expires') <= ?
+                  AND JSON_EXTRACT(car, '$.rental_expires') > ?
+            `, [tomorrow, new Date().toISOString()]);
+
+            for (const user of expiring) {
+                try {
+                    const carData = JSON.parse(user.car);
+                    if (carData.name) {
+                        await sendNotification(user.telegram_id,
+                            `⚠️ <b>Аренда истекает!</b>\n\n🚗 <b>${carData.name}</b>\nАренда заканчивается через 24 часа.\n<i>Продлите аренду в разделе «Гараж» 🔧</i>`
+                        );
+                    }
+                } catch (e) { }
+            }
+        } catch (e) {
+            console.error('Rental check error:', e.message);
+        }
+    };
+
+    // Run at 9:00 AM daily
+    const now = new Date();
+    const nextRun = new Date(now);
+    nextRun.setHours(9, 0, 0, 0);
+    if (nextRun <= now) nextRun.setDate(nextRun.getDate() + 1);
+    const delay = nextRun - now;
+
+    setTimeout(() => {
+        checkRentals();
+        setInterval(checkRentals, 24 * 60 * 60 * 1000);
+    }, delay);
+
+    console.log(`📅 Rental check scheduled for ${nextRun.toLocaleTimeString()}`);
+}
+
 // Start Server
-app.listen(PORT, () => {
+http_server.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`\nv6.0.3 with SQLite Persistence - ELITE Edition `);
+    console.log(`\nv6.2 with WebSocket Live Updates + Telegram Push`);
     console.log(`📡 Сервер запущен: http://localhost:${PORT}`);
     console.log(`🚖 TAXI SIMULATOR PRO initialized successfully.\n`);
+
+    try { scheduleDailyRentalCheck(); } catch (e) { }
 });
