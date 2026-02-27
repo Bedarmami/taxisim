@@ -882,15 +882,14 @@ async function takeOrder(orderId, event, useAutopilot = false) {
             showNotification(`✅ Заказ выполнен! +${result.earnings.toFixed(2)} PLN`, 'success');
             try { soundManager.play('coin'); } catch (e) { }
         }
-    }
 
     } catch (error) {
-    console.error('Error:', error);
-    showNotification(error.message, 'error');
-    if (card) card.classList.remove('in-progress');
-} finally {
-    isProcessingOrder = false;
-}
+        console.error('Error:', error);
+        showNotification(error.message, 'error');
+        if (card) card.classList.remove('in-progress');
+    } finally {
+        isProcessingOrder = false;
+    }
 }
 
 function animateRide(orderId, duration) {
@@ -2991,7 +2990,7 @@ document.addEventListener('click', function (e) {
     if (!window.TELEGRAM_ID && typeof TELEGRAM_ID === 'undefined') return;
 
     const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = ${ wsProto }//;
+    const wsUrl = `${wsProto}//${location.host}`;
     let ws = null;
     let reconnectTimer = null;
 
