@@ -2359,53 +2359,86 @@ body {
 .garage-content {
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    gap: 14px;
     flex: 1;
     overflow-y: auto;
 }
 
+/* Hero car card - purple neon glow */
 .current-car-card {
-    background-color: var(--secondary-bg);
-    padding: 16px;
-    border-radius: 16px;
-    border: 1px solid var(--border-color);
+    background: linear-gradient(135deg, rgba(88, 86, 214, 0.08), rgba(255, 255, 255, 0.03));
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    padding: 20px;
+    border-radius: 20px;
+    border: 1px solid rgba(88, 86, 214, 0.35);
     flex-shrink: 0;
+    box-shadow: 0 0 25px rgba(88, 86, 214, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    position: relative;
+    overflow: hidden;
+}
+
+.current-car-card::before {
+    content: '';
+    position: absolute;
+    top: -30px;
+    right: -30px;
+    width: 120px;
+    height: 120px;
+    background: radial-gradient(circle, rgba(88, 86, 214, 0.2) 0%, transparent 70%);
+    pointer-events: none;
 }
 
 .current-car-card h3 {
-    margin-bottom: 12px;
-    font-size: 16px;
+    margin-bottom: 14px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
 }
 
 .car-details {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
 }
 
 .car-name {
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--accent-color);
+    font-size: 22px;
+    font-weight: 900;
+    color: var(--text-color);
+    letter-spacing: -0.3px;
 }
 
 .car-status {
-    font-size: 14px;
-    color: #8e8e93;
-    margin-bottom: 8px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
 }
 
+/* Car stats as mini glassmorphism tiles */
 .car-stats {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 8px;
-    color: #8e8e93;
-    font-size: 14px;
+    font-size: 13px;
+}
+
+.car-stats>div {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 8px 10px;
+    color: var(--text-secondary);
 }
 
 .car-stats span {
     color: var(--text-color);
-    font-weight: 600;
+    font-weight: 700;
+    display: block;
+    font-size: 15px;
+    margin-top: 2px;
 }
 
 .cars-section {
@@ -2414,54 +2447,75 @@ body {
 
 .cars-section h3 {
     margin-bottom: 12px;
-    font-size: 16px;
+    font-size: 15px;
+    font-weight: 800;
     color: var(--text-color);
+    letter-spacing: 0.3px;
 }
 
 .cars-list {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
 }
 
+/* Buy/Rent car cards */
 .car-card {
-    background-color: var(--secondary-bg);
-    border-radius: 16px;
-    padding: 14px;
-    border: 1px solid var(--border-color);
-    transition: all 0.2s;
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: 18px;
+    padding: 14px 16px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    transition: all 0.25s ease;
     flex-shrink: 0;
 }
 
-.car-card:active {
+.car-card:hover {
+    border-color: rgba(255, 215, 0, 0.2);
     transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.car-card:active {
+    transform: scale(0.99);
 }
 
 .car-card-header {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     margin-bottom: 10px;
 }
 
 .car-icon {
-    font-size: 32px;
+    font-size: 34px;
+    filter: drop-shadow(0 0 6px rgba(255, 215, 0, 0.3));
 }
 
 .car-name {
     font-size: 16px;
-    font-weight: 700;
+    font-weight: 800;
+    color: var(--text-color);
 }
 
+/* Car specs grid */
 .car-specs {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-    background-color: rgba(0, 0, 0, 0.05);
+    gap: 6px;
+    background: rgba(0, 0, 0, 0.2);
     padding: 10px;
-    border-radius: 10px;
+    border-radius: 12px;
     margin-bottom: 8px;
-    font-size: 13px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.car-specs>div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
 }
 
 .gas-badge {
@@ -3673,10 +3727,10 @@ button {
     width: 80px;
     height: 80px;
     border-radius: 50%;
-    border: 3px solid var(--accent-color);
+    border: 3px solid #FFD700;
     padding: 3px;
     background: var(--app-bg);
-    box-shadow: 0 8px 20px rgba(0, 122, 255, 0.15);
+    box-shadow: 0 0 18px rgba(255, 215, 0, 0.35);
 }
 
 .profile-avatar-large img {
@@ -3694,12 +3748,13 @@ button {
 
 .profile-level-badge {
     display: inline-block;
-    background: var(--accent-color);
-    color: white;
+    background: linear-gradient(135deg, #FFD700, #FF9500);
+    color: #000;
     padding: 4px 12px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: 700;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 900;
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
 }
 
 .profile-stats-grid {
@@ -3709,13 +3764,20 @@ button {
 }
 
 .p-stat {
-    background: var(--secondary-bg);
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     padding: 14px;
     border-radius: 16px;
-    border: 1px solid var(--border-color);
+    border: 1px solid rgba(255, 255, 255, 0.07);
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 5px;
+    transition: border-color 0.2s;
+}
+
+.p-stat:hover {
+    border-color: rgba(255, 215, 0, 0.2);
 }
 
 .p-label {
@@ -4016,10 +4078,10 @@ button {
     width: 80px;
     height: 80px;
     border-radius: 50%;
-    border: 3px solid var(--accent-color);
+    border: 3px solid #FFD700;
     padding: 3px;
     background: var(--app-bg);
-    box-shadow: 0 8px 20px rgba(0, 122, 255, 0.15);
+    box-shadow: 0 0 18px rgba(255, 215, 0, 0.35);
 }
 
 .profile-avatar-large img {
@@ -4037,12 +4099,13 @@ button {
 
 .profile-level-badge {
     display: inline-block;
-    background: var(--accent-color);
-    color: white;
+    background: linear-gradient(135deg, #FFD700, #FF9500);
+    color: #000;
     padding: 4px 12px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: 700;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 900;
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
 }
 
 .profile-stats-grid {
@@ -4052,13 +4115,20 @@ button {
 }
 
 .p-stat {
-    background: var(--secondary-bg);
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     padding: 14px;
     border-radius: 16px;
-    border: 1px solid var(--border-color);
+    border: 1px solid rgba(255, 255, 255, 0.07);
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 5px;
+    transition: border-color 0.2s;
+}
+
+.p-stat:hover {
+    border-color: rgba(255, 215, 0, 0.2);
 }
 
 .p-label {
