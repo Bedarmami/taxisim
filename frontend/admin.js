@@ -26,7 +26,7 @@ function openTab(evt, tabName) {
     if (tabName === 'tab-plates') loadAdminPlates();
     if (tabName === 'tab-live-config') loadConfigs();
     if (tabName === 'tab-car-profit') loadCarProfitability();
-    if (tabName === 'tab-events') loadEvents();
+    if (tabName === 'tab-events') loadEventsAdmin();
     if (tabName === 'tab-crypto') loadCryptoAdmin();
 }
 
@@ -1518,7 +1518,7 @@ async function loadCarProfitability() {
 }
 // ============= EVENT MANAGEMENT =============
 
-async function loadEvents() {
+async function loadEventsAdmin() {
     const list = document.getElementById('events-list');
     if (!list) return;
 

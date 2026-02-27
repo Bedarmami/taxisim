@@ -256,74 +256,81 @@ function initDB() {
             )`);
 
             // 2. RUN ALL MIGRATIONS
-            const migrations = [
-                `ALTER TABLE users ADD COLUMN referred_by TEXT`,
-                `ALTER TABLE users ADD COLUMN referred_count INTEGER DEFAULT 0`,
-                `ALTER TABLE users ADD COLUMN crypto_taxi_balance REAL DEFAULT 0`,
-                `ALTER TABLE users ADD COLUMN last_daily_bonus TEXT`,
-                `ALTER TABLE users ADD COLUMN mileage REAL DEFAULT 0`,
-                `ALTER TABLE users ADD COLUMN last_stamina_update TEXT`,
-                `ALTER TABLE users ADD COLUMN login_streak INTEGER DEFAULT 0`,
-                `ALTER TABLE users ADD COLUMN last_login_date TEXT`,
-                `ALTER TABLE users ADD COLUMN lootboxes_data TEXT DEFAULT '{}'`,
-                `ALTER TABLE users ADD COLUMN lootboxes_given_data TEXT DEFAULT '{}'`,
-                `ALTER TABLE users ADD COLUMN casino_spins_today INTEGER DEFAULT 0`,
-                `ALTER TABLE users ADD COLUMN casino_last_reset TEXT`,
-                `ALTER TABLE users ADD COLUMN casino_stats TEXT DEFAULT '{}'`,
-                `ALTER TABLE users ADD COLUMN tutorial_completed INTEGER DEFAULT 0`,
-                `ALTER TABLE users ADD COLUMN pending_auction_rewards TEXT DEFAULT '[]'`,
-                `ALTER TABLE users ADD COLUMN free_plate_rolls INTEGER DEFAULT 0`,
-                `ALTER TABLE users ADD COLUMN username TEXT`,
-                `ALTER TABLE users ADD COLUMN current_district TEXT DEFAULT 'suburbs'`,
-                `ALTER TABLE users ADD COLUMN uncollected_fleet_revenue REAL DEFAULT 0`,
-                `ALTER TABLE users ADD COLUMN is_autonomous_active INTEGER DEFAULT 0`,
-                `ALTER TABLE users ADD COLUMN paid_rests_today INTEGER DEFAULT 0`,
-                `ALTER TABLE users ADD COLUMN last_autonomous_update TEXT`,
-                `ALTER TABLE users ADD COLUMN skills TEXT DEFAULT '{"charisma":0,"mechanic":0,"navigator":0}'`,
-                `ALTER TABLE users ADD COLUMN cleanliness REAL DEFAULT 100.0`,
-                `ALTER TABLE users ADD COLUMN tire_condition REAL DEFAULT 100.0`,
-                `ALTER TABLE support_messages ADD COLUMN sender_type TEXT DEFAULT 'user'`,
-                `ALTER TABLE car_definitions ADD COLUMN has_autopilot INTEGER DEFAULT 0`,
-                `ALTER TABLE car_definitions ADD COLUMN is_autonomous INTEGER DEFAULT 0`,
-                `ALTER TABLE jackpot_history ADD COLUMN winner_id TEXT`,
-                `ALTER TABLE orders_history ADD COLUMN district_id TEXT`,
-                `ALTER TABLE gas_stations ADD COLUMN price_petrol REAL DEFAULT 6.80`,
-                `ALTER TABLE gas_stations ADD COLUMN price_gas REAL DEFAULT 3.60`,
-                `ALTER TABLE gas_stations ADD COLUMN fuel_stock REAL DEFAULT 0`,
-                `ALTER TABLE gas_stations ADD COLUMN uncollected_revenue REAL DEFAULT 0`
-            ];
-
-            migrations.forEach(sql => {
-                db.run(sql, (err) => {
-                    // Ignore errors if column already exists
-                    if (err && !err.message.includes('duplicate column name')) {
-                        // console.error(`Safe migration message (${sql}):`, err.message);
-                    }
+            // 2. RUN ALL MIGRATIONS DEFENSIVELY
+            const addColumn = (table, column, definition) => {
+                return new Promise((resolve) => {
+                    db.all(`PRAGMA table_info(${table})`, (err, columns) => {
+                        if (err) {
+                            console.error(`Error checking table info for ${table}:`, err.message);
+                            return resolve();
+                        }
+                        const exists = columns.some(c => c.name === column);
+                        if (!exists) {
+                            db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`, (err) => {
+                                if (err) console.error(`Migration error (${table}.${column}):`, err.message);
+                                resolve();
+                            });
+                        } else {
+                            resolve();
+                        }
+                    });
                 });
-            });
+            };
 
-            // 3. SEED INITIAL DATA
-            db.run(`INSERT OR IGNORE INTO global_events (id, name, multiplier, is_active, description) 
-                    VALUES ('heavy_rain', 'Сильный ливень', 1.5, 0, 'Повышенный спрос из-за непогоды!')`);
+            const runMigrations = async () => {
+                try {
+                    await addColumn('users', 'referred_by', 'TEXT');
+                    await addColumn('users', 'referred_count', 'INTEGER DEFAULT 0');
+                    await addColumn('users', 'crypto_taxi_balance', 'REAL DEFAULT 0');
+                    await addColumn('users', 'last_daily_bonus', 'TEXT');
+                    await addColumn('users', 'mileage', 'REAL DEFAULT 0');
+                    await addColumn('users', 'last_stamina_update', 'TEXT');
+                    await addColumn('users', 'login_streak', 'INTEGER DEFAULT 0');
+                    await addColumn('users', 'last_login_date', 'TEXT');
+                    await addColumn('users', 'lootboxes_data', "TEXT DEFAULT '{}'");
+                    await addColumn('users', 'lootboxes_given_data', "TEXT DEFAULT '{}'");
+                    await addColumn('users', 'casino_spins_today', 'INTEGER DEFAULT 0');
+                    await addColumn('users', 'casino_last_reset', 'TEXT');
+                    await addColumn('users', 'casino_stats', "TEXT DEFAULT '{}'");
+                    await addColumn('users', 'tutorial_completed', 'INTEGER DEFAULT 0');
+                    await addColumn('users', 'pending_auction_rewards', "TEXT DEFAULT '[]'");
+                    await addColumn('users', 'free_plate_rolls', 'INTEGER DEFAULT 0');
+                    await addColumn('users', 'username', 'TEXT');
+                    await addColumn('users', 'current_district', "TEXT DEFAULT 'suburbs'");
+                    await addColumn('users', 'uncollected_fleet_revenue', 'REAL DEFAULT 0');
+                    await addColumn('users', 'is_autonomous_active', 'INTEGER DEFAULT 0');
+                    await addColumn('users', 'paid_rests_today', 'INTEGER DEFAULT 0');
+                    await addColumn('users', 'last_autonomous_update', 'TEXT');
+                    await addColumn('users', 'skills', "TEXT DEFAULT '{\"charisma\":0,\"mechanic\":0,\"navigator\":0}'");
+                    await addColumn('users', 'cleanliness', 'REAL DEFAULT 100.0');
+                    await addColumn('users', 'tire_condition', 'REAL DEFAULT 100.0');
+                    await addColumn('support_messages', 'sender_type', "TEXT DEFAULT 'user'");
+                    await addColumn('car_definitions', 'has_autopilot', 'INTEGER DEFAULT 0');
+                    await addColumn('car_definitions', 'is_autonomous', 'INTEGER DEFAULT 0');
+                    await addColumn('jackpot_history', 'winner_id', 'TEXT');
+                    await addColumn('orders_history', 'district_id', 'TEXT');
+                    await addColumn('gas_stations', 'price_petrol', 'REAL DEFAULT 6.80');
+                    await addColumn('gas_stations', 'price_gas', 'REAL DEFAULT 3.60');
+                    await addColumn('gas_stations', 'fuel_stock', 'REAL DEFAULT 0');
+                    await addColumn('gas_stations', 'uncollected_revenue', 'REAL DEFAULT 0');
 
-            db.run(`INSERT OR IGNORE INTO global_settings(key, value) VALUES('jackpot_pool', '0')`);
+                    console.log('Database initialization and migrations check completed.');
 
-            // 4. INDEXES & FINALIZE
-            db.run(`CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id)`);
-            db.run(`CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders_history(user_id)`);
-            db.run(`CREATE INDEX IF NOT EXISTS idx_orders_completed_at ON orders_history(completed_at)`);
-            db.run(`CREATE INDEX IF NOT EXISTS idx_drivers_user_id ON drivers(user_id)`);
-            db.run(`CREATE INDEX IF NOT EXISTS idx_promo_usages_user ON promo_usages(user_id, promo_id)`);
-            db.run(`CREATE INDEX IF NOT EXISTS idx_plates_owner ON license_plates(owner_id)`);
+                    await seedDB();
 
-            console.log('Database initialization and migrations check completed.');
+                    // v6.0.2: Clean up license plates without owners
+                    db.run("DELETE FROM license_plates WHERE plate_number IN ('01', 'BOSS', 'II-105-BU') AND owner_id IS NULL");
 
-            seedDB().then(() => {
-                // v6.0.2: Clean up license plates without owners
-                db.run("DELETE FROM license_plates WHERE plate_number IN ('01', 'BOSS', 'II-105-BU') AND owner_id IS NULL");
-                dbReadyResolve();
-                resolve();
-            });
+                    dbReadyResolve();
+                    resolve();
+                } catch (e) {
+                    console.error('Critical Migration/Seed Error:', e);
+                    dbReadyResolve(); // Resolve anyway to not hang the server
+                    resolve();
+                }
+            };
+
+            runMigrations();
         });
     });
 }
