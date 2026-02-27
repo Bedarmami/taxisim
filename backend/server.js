@@ -1095,9 +1095,9 @@ function generateOrder(user, districtId = 'suburbs') {
     const is_vip = Math.random() < district.vipChance;
     if (is_vip) basePrice *= 1.5;
 
-    // v2.3: Apply global event multipliers
-    if (currentEvent) {
-        basePrice *= currentEvent.payMultiplier;
+    // v2.3: Apply global event multipliers (v6.1.1 fix: use correct global variable)
+    if (GLOBAL_ACTIVE_EVENT && GLOBAL_ACTIVE_EVENT.is_active) {
+        basePrice *= (GLOBAL_ACTIVE_EVENT.multiplier || 1.0);
     }
 
     // Return the final order object
@@ -1244,8 +1244,12 @@ async function getUser(telegramId) {
                     if (row.fuel >= fuelNeeded) {
                         row.fuel -= fuelNeeded;
                         totalFuelUsed += fuelNeeded;
-                        // Avg earnings per 8km ride ~ 20 PLN
-                        totalEarnings += 20;
+                        // Avg earnings per 8km ride ~ 20 PLN (v6.1.1: Multiplied by global event)
+                        let baseEarnings = 20;
+                        if (GLOBAL_ACTIVE_EVENT && GLOBAL_ACTIVE_EVENT.is_active) {
+                            baseEarnings *= (GLOBAL_ACTIVE_EVENT.multiplier || 1.0);
+                        }
+                        totalEarnings += baseEarnings;
                         row.rides_completed++;
                         row.total_distance += 8;
                     } else {
@@ -1295,6 +1299,7 @@ async function getUser(telegramId) {
     if (row.car) row.car.mileage = Number(row.car.mileage || 0);
 
     row.free_plate_rolls = parseInt(row.free_plate_rolls) || 0;
+    row.crypto_taxi_balance = parseFloat(row.crypto_taxi_balance) || 0;
 
     // v3.4: Store original values for delta-based atomic updates
     row._originalBalance = row.balance;
@@ -1390,7 +1395,8 @@ async function saveUser(user) {
         skills = ?, cleanliness = ?, tire_condition = ?,
         tutorial_completed = ?, pending_auction_rewards = ?, free_plate_rolls = ?, is_banned = ?,
         current_district = ?, mileage = ?, uncollected_fleet_revenue = ?,
-        is_autonomous_active = ?, last_autonomous_update = ?, paid_rests_today = ?
+        is_autonomous_active = ?, last_autonomous_update = ?, paid_rests_today = ?,
+        crypto_taxi_balance = ?
         WHERE telegram_id = ?`;
 
     const params = [
@@ -1426,6 +1432,7 @@ async function saveUser(user) {
         user.is_autonomous_active || 0,
         user.last_autonomous_update,
         user.paid_rests_today || 0,
+        user.crypto_taxi_balance || 0,
         user.telegram_id
     ];
 
@@ -1831,13 +1838,8 @@ app.post('/api/user/:telegramId/ride', rateLimitMiddleware, async (req, res) => 
         if (isNaN(user.gas_fuel)) user.gas_fuel = 0;
 
         // Расчет дохода
-        // v6.1.0: Global Event Multiplier
-        let eventMultiplier = 1.0;
-        if (GLOBAL_ACTIVE_EVENT && GLOBAL_ACTIVE_EVENT.is_active) {
-            eventMultiplier = GLOBAL_ACTIVE_EVENT.multiplier || 1.0;
-        }
-
-        const multiplier = parseFloat(await getConfig('earnings_multiplier', '1.0')) * eventMultiplier;
+        // v6.1.0: Global Event Multiplier (v6.1.1: Already included in order.price, but we multiply by config anyway)
+        const multiplier = parseFloat(await getConfig('earnings_multiplier', '1.0'));
         let earnings = order.price * multiplier;
 
         // v3.5 Sanity Check: Revenue/Distance ratio (prevent price manipulation)
@@ -2277,7 +2279,14 @@ app.post('/api/user/:telegramId/autonomous-ride', async (req, res) => {
 
         // Execute ride
         user.fuel -= fuelNeeded;
-        const earnings = 20 + Math.floor(Math.random() * 10); // 20-30 PLN
+        let earnings = 20 + Math.floor(Math.random() * 10); // 20-30 PLN
+
+        // v6.1.1: Global Event Multiplier
+        if (GLOBAL_ACTIVE_EVENT && GLOBAL_ACTIVE_EVENT.is_active) {
+            earnings *= (GLOBAL_ACTIVE_EVENT.multiplier || 1.0);
+            earnings = Math.floor(earnings);
+        }
+
         user.balance += earnings;
         user.total_earned += earnings;
         user.rides_completed++;

@@ -1581,9 +1581,9 @@ async function loadCryptoAdmin() {
             headers: { 'x-admin-password': adminPassword }
         });
 
-        if (stats && !stats._isError) {
-            document.getElementById('admin-crypto-price').textContent = `${stats.currentPrice.toFixed(4)} PLN`;
-            document.getElementById('admin-crypto-total-supply').textContent = `${stats.totalSupply.toFixed(2)} $TAXI`;
+        if (stats && !stats._isError && stats.currentPrice !== undefined) {
+            document.getElementById('admin-crypto-price').textContent = `${parseFloat(stats.currentPrice).toFixed(4)} PLN`;
+            document.getElementById('admin-crypto-total-supply').textContent = `${parseFloat(stats.totalSupply || 0).toFixed(2)} $TAXI`;
         }
 
         const settings = await safeFetchJson('/api/admin/crypto/settings', {
@@ -1591,8 +1591,10 @@ async function loadCryptoAdmin() {
         });
 
         if (settings && !settings._isError) {
-            document.getElementById('crypto-min-price').value = settings.minFluctuation; // Actually, the HTML had placeholders for min/max price, but I implemented fluctuation in server. I should match them.
-            document.getElementById('crypto-max-price').value = settings.maxFluctuation;
+            const minInput = document.getElementById('crypto-min-price');
+            const maxInput = document.getElementById('crypto-max-price');
+            if (minInput) minInput.value = settings.minFluctuation;
+            if (maxInput) maxInput.value = settings.maxFluctuation;
         }
 
         const holders = await safeFetchJson('/api/admin/crypto/holders', {
@@ -1600,16 +1602,18 @@ async function loadCryptoAdmin() {
         });
 
         const tbody = document.getElementById('crypto-holders-tbody');
-        if (holders && !holders._isError) {
+        if (holders && !holders._isError && Array.isArray(holders)) {
             tbody.innerHTML = holders.map(h => `
                 <tr>
-                    <td><b>${h.first_name || 'Игрок'}</b><br><small style="color:#888">${h.telegram_id}</small></td>
-                    <td style="color:#f1c40f; font-weight:bold;">${parseFloat(h.crypto_taxi_balance).toFixed(2)} $TAXI</td>
-                    <td>${(parseFloat(h.crypto_taxi_balance) * (stats?.currentPrice || 0)).toFixed(2)} PLN</td>
+                    <td><b>${h.username || 'Игрок'}</b><br><small style="color:#888">${h.telegram_id}</small></td>
+                    <td style="color:#f1c40f; font-weight:bold;">${parseFloat(h.crypto_taxi_balance || 0).toFixed(2)} $TAXI</td>
+                    <td>${(parseFloat(h.crypto_taxi_balance || 0) * (stats?.currentPrice || 0)).toFixed(2)} PLN</td>
                 </tr>
             `).join('');
         }
-    } catch (e) { console.error(e); }
+    } catch (e) {
+        console.error('Error in loadCryptoAdmin:', e);
+    }
 }
 
 async function saveCryptoSettings() {
