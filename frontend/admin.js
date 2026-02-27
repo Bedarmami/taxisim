@@ -1563,14 +1563,14 @@ async function toggleEvent(eventId, active) {
         });
 
         if (res && res.success) {
-            loadEvents(); // Refresh list to update active state
+            loadEventsAdmin(); // Refresh list to update active state
         } else {
             alert('Ошибка: ' + (res?.error || 'Не удалось переключить событие'));
-            loadEvents(); // Restore state locally
+            loadEventsAdmin(); // Restore state locally
         }
     } catch (e) {
         alert('Ошибка сети');
-        loadEvents();
+        loadEventsAdmin();
     }
 }
 // ============= CRYPTO MANAGEMENT =============

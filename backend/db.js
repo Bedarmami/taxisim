@@ -20,6 +20,9 @@ const db = new sqlite3.Database(dbPath, (err) => {
         db.run('PRAGMA synchronous = NORMAL');
         db.run('PRAGMA cache_size = -20000'); // 20MB cache
         db.run('PRAGMA temp_store = MEMORY');
+
+        // Start initialization
+        initDB().catch(e => console.error('Failed to init DB:', e));
     }
 });
 
@@ -405,15 +408,35 @@ async function seedDB() {
             await run(`INSERT OR IGNORE INTO gas_stations(id, name, district_id, purchase_price) VALUES(?, ?, ?, ?)`,
                 [station.id, station.name, station.district_id, station.purchase_price]);
         }
+
+        // 4. Seed Global Events
+        const events = [
+            { id: 'rain', name: '🌧️ Проливной дождь', description: 'Повышенный спрос на такси! Доход x1.5', multiplier: 1.5 },
+            { id: 'snow', name: '❄️ Снегопад', description: 'Дороги замело, тарифы выросли! Доход x2.0', multiplier: 2.0 },
+            { id: 'rush_hour', name: '🌆 Час пик', description: 'Весь город в движении! Доход x1.3', multiplier: 1.3 },
+            { id: 'holiday', name: '🎉 Праздники', description: 'Время подарков и поездок! Доход x1.8', multiplier: 1.8 }
+        ];
+
+        for (const ev of events) {
+            await run(`INSERT OR IGNORE INTO global_events(id, name, description, multiplier) VALUES(?, ?, ?, ?)`,
+                [ev.id, ev.name, ev.description, ev.multiplier]);
+        }
+
+        // 5. Seed Crypto Defaults
+        const cryptoDefaults = [
+            { key: 'crypto_min_fluctuation', value: '-0.05' },
+            { key: 'crypto_max_fluctuation', value: '0.05' },
+            { key: 'crypto_fluctuation_interval_ms', value: '300000' } // 5 mins
+        ];
+
+        for (const conf of cryptoDefaults) {
+            await run(`INSERT OR IGNORE INTO global_settings(key, value) VALUES(?, ?)`, [conf.key, conf.value]);
+        }
     } catch (e) {
         console.error('Error seeding database:', e);
     }
 }
 
-// Call initDB when database is opened
-db.on('open', () => {
-    initDB();
-});
 
 // Promisified helper functions
 function query(sql, params = []) {

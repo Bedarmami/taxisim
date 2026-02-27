@@ -428,14 +428,10 @@ app.post('/api/user/:telegramId/buy-coffee', async (req, res) => {
 
 // v2.3: Get current global event
 app.get('/api/current-event', (req, res) => {
-    if (currentEvent) {
-        const timeLeft = currentEvent.endTime - Date.now();
+    if (GLOBAL_ACTIVE_EVENT) {
         res.json({
             active: true,
-            event: {
-                ...currentEvent,
-                timeLeft
-            }
+            event: GLOBAL_ACTIVE_EVENT
         });
     } else {
         res.json({ active: false });
