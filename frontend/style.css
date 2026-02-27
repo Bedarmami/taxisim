@@ -56,7 +56,8 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #0a0a0a 100%);
+    background: radial-gradient(circle at 50% 40%, rgba(88, 86, 214, 0.15) 0%, rgba(10, 10, 15, 1) 60%);
+    background-color: #050508;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -69,20 +70,23 @@
     text-align: center;
     width: 85%;
     max-width: 320px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 .splash-logo-wrap {
     position: relative;
     display: inline-block;
-    margin-bottom: 15px;
+    margin-bottom: 20px;
 }
 
 .splash-logo {
-    font-size: 72px;
-    animation: splashBounce 2s ease-in-out infinite;
+    font-size: 80px;
+    animation: splashBounce 2.5s ease-in-out infinite;
     position: relative;
     z-index: 2;
-    filter: drop-shadow(0 0 15px rgba(243, 160, 0, 0.4));
+    filter: drop-shadow(0 10px 20px rgba(255, 215, 0, 0.3)) drop-shadow(0 0 30px rgba(88, 86, 214, 0.4));
 }
 
 .splash-glow {
@@ -99,73 +103,96 @@
 }
 
 .splash-title {
-    font-size: 22px;
+    font-size: 24px;
     font-weight: 900;
-    letter-spacing: 3px;
-    margin-bottom: 4px;
-    background: linear-gradient(90deg, #f3a000, #ffd700, #f3a000);
+    letter-spacing: 2.5px;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    background: linear-gradient(90deg, #FFD700, #FF9500, #FFD700);
     background-size: 200% auto;
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
     animation: splashShimmer 3s linear infinite;
+    filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.2));
 }
 
 .splash-version {
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.3);
-    letter-spacing: 2px;
-    margin-bottom: 30px;
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.4);
+    letter-spacing: 3px;
+    margin-bottom: 40px;
 }
 
 .splash-progress-wrap {
-    margin-bottom: 20px;
+    width: 100%;
+    margin-bottom: 24px;
 }
 
 .splash-progress-bar {
     width: 100%;
     height: 6px;
-    background: rgba(255, 255, 255, 0.08);
-    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
     overflow: hidden;
-    margin-bottom: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    margin-bottom: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .splash-progress-fill {
     height: 100%;
     width: 0%;
-    background: linear-gradient(90deg, #f3a000, #ffd700);
-    border-radius: 3px;
-    transition: width 0.4s ease;
-    box-shadow: 0 0 10px rgba(243, 160, 0, 0.5);
+    background: linear-gradient(90deg, #FF9500, #FFD700);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+    position: relative;
+}
+
+.splash-progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+    animation: progressShimmer 1.5s infinite;
 }
 
 .splash-progress-info {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    font-family: var(--font-main);
 }
 
 .splash-status {
-    font-size: 12px;
+    font-size: 11px;
+    font-weight: 600;
     color: rgba(255, 255, 255, 0.5);
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
 .splash-percent {
-    font-size: 12px;
-    color: #f3a000;
-    font-weight: bold;
-    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    color: #FFD700;
+    font-weight: 800;
 }
 
 .splash-tip {
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.25);
-    padding: 10px 15px;
     background: rgba(255, 255, 255, 0.03);
-    border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.4);
+    padding: 12px 16px;
     line-height: 1.4;
 }
 
@@ -4585,23 +4612,28 @@ button {
 
 /* ============= v6.2: SKELETON LOADING ============= */
 @keyframes skeletonShimmer {
-    0%   { background-position: -200% 0; }
-    100% { background-position:  200% 0; }
+    0% {
+        background-position: -200% 0;
+    }
+
+    100% {
+        background-position: 200% 0;
+    }
 }
 
 .skeleton {
     background: linear-gradient(90deg,
-        rgba(255,255,255,0.04) 25%,
-        rgba(255,255,255,0.10) 50%,
-        rgba(255,255,255,0.04) 75%);
+            rgba(255, 255, 255, 0.04) 25%,
+            rgba(255, 255, 255, 0.10) 50%,
+            rgba(255, 255, 255, 0.04) 75%);
     background-size: 200% 100%;
     animation: skeletonShimmer 1.4s infinite;
     border-radius: 10px;
 }
 
 .skeleton-card {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.06);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 20px;
     padding: 18px 20px;
     margin-bottom: 12px;
@@ -4612,10 +4644,22 @@ button {
     border-radius: 6px;
     margin-bottom: 10px;
 }
-.skeleton-line.s { width: 38%; }
-.skeleton-line.m { width: 62%; }
-.skeleton-line.l { width: 88%; }
-.skeleton-line.f { width: 100%; }
+
+.skeleton-line.s {
+    width: 38%;
+}
+
+.skeleton-line.m {
+    width: 62%;
+}
+
+.skeleton-line.l {
+    width: 88%;
+}
+
+.skeleton-line.f {
+    width: 100%;
+}
 
 .skeleton-circle {
     width: 40px;
@@ -4655,8 +4699,15 @@ button {
 }
 
 @keyframes overlayIn {
-    from { opacity: 0; transform: scale(0.95); }
-    to   { opacity: 1; transform: scale(1); }
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
 }
 
 .order-success-checkmark {
@@ -4665,8 +4716,13 @@ button {
 }
 
 @keyframes checkPop {
-    0%   { transform: scale(0) rotate(-30deg); }
-    100% { transform: scale(1) rotate(0deg); }
+    0% {
+        transform: scale(0) rotate(-30deg);
+    }
+
+    100% {
+        transform: scale(1) rotate(0deg);
+    }
 }
 
 .order-success-text {
@@ -4680,29 +4736,34 @@ button {
     font-size: 22px;
     font-weight: 900;
     color: #FFD700;
-    text-shadow: 0 0 12px rgba(255,215,0,0.6);
+    text-shadow: 0 0 12px rgba(255, 215, 0, 0.6);
 }
 
 
 /* ============= v6.2: SKELETON LOADING ============= */
 @keyframes skeletonShimmer {
-    0%   { background-position: -200% 0; }
-    100% { background-position:  200% 0; }
+    0% {
+        background-position: -200% 0;
+    }
+
+    100% {
+        background-position: 200% 0;
+    }
 }
 
 .skeleton {
     background: linear-gradient(90deg,
-        rgba(255,255,255,0.04) 25%,
-        rgba(255,255,255,0.10) 50%,
-        rgba(255,255,255,0.04) 75%);
+            rgba(255, 255, 255, 0.04) 25%,
+            rgba(255, 255, 255, 0.10) 50%,
+            rgba(255, 255, 255, 0.04) 75%);
     background-size: 200% 100%;
     animation: skeletonShimmer 1.4s infinite;
     border-radius: 10px;
 }
 
 .skeleton-card {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.06);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 20px;
     padding: 18px 20px;
     margin-bottom: 12px;
@@ -4713,10 +4774,22 @@ button {
     border-radius: 6px;
     margin-bottom: 10px;
 }
-.skeleton-line.s { width: 38%; }
-.skeleton-line.m { width: 62%; }
-.skeleton-line.l { width: 88%; }
-.skeleton-line.f { width: 100%; }
+
+.skeleton-line.s {
+    width: 38%;
+}
+
+.skeleton-line.m {
+    width: 62%;
+}
+
+.skeleton-line.l {
+    width: 88%;
+}
+
+.skeleton-line.f {
+    width: 100%;
+}
 
 .skeleton-circle {
     width: 40px;
@@ -4756,8 +4829,15 @@ button {
 }
 
 @keyframes overlayIn {
-    from { opacity: 0; transform: scale(0.95); }
-    to   { opacity: 1; transform: scale(1); }
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
 }
 
 .order-success-checkmark {
@@ -4766,8 +4846,13 @@ button {
 }
 
 @keyframes checkPop {
-    0%   { transform: scale(0) rotate(-30deg); }
-    100% { transform: scale(1) rotate(0deg); }
+    0% {
+        transform: scale(0) rotate(-30deg);
+    }
+
+    100% {
+        transform: scale(1) rotate(0deg);
+    }
 }
 
 .order-success-text {
@@ -4781,5 +4866,5 @@ button {
     font-size: 22px;
     font-weight: 900;
     color: #FFD700;
-    text-shadow: 0 0 12px rgba(255,215,0,0.6);
+    text-shadow: 0 0 12px rgba(255, 215, 0, 0.6);
 }
