@@ -152,9 +152,9 @@ class BusinessManager {
         const mileageContainer = document.getElementById('biz-car-mileage');
         if (mileageContainer && this.currentCar) {
             mileageContainer.innerHTML = `
-                <div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:10px; font-size:0.85em; margin-bottom:15px; border:1px solid #333; display:flex; justify-content:space-between; align-items:center;">
-                    <div style="color:#aaa;">🚗 Активное авто: <span style="color:#fff; font-weight:bold;">${this.currentCar.name}</span></div>
-                    <div style="color:#aaa;">🛤️ Пробег: <span style="color:var(--accent-color); font-weight:bold;">${(this.currentCar.mileage || 0).toFixed(1)} км</span></div>
+                <div style="background:rgba(15, 15, 20, 0.6); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); padding:14px; border-radius:16px; font-size:0.85em; margin-bottom:15px; border:1px solid rgba(255, 215, 0, 0.2); display:flex; justify-content:space-between; align-items:center; box-shadow:0 4px 15px rgba(0,0,0,0.4);">
+                    <div style="color:var(--text-secondary);">🚗 Активное авто: <span style="color:#fff; font-weight:800; font-size:1.1em; margin-left:4px;">${this.currentCar.name}</span></div>
+                    <div style="color:var(--text-secondary);">🛤️ Пробег: <span style="color:#00bd56; font-weight:800; font-size:1.1em; margin-left:4px;">${(this.currentCar.mileage || 0).toFixed(1)} км</span></div>
                 </div>
             `;
         }
@@ -163,12 +163,13 @@ class BusinessManager {
         const fleetWithdrawContainer = document.getElementById('fleet-withdraw-container');
         if (fleetWithdrawContainer) {
             fleetWithdrawContainer.innerHTML = `
-                <div style="background:rgba(46, 204, 113, 0.05); border:1px solid #2ecc7133; border-radius:12px; padding:12px; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;">
+                <div style="background:rgba(46, 204, 113, 0.08); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1px solid rgba(46, 204, 113, 0.3); border-radius:16px; padding:16px; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center; box-shadow:0 4px 20px rgba(46, 204, 113, 0.15);">
                     <div>
-                        <div style="font-size:0.75em; color:#888; text-transform:uppercase;">Касса автопарка</div>
-                        <div style="font-size:1.1em; font-weight:bold; color:#2ecc71;">${(this.uncollectedFleetRevenue || 0).toFixed(2)} PLN</div>
+                        <div style="font-size:0.75em; color:var(--text-secondary); text-transform:uppercase; font-weight:700; letter-spacing:1px; margin-bottom:4px;">Касса автопарка</div>
+                        <div style="font-size:1.4em; font-weight:900; color:#2ecc71; text-shadow:0 0 10px rgba(46, 204, 113, 0.4);">${(this.uncollectedFleetRevenue || 0).toFixed(2)} PLN</div>
                     </div>
                     <button class="action-btn success small" 
+                            style="background:linear-gradient(135deg, #2ecc71, #27ae60); border:none; box-shadow:0 0 15px rgba(46,204,113,0.4);"
                             ${this.uncollectedFleetRevenue > 0 ? '' : 'disabled style="opacity:0.5"'}
                             onclick="businessManager.withdrawFleetProfit()">💰 Снять (-10%)</button>
                 </div>
@@ -232,24 +233,26 @@ class BusinessManager {
                 const isPersonal = carInstance.type === 'personal';
 
                 const div = document.createElement('div');
-                div.className = 'fleet-car-card';
-                div.style.cssText = 'background:#252525; margin-bottom:10px; padding:12px 15px; border-radius:12px; display:flex; justify-content:space-between; align-items:center; border:1px solid #333;';
+                div.className = 'driver-card';
+                div.style.cssText = 'background:rgba(15, 15, 20, 0.6); backdrop-filter:blur(16px); padding:16px; border-radius:16px; display:flex; justify-content:space-between; align-items:center; border:1px solid rgba(255,255,255,0.08); margin-bottom:12px; box-shadow:0 4px 15px rgba(0,0,0,0.4);';
 
                 div.innerHTML = `
-<div style="display:flex; align-items:center;">
-    <span style="font-size:1.8em; margin-right:12px; display:flex; align-items:center; justify-content:center; width:40px; height:40px;">${typeof renderCarImage === 'function' ? renderCarImage(carDef) : carDef.image}</span>
+                    <div style="display:flex; align-items:center;">
+                        <span style="font-size:2em; margin-right:14px; display:flex; align-items:center; justify-content:center; width:48px; height:48px; background:rgba(255,255,255,0.05); border-radius:12px; border:1px solid rgba(255,255,255,0.1); filter:drop-shadow(0 0 8px rgba(255,255,255,0.2));">${typeof renderCarImage === 'function' ? renderCarImage(carDef) : carDef.image}</span>
                         <div>
-                            <div style="font-weight:bold; color:#fff;">${carDef.name}</div>
-                            <div style="font-size:0.75em; color:#777;">
-                                ${isPersonal ? '<span style="color:var(--accent-color);">⭐ Личная</span>' : '🏢 Аренда'} | 
+                            <div style="font-weight:800; color:#fff; font-size:16px; margin-bottom:4px;">${carDef.name}</div>
+                            <div style="font-size:0.8em; color:var(--text-secondary); font-weight:500;">
+                                ${isPersonal ? '<span style="color:#FFD700;">⭐ Личная</span>' : '🏢 Аренда'} | 
                                 ID: ${carInstance.id.split('_').pop()}
                             </div>
                         </div>
                     </div>
                     <div style="display:flex; gap:8px;">
                         ${isActive ?
-                        '<span style="background:rgba(46, 204, 113, 0.2); color:#2ecc71; padding:6px 12px; border-radius:10px; font-size:0.8em; font-weight:bold; border:1px solid #2ecc7144;">🔋 Активна</span>' :
-                        `<button class="action-btn small" style="background:#555; color:white;" onclick="businessManager.selectCar('${carInstance.modelId}')">🚗 Ехать</button>`
+                        `<button class="action-btn small" disabled style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2);">🚗 В игре</button>` :
+                        isTaken ?
+                            '<span style="background:rgba(46, 204, 113, 0.2); color:#2ecc71; padding:6px 12px; border-radius:10px; font-size:0.8em; font-weight:bold; border:1px solid #2ecc7144;">🔋 Активна</span>' :
+                            `<button class="action-btn small" style="background:#555; color:white;" onclick="businessManager.selectCar('${carInstance.modelId}')">🚗 Ехать</button>`
                     }
                         ${isTaken ?
                         '<span style="background:#444; color:#888; padding:6px 12px; border-radius:10px; font-size:0.8em; border:1px solid #555;">Занята</span>' :
