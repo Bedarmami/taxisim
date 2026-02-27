@@ -133,6 +133,38 @@ const logError = async (level, message, stack = '') => {
     } catch (e) { console.error('Logging error:', e); }
 };
 
+// v6.1.0: Global State for Apps
+let GLOBAL_ACTIVE_EVENT = null;
+let CURRENT_TAXI_PRICE = 1.0;
+let TAXI_PRICE_HISTORY = [];
+
+async function updateTaxiPrice() {
+    // Random fluctuation between -5% and +5.5% (slight upward bias)
+    const change = (Math.random() * 0.105) - 0.05;
+    CURRENT_TAXI_PRICE = Math.max(0.1, Number((CURRENT_TAXI_PRICE * (1 + change)).toFixed(4)));
+
+    TAXI_PRICE_HISTORY.push({ price: CURRENT_TAXI_PRICE, timestamp: new Date().toISOString() });
+    if (TAXI_PRICE_HISTORY.length > 20) TAXI_PRICE_HISTORY.shift();
+
+    await db.run('INSERT INTO crypto_prices (symbol, price, timestamp) VALUES (?, ?, ?)',
+        ['TAXI', CURRENT_TAXI_PRICE, new Date().toISOString()]);
+}
+// Start crypto updates every 5 mins
+setInterval(updateTaxiPrice, 5 * 60 * 1000);
+// Initial price from DB or default
+db.dbReady.then(async () => {
+    const lastPrice = await db.get('SELECT price FROM crypto_prices ORDER BY id DESC LIMIT 1');
+    if (lastPrice) CURRENT_TAXI_PRICE = lastPrice.price;
+    else updateTaxiPrice();
+});
+
+// v6.1.0: Load active event
+async function loadActiveEvent() {
+    const event = await db.get('SELECT * FROM global_events WHERE is_active = 1');
+    GLOBAL_ACTIVE_EVENT = event || null;
+}
+db.dbReady.then(loadActiveEvent);
+
 const logActivity = async (telegramId, action, details = {}) => {
     try {
         await db.run('INSERT INTO user_activity (user_id, action, details, timestamp) VALUES (?, ?, ?, ?)',
@@ -1537,6 +1569,19 @@ app.get('/api/user/:telegramId', async (req, res) => {
                 username: username || 'Таксист'
             };
 
+            // v6.1.0: Referral Logic
+            const { ref } = req.query;
+            if (ref && ref !== telegramId) {
+                const referrer = await getUser(ref);
+                if (referrer) {
+                    newUser.referred_by = ref;
+                    newUser.balance += 500; // Bonus for new user
+                    // Note: Referrer bonus will be applied on save via atomic update or direct update
+                    await db.run('UPDATE users SET balance = balance + 500, referred_count = referred_count + 1 WHERE telegram_id = ?', [ref]);
+                    logActivity(ref, 'REFERRAL_BONUS', { target: telegramId });
+                }
+            }
+
             await db.run(`INSERT INTO users (
                 id, telegram_id, balance, total_earned, 
                 car_id, car_data, owned_cars_data, 
@@ -1548,8 +1593,9 @@ app.get('/api/user/:telegramId', async (req, res) => {
                 business_data, achievements_data, 
                 skills, cleanliness, tire_condition,
                 lootboxes_data, lootboxes_given_data,
-                created_at, last_login, username, mileage
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+                created_at, last_login, username, mileage,
+                referred_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
                 newUser.id, newUser.telegram_id, newUser.balance, newUser.total_earned,
                 newUser.car_id, JSON.stringify(newUser.car), JSON.stringify(newUser.owned_cars),
                 newUser.fuel, newUser.gas_fuel,
@@ -1562,7 +1608,8 @@ app.get('/api/user/:telegramId', async (req, res) => {
                 JSON.stringify(newUser.skills), newUser.cleanliness, newUser.tire_condition,
                 JSON.stringify({ wooden: 0, silver: 0, gold: 0, legendary: 0 }),
                 JSON.stringify({ wooden: 0, silver: 0, gold: 0, legendary: 0 }),
-                newUser.created_at, newUser.last_login, newUser.username, 0
+                newUser.created_at, newUser.last_login, newUser.username, 0,
+                newUser.referred_by || null
             ]);
 
             user = newUser;
@@ -1629,7 +1676,10 @@ app.get('/api/user/:telegramId', async (req, res) => {
             jackpot_pool: Number(JACKPOT_POOL.toFixed(2)),
             is_autonomous_active: !!user.is_autonomous_active,
             paid_rests_today: user.paid_rests_today || 0,
-            uncollected_fleet_revenue: Number(user.uncollected_fleet_revenue || 0).toFixed(2)
+            uncollected_fleet_revenue: Number(user.uncollected_fleet_revenue || 0).toFixed(2),
+            crypto_taxi_balance: Number(user.crypto_taxi_balance || 0).toFixed(4),
+            referred_count: user.referred_count || 0,
+            active_event: GLOBAL_ACTIVE_EVENT
         });
 
     } catch (error) {
@@ -1761,7 +1811,13 @@ app.post('/api/user/:telegramId/ride', rateLimitMiddleware, async (req, res) => 
         if (isNaN(user.gas_fuel)) user.gas_fuel = 0;
 
         // Расчет дохода
-        const multiplier = parseFloat(await getConfig('earnings_multiplier', '1.0'));
+        // v6.1.0: Global Event Multiplier
+        let eventMultiplier = 1.0;
+        if (GLOBAL_ACTIVE_EVENT && GLOBAL_ACTIVE_EVENT.is_active) {
+            eventMultiplier = GLOBAL_ACTIVE_EVENT.multiplier || 1.0;
+        }
+
+        const multiplier = parseFloat(await getConfig('earnings_multiplier', '1.0')) * eventMultiplier;
         let earnings = order.price * multiplier;
 
         // v3.5 Sanity Check: Revenue/Distance ratio (prevent price manipulation)
@@ -5117,6 +5173,100 @@ app.post('/api/error-report', async (req, res) => {
         res.status(500).json({ error: e.message });
     }
 });
+
+// --- v6.1.0: Advanced Features Endpoints ---
+
+// Get Crypto Price & History
+app.get('/api/crypto/taxi', (req, res) => {
+    res.json({
+        symbol: 'TAXI',
+        currentPrice: CURRENT_TAXI_PRICE,
+        history: TAXI_PRICE_HISTORY
+    });
+});
+
+// Buy $TAXI
+app.post('/api/user/:telegramId/crypto/buy', async (req, res) => {
+    try {
+        const { telegramId } = req.params;
+        const { amountPLN } = req.body; // How much PLN to spend
+        const user = await getUser(telegramId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        if (user.balance < amountPLN) return res.status(400).json({ error: 'Недостаточно баланса' });
+
+        const taxiAmount = amountPLN / CURRENT_TAXI_PRICE;
+        user.balance -= amountPLN;
+        user.crypto_taxi_balance = (Number(user.crypto_taxi_balance) || 0) + taxiAmount;
+
+        await saveUser(user);
+        res.json({
+            success: true,
+            newBalance: user.balance,
+            newCryptoBalance: user.crypto_taxi_balance,
+            message: `Куплено ${taxiAmount.toFixed(4)} $TAXI`
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Sell $TAXI
+app.post('/api/user/:telegramId/crypto/sell', async (req, res) => {
+    try {
+        const { telegramId } = req.params;
+        const { amountTaxi } = req.body; // How much TAXI to sell
+        const user = await getUser(telegramId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        if (user.crypto_taxi_balance < amountTaxi) return res.status(400).json({ error: 'Недостаточно $TAXI' });
+
+        const plnAmount = amountTaxi * CURRENT_TAXI_PRICE;
+        user.crypto_taxi_balance -= amountTaxi;
+        user.balance += plnAmount;
+
+        await saveUser(user);
+        res.json({
+            success: true,
+            newBalance: user.balance,
+            newCryptoBalance: user.crypto_taxi_balance,
+            message: `Продано за ${plnAmount.toFixed(2)} PLN`
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Admin: Manage Events
+app.post('/api/admin/events/toggle', adminAuth, async (req, res) => {
+    try {
+        const { eventId, active } = req.body;
+
+        // Deactivate all first (only one global event at a time)
+        await db.run('UPDATE global_events SET is_active = 0');
+
+        if (active) {
+            await db.run('UPDATE global_events SET is_active = 1 WHERE id = ?', [eventId]);
+        }
+
+        await loadActiveEvent();
+        res.json({ success: true, currentEvent: GLOBAL_ACTIVE_EVENT });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Admin: Get all events
+app.get('/api/admin/events', adminAuth, async (req, res) => {
+    try {
+        const events = await db.query('SELECT * FROM global_events');
+        res.json(events);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// --- End Advanced Features Endpoints ---
 
 // ============= 404 HANDLERS =============
 // API 404 - Always return JSON

@@ -64,6 +64,8 @@ let currentDistrict = 'suburbs';
 let districts = [];
 let staminaInterval = null;
 let eventInterval = null;
+// v6.1.0: Crypto State
+let cryptoPrice = { currentPrice: 1.0, history: [] };
 
 // ============= КОНФИГУРАЦИЯ =============
 const API_BASE_URL = window.location.origin + '/api';
@@ -479,6 +481,7 @@ async function loadUserData() {
         updateGarageScreen();
         updateBalanceDisplay();
         updatePlatesUI();
+        updateGlobalEventBanner(); // v6.1.0
         if (typeof checkRetentionMilestones === 'function') checkRetentionMilestones();
         startRetentionIntervals();
     } catch (error) {
@@ -998,6 +1001,12 @@ function updateMainScreen() {
     if (elements.fuel) elements.fuel.textContent = userData.fuel?.toFixed(1) || '0.0';
     if (elements.maxFuel) elements.maxFuel.textContent = userData.max_fuel || '45';
     if (elements.stamina) elements.stamina.textContent = Math.floor(userData.stamina || 0);
+
+    // v6.1.0: Crypto in main screen? Maybe only in wallet, but we sync balance here
+    if (userData.crypto_taxi_balance !== undefined) {
+        const cryptoEl = document.getElementById('user-crypto-balance');
+        if (cryptoEl) cryptoEl.textContent = `${Number(userData.crypto_taxi_balance).toFixed(4)} $TAXI`;
+    }
     if (elements.level) elements.level.textContent = `Ур. ${userData.level || 1}`;
     if (elements.ridesToday) elements.ridesToday.textContent = userData.rides_today || '0';
     if (elements.ridesStreak) {
@@ -2153,6 +2162,89 @@ function setupMuteListener() {
 })();
 // End of main script
 
+// ============= v6.1.0: CRYPTO & REFERRAL LOGIC =============
+
+async function updateCryptoMarket() {
+    try {
+        const data = await safeFetchJson(`${API_BASE_URL}/crypto/taxi`);
+        if (data && !data._isError) {
+            cryptoPrice = data;
+            const priceEl = document.getElementById('crypto-current-price');
+            if (priceEl) priceEl.textContent = `${data.currentPrice.toFixed(4)} PLN`;
+        }
+    } catch (e) { console.error('Crypto price fetch failed', e); }
+}
+
+async function buyCrypto() {
+    const amountPLN = parseFloat(document.getElementById('crypto-buy-amount').value);
+    if (isNaN(amountPLN) || amountPLN <= 0) return showNotification('Введите сумму в PLN', 'warning');
+
+    try {
+        const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/crypto/buy`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amountPLN })
+        });
+        if (result && result.success) {
+            userData.balance = result.newBalance;
+            userData.crypto_taxi_balance = result.newCryptoBalance;
+            updateMainScreen();
+            showNotification(result.message, 'success');
+        } else {
+            showNotification(result?.error || 'Ошибка покупки', 'error');
+        }
+    } catch (e) { showNotification('Ошибка сети', 'error'); }
+}
+
+async function sellCrypto() {
+    const amountTaxi = parseFloat(document.getElementById('crypto-sell-amount').value);
+    if (isNaN(amountTaxi) || amountTaxi <= 0) return showNotification('Введите кол-во $TAXI', 'warning');
+
+    try {
+        const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/crypto/sell`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amountTaxi })
+        });
+        if (result && result.success) {
+            userData.balance = result.newBalance;
+            userData.crypto_taxi_balance = result.newCryptoBalance;
+            updateMainScreen();
+            showNotification(result.message, 'success');
+        } else {
+            showNotification(result?.error || 'Ошибка продажи', 'error');
+        }
+    } catch (e) { showNotification('Ошибка сети', 'error'); }
+}
+
+function copyReferralLink() {
+    const input = document.getElementById('referral-link-input');
+    if (input) {
+        input.select();
+        document.execCommand('copy');
+        showNotification('🔗 Ссылка скопирована!', 'success');
+        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+    }
+}
+
+function updateGlobalEventBanner() {
+    const banner = document.getElementById('global-event-banner');
+    if (!banner || !userData || !userData.active_event) {
+        if (banner) banner.style.display = 'none';
+        return;
+    }
+
+    banner.style.display = 'flex';
+    document.getElementById('event-banner-name').textContent = userData.active_event.name;
+    document.getElementById('event-banner-desc').textContent = userData.active_event.description;
+}
+
+// Start price updates polling
+setInterval(updateCryptoMarket, 30000);
+updateCryptoMarket();
+
+// ============= v6.1.0: End Advanced Features =============
+
 
 // ============= v3.3: LEVEL UP WOW EFFECT =============
 function showLevelUpWow(newLevel) {
@@ -2316,6 +2408,15 @@ function updateProfileScreen() {
             }
         } catch (e) { console.error('Error rendering profile achievements:', e); }
     }
+
+    // v6.1.0: Referral updates
+    const refInput = document.getElementById('referral-link-input');
+    if (refInput) {
+        const baseUrl = window.location.origin + window.location.pathname;
+        refInput.value = `${baseUrl}?ref=${TELEGRAM_ID}`;
+    }
+    const refCountEl = document.getElementById('profile-ref-count');
+    if (refCountEl) refCountEl.textContent = userData.referred_count || 0;
 }
 // ============= v3.3: LICENSE PLATE MANAGEMENT =============
 

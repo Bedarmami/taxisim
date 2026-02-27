@@ -92,10 +92,30 @@ function initDB() {
                 FOREIGN KEY(user_id) REFERENCES users(id)
             )`);
 
-            // v3.6: Car Profitability Matrix - Add car_id to orders_history
-            db.run(`ALTER TABLE orders_history ADD COLUMN car_id TEXT`, (err) => {
-                // Ignore duplicate column errors
-            });
+            // v6.1.0: Advanced Features Migration
+            db.run(`ALTER TABLE users ADD COLUMN referred_by TEXT`, (err) => { });
+            db.run(`ALTER TABLE users ADD COLUMN referred_count INTEGER DEFAULT 0`, (err) => { });
+            db.run(`ALTER TABLE users ADD COLUMN crypto_taxi_balance REAL DEFAULT 0`, (err) => { });
+
+            db.run(`CREATE TABLE IF NOT EXISTS crypto_prices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                symbol TEXT DEFAULT 'TAXI',
+                price REAL,
+                timestamp TEXT
+            )`);
+
+            db.run(`CREATE TABLE IF NOT EXISTS global_events (
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                multiplier REAL DEFAULT 1.0,
+                is_active INTEGER DEFAULT 0,
+                description TEXT,
+                expires_at TEXT
+            )`);
+
+            // Seed initial event if not exists
+            db.run(`INSERT OR IGNORE INTO global_events (id, name, multiplier, is_active, description) 
+                    VALUES ('heavy_rain', 'Сильный ливень', 1.5, 0, 'Повышенный спрос из-за непогоды!')`);
 
             console.log('Database tables initialized.');
 

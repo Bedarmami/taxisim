@@ -26,6 +26,7 @@ function openTab(evt, tabName) {
     if (tabName === 'tab-plates') loadAdminPlates();
     if (tabName === 'tab-live-config') loadConfigs();
     if (tabName === 'tab-car-profit') loadCarProfitability();
+    if (tabName === 'tab-events') loadEvents();
 }
 
 async function checkAuth() {
@@ -1512,5 +1513,62 @@ async function loadCarProfitability() {
         });
     } else {
         tbody.innerHTML = '<tr><td colspan="4" style="color:#e74c3c;">Ошибка загрузки данных</td></tr>';
+    }
+}
+// ============= EVENT MANAGEMENT =============
+
+async function loadEvents() {
+    const list = document.getElementById('events-list');
+    if (!list) return;
+
+    list.innerHTML = '<div class="loading">Загрузка событий...</div>';
+
+    try {
+        const events = await safeFetchJson('/api/admin/events', {
+            headers: { 'x-admin-password': adminPassword }
+        });
+
+        if (events && !events._isError) {
+            list.innerHTML = events.map(ev => `
+                <div class="event-admin-card ${ev.is_active ? 'active' : ''}">
+                    <div class="event-info">
+                        <h3>${ev.name} (x${ev.multiplier})</h3>
+                        <p>${ev.description}</p>
+                    </div>
+                    <div class="event-controls">
+                        <label class="switch">
+                            <input type="checkbox" ${ev.is_active ? 'checked' : ''} 
+                                   onchange="toggleEvent('${ev.id}', this.checked)">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            list.innerHTML = '<div class="error">Ошибка загрузки событий</div>';
+        }
+    } catch (e) {
+        console.error(e);
+        list.innerHTML = '<div class="error">Ошибка сети</div>';
+    }
+}
+
+async function toggleEvent(eventId, active) {
+    try {
+        const res = await safeFetchJson('/api/admin/events/toggle', {
+            method: 'POST',
+            headers: { 'x-admin-password': adminPassword, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ eventId, active })
+        });
+
+        if (res && res.success) {
+            loadEvents(); // Refresh list to update active state
+        } else {
+            alert('Ошибка: ' + (res?.error || 'Не удалось переключить событие'));
+            loadEvents(); // Restore state locally
+        }
+    } catch (e) {
+        alert('Ошибка сети');
+        loadEvents();
     }
 }

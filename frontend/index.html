@@ -23,6 +23,14 @@
 </head>
 
 <body>
+    <!-- v6.1.0: Global Event Banner -->
+    <div id="global-event-banner" class="global-event-banner" style="display: none;">
+        <div class="event-icon">📢</div>
+        <div class="event-info">
+            <div class="event-name" id="event-banner-name">Событие активно!</div>
+            <div class="event-desc" id="event-banner-desc">Описание события...</div>
+        </div>
+    </div>
     <!-- Splash Screen / Loading Overlay -->
     <div id="splash-screen" class="splash-screen">
         <div class="splash-content">
@@ -456,6 +464,7 @@
                 <div class="biz-tab" data-tab="fleet">🚗 Автопарк</div>
                 <div class="biz-tab" data-tab="investments">⛽ АЗС</div>
                 <div class="biz-tab" data-tab="market">⚖️ Рынок</div>
+                <div class="biz-tab" data-tab="crypto">🪙 Крипто</div>
                 <div class="biz-tab" data-tab="shop">🏪 Магазин</div>
             </div>
 
@@ -518,6 +527,30 @@
                             Перепродажа АЗС и уникальных номеров.
                         </div>
                         <div id="market-list"></div>
+                    </div>
+                </div>
+
+                <!-- Tab: Crypto -->
+                <div id="tab-crypto" class="tab-content">
+                    <div class="crypto-card">
+                        <div class="crypto-header">
+                            <div class="crypto-symbol">🪙 $TAXI</div>
+                            <div class="crypto-price" id="crypto-current-price">0.00 PLN</div>
+                        </div>
+                        <div class="crypto-stats">
+                            <span>Твой баланс:</span>
+                            <span id="user-crypto-balance">0.0000 $TAXI</span>
+                        </div>
+                        <div class="crypto-actions">
+                            <input type="number" id="crypto-buy-amount" placeholder="Кол-во PLN" min="1">
+                            <button class="action-btn success small" onclick="buyCrypto()">Купить</button>
+                        </div>
+                        <div class="crypto-actions">
+                            <input type="number" id="crypto-sell-amount" placeholder="Кол-во TAXI" min="0.0001"
+                                step="0.0001">
+                            <button class="action-btn primary small" onclick="sellCrypto()">Продать</button>
+                        </div>
+                        <div class="crypto-disclaimer">Курс меняется каждые 5 минут.</div>
                     </div>
                 </div>
 
@@ -801,6 +834,19 @@
                 </div>
                 <button id="profile-claim-streak-btn" class="menu-btn online-primary" style="display: none;">Забрать
                     награду</button>
+            </div>
+
+            <!-- v6.1.0: Referral System in Profile -->
+            <div class="profile-section">
+                <div class="profile-section-title">🤝 Реферальная система</div>
+                <div class="referral-box">
+                    <p>Приглашай друзей и получай <strong>500 PLN</strong> за каждого!</p>
+                    <div class="ref-link-wrap">
+                        <input type="text" id="referral-link-input" readonly>
+                        <button class="action-btn small" onclick="copyReferralLink()">📋</button>
+                    </div>
+                    <div class="ref-stats">Приглашено: <span id="profile-ref-count">0</span></div>
+                </div>
             </div>
 
             <!-- v3.2: Rewards / Achievements in Profile -->
