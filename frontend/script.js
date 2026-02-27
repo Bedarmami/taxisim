@@ -2678,6 +2678,12 @@ async function updateSocialPulse() {
             if (jackpotEl) jackpotEl.textContent = data.jackpot.toFixed(2);
         }
 
+        // 5. Update Global Event
+        if (userData && data.active_event !== undefined) {
+            userData.active_event = data.active_event;
+            updateGlobalEventBanner();
+        }
+
     } catch (e) {
         console.error('Pulse update failed:', e);
     }

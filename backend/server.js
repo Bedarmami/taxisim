@@ -1530,7 +1530,8 @@ app.get('/api/social/pulse', async (req, res) => {
             occupancy,
             events: events.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 10),
             surges,
-            jackpot: Number(JACKPOT_POOL.toFixed(2))
+            jackpot: Number(JACKPOT_POOL.toFixed(2)),
+            active_event: GLOBAL_ACTIVE_EVENT
         });
     } catch (e) {
         console.error('Pulse error:', e);
@@ -4516,12 +4517,12 @@ app.get('/api/admin/crypto/stats', adminAuth, async (req, res) => {
 
 app.get('/api/admin/crypto/holders', adminAuth, async (req, res) => {
     try {
-        const holders = await db.all(`
-            SELECT telegram_id, first_name, crypto_taxi_balance 
+        const holders = await db.query(`
+            SELECT username, crypto_taxi_balance, telegram_id
             FROM users 
-            WHERE CAST(crypto_taxi_balance AS REAL) > 0 
-            ORDER BY CAST(crypto_taxi_balance AS REAL) DESC 
-            LIMIT 50
+            WHERE crypto_taxi_balance > 0 
+            ORDER BY crypto_taxi_balance DESC 
+            LIMIT 10
         `);
         res.json(holders);
     } catch (e) { res.status(500).json({ error: e.message }); }
