@@ -1047,44 +1047,48 @@ body {
 .bar-item .bar-labels {
     display: flex;
     justify-content: space-between;
-    font-size: 13px;
-    font-weight: 600;
-    margin-bottom: 6px;
-    color: var(--text-color);
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 7px;
+    color: var(--text-secondary);
 }
 
 .progress-bar {
     width: 100%;
-    height: 10px;
-    background: var(--secondary-bg);
-    border-radius: 5px;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
     overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .fill {
     height: 100%;
-    border-radius: 5px;
-    transition: width 0.3s ease;
+    border-radius: 10px;
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .fill.fuel {
-    background: linear-gradient(90deg, #34C759, #32D74B);
+    background: linear-gradient(90deg, #2ecc71, #27ae60);
+    box-shadow: 0 0 8px rgba(46, 204, 113, 0.5);
 }
 
 .fill.stamina {
     background: linear-gradient(90deg, #FF9500, #FFCC00);
+    box-shadow: 0 0 8px rgba(255, 149, 0, 0.5);
 }
 
 .fill.gas {
-    background: linear-gradient(90deg, #007AFF, #5AC8FA);
+    background: linear-gradient(90deg, #5856D6, #5AC8FA);
+    box-shadow: 0 0 8px rgba(88, 86, 214, 0.5);
 }
 
 .quick-stats {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-    padding-top: 15px;
-    border-top: 1px solid var(--border-color);
+    gap: 8px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .q-stat {
@@ -1092,17 +1096,24 @@ body {
     flex-direction: column;
     align-items: center;
     text-align: center;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    padding: 8px 4px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .q-label {
-    font-size: 11px;
-    color: var(--hint-color);
+    font-size: 10px;
+    color: var(--text-secondary);
     margin-bottom: 4px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
 }
 
 .q-value {
-    font-size: 14px;
-    font-weight: 700;
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--text-color);
 }
 
 /* ============= ACTION GRID ============= */
@@ -1179,26 +1190,28 @@ body {
 }
 
 .back-btn {
-    background: none;
-    border: none;
-    color: var(--accent-color);
-    font-size: 18px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-color);
+    font-size: 14px;
+    font-weight: 700;
     cursor: pointer;
-    padding: 8px 12px;
-    min-width: 40px;
-    height: 40px;
+    padding: 7px 14px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 50%;
-    transition: background-color 0.2s, transform 0.1s;
+    border-radius: 20px;
+    transition: all 0.2s ease;
     -webkit-user-select: none;
     user-select: none;
     margin-right: 10px;
+    backdrop-filter: blur(8px);
+    gap: 4px;
 }
 
 .back-btn:active {
-    background-color: var(--secondary-bg);
+    background: rgba(255, 255, 255, 0.12);
     transform: scale(0.95);
 }
 
@@ -1716,28 +1729,32 @@ body {
 }
 
 .filter-btn {
-    padding: 8px 16px;
-    border: 1px solid var(--border-color);
-    background: var(--secondary-bg);
-    color: var(--text-color);
+    padding: 8px 18px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-secondary);
     border-radius: 20px;
-    font-size: 14px;
+    font-size: 13px;
+    font-weight: 700;
+    font-family: var(--font-main);
     cursor: pointer;
     white-space: nowrap;
-    transition: all 0.2s;
+    transition: all 0.2s ease;
     -webkit-user-select: none;
     user-select: none;
     min-height: 36px;
+    backdrop-filter: blur(8px);
 }
 
 .filter-btn.active {
-    background-color: var(--accent-color);
-    color: white;
-    border-color: var(--accent-color);
+    background: rgba(255, 215, 0, 0.15);
+    color: var(--primary-color);
+    border-color: rgba(255, 215, 0, 0.4);
+    box-shadow: 0 0 12px rgba(255, 215, 0, 0.2);
 }
 
 .filter-btn:active {
-    transform: scale(0.98);
+    transform: scale(0.97);
 }
 
 .orders-list {
