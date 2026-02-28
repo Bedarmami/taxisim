@@ -3256,3 +3256,125 @@ document.addEventListener('click', function (e) {
     // Wait until app is initialized then connect
     setTimeout(connect, 2000);
 })();
+
+// ============= v3.8: ФОНДОВЫЙ РЫНОК (ИНВЕСТИЦИИ) =============
+
+async function loadInvestments() {
+    const list = document.getElementById('investments-list');
+    if (!list) return;
+    list.innerHTML = '<div style="text-align:center; color:#666; padding:20px;">Загрузка...</div>';
+
+    try {
+        const stocks = await safeFetchJson(`${API_BASE_URL}/stocks`);
+        if (!stocks || stocks._isError || !Array.isArray(stocks)) {
+            list.innerHTML = '<div style="color:#ff3b30; padding:20px;">Ошибка загрузки рынка</div>';
+            return;
+        }
+
+        const portfolio = userData?.stocks_data || {};
+
+        // Calculate portfolio value
+        let portfolioValue = 0;
+        stocks.forEach(s => {
+            if (portfolio[s.symbol]) {
+                portfolioValue += (portfolio[s.symbol] * s.price);
+            }
+        });
+
+        const portfolioSummary = document.getElementById('portfolio-summary');
+        const portfolioValueEl = document.getElementById('portfolio-value');
+        if (portfolioValue > 0) {
+            if (portfolioSummary) portfolioSummary.style.display = 'block';
+            if (portfolioValueEl) portfolioValueEl.textContent = `${portfolioValue.toFixed(2)} PLN`;
+        } else {
+            if (portfolioSummary) portfolioSummary.style.display = 'none';
+        }
+
+        list.innerHTML = stocks.map(s => {
+            const isUp = s.change_pct >= 0;
+            const changeColor = isUp ? '#34C759' : '#ff3b30';
+            const changeIcon = isUp ? '▲' : '▼';
+            const owned = portfolio[s.symbol] || 0;
+            const ownedValue = (owned * s.price).toFixed(2);
+
+            return `
+            <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius:14px; padding:14px 16px; margin-bottom:12px;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+                    <div>
+                        <div style="font-weight:800; font-size:1.05em;">${s.name}</div>
+                        <div style="font-size:0.8em; color:#888; margin-top:2px;">${s.symbol}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:1.2em; font-weight:800;">${s.price.toFixed(2)} PLN</div>
+                        <div style="color:${changeColor}; font-size:0.85em; font-weight:600;">${changeIcon} ${Math.abs(s.change_pct)}%</div>
+                    </div>
+                </div>
+
+                ${owned > 0 ? `
+                <div style="background:rgba(52,199,89,0.08); border:1px solid rgba(52,199,89,0.15); border-radius:8px; padding:8px 10px; margin-bottom:10px; font-size:0.85em;">
+                    📦 В портфеле: <strong>${owned} шт.</strong> · Стоимость: <strong>${ownedValue} PLN</strong>
+                </div>` : ''}
+
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <input type="number" id="qty-${s.symbol}" min="1" value="1" style="width:60px; padding:6px 8px; border-radius:8px; border:1px solid #444; background:#111; color:#fff; font-size:0.9em;">
+                    <button class="action-btn success" style="flex:1; font-size:0.85em;" onclick="buyStock('${s.symbol}', '${s.name}')">🟢 Купить</button>
+                    ${owned > 0 ? `<button class="action-btn error" style="flex:1; font-size:0.85em;" onclick="sellStock('${s.symbol}', '${s.name}')">🔴 Продать</button>` : ''}
+                </div>
+            </div>`;
+        }).join('');
+
+    } catch (e) {
+        console.error('Stocks load error:', e);
+        list.innerHTML = '<div style="color:#ff3b30; padding:20px;">Ошибка соединения</div>';
+    }
+}
+
+async function buyStock(symbol, name) {
+    const qtyInput = document.getElementById(`qty-${symbol}`);
+    const quantity = parseInt(qtyInput?.value || 1);
+    if (!quantity || quantity <= 0) return showNotification('Укажите количество акций', 'error');
+
+    try {
+        const result = await safeFetchJson(`${API_BASE_URL}/stocks/buy`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ telegramId: TELEGRAM_ID, symbol, quantity })
+        });
+        if (result && result.success) {
+            userData.balance = result.new_balance;
+            userData.stocks_data = result.portfolio;
+            updateMainScreen();
+            showNotification(result.message, 'success');
+            loadInvestments();
+        } else {
+            showNotification(result?.error || 'Ошибка покупки', 'error');
+        }
+    } catch (e) {
+        showNotification('Ошибка соединения', 'error');
+    }
+}
+
+async function sellStock(symbol, name) {
+    const qtyInput = document.getElementById(`qty-${symbol}`);
+    const quantity = parseInt(qtyInput?.value || 1);
+    if (!quantity || quantity <= 0) return showNotification('Укажите количество акций', 'error');
+
+    try {
+        const result = await safeFetchJson(`${API_BASE_URL}/stocks/sell`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ telegramId: TELEGRAM_ID, symbol, quantity })
+        });
+        if (result && result.success) {
+            userData.balance = result.new_balance;
+            userData.stocks_data = result.portfolio;
+            updateMainScreen();
+            showNotification(result.message, 'success');
+            loadInvestments();
+        } else {
+            showNotification(result?.error || 'Ошибка продажи', 'error');
+        }
+    } catch (e) {
+        showNotification('Ошибка соединения', 'error');
+    }
+}

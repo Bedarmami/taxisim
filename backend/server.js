@@ -1272,6 +1272,7 @@ async function getUser(telegramId) {
         row.casino_stats = row.casino_stats ? JSON.parse(row.casino_stats) : { total_won: 0, total_lost: 0, spins: 0 };
         row.skills = row.skills ? JSON.parse(row.skills) : { charisma: 0, mechanic: 0, navigator: 0 };
         row.pending_auction_rewards = row.pending_auction_rewards ? JSON.parse(row.pending_auction_rewards) : [];
+        row.stocks_data = row.stocks_data ? JSON.parse(row.stocks_data) : {}; // v3.8
     } catch (e) {
         console.error('Error parsing JSON for user', telegramId, e);
         // Ensure defaults on error
@@ -1396,7 +1397,7 @@ async function saveUser(user) {
         tutorial_completed = ?, pending_auction_rewards = ?, free_plate_rolls = ?, is_banned = ?,
         current_district = ?, mileage = ?, uncollected_fleet_revenue = ?,
         is_autonomous_active = ?, last_autonomous_update = ?, paid_rests_today = ?,
-        crypto_taxi_balance = ?
+        crypto_taxi_balance = ?, stocks_data = ?
         WHERE telegram_id = ?`;
 
     const params = [
@@ -1433,6 +1434,7 @@ async function saveUser(user) {
         user.last_autonomous_update,
         user.paid_rests_today || 0,
         user.crypto_taxi_balance || 0,
+        JSON.stringify(user.stocks_data || {}), // v3.8
         user.telegram_id
     ];
 
@@ -3820,6 +3822,149 @@ app.post('/api/casino/slots', async (req, res) => {
     }
 });
 
+// ============= v3.8: STOCK MARKET (ФОНДОВЫЙ РЫНОК) =============
+
+const STOCK_DEFINITIONS = [
+    { symbol: 'YDX', name: 'Yodex Taxi', price: 120, volatility: 0.03 },
+    { symbol: 'GZPR', name: 'ГазТранс PLN', price: 85, volatility: 0.04 },
+    { symbol: 'WRSW', name: 'Варшавский Порт', price: 200, volatility: 0.05 },
+    { symbol: 'CRYPTX', name: 'CryptX Token', price: 50, volatility: 0.12 },
+    { symbol: 'POLTRANS', name: 'ПолТранс Логистика', price: 310, volatility: 0.025 },
+];
+
+// Seed stocks if not exist
+async function seedStocks() {
+    try {
+        for (const stock of STOCK_DEFINITIONS) {
+            const existing = await db.get('SELECT symbol FROM stocks WHERE symbol = ?', [stock.symbol]);
+            if (!existing) {
+                await db.run(
+                    'INSERT INTO stocks (symbol, name, price, previous_price, volatility, history) VALUES (?, ?, ?, ?, ?, ?)',
+                    [stock.symbol, stock.name, stock.price, stock.price, stock.volatility, JSON.stringify([stock.price])]
+                );
+            }
+        }
+        console.log('[Stocks] Market seeded');
+    } catch (e) {
+        console.error('[Stocks] Seed error:', e);
+    }
+}
+
+// Update stock prices every 2 minutes
+async function updateStockPrices() {
+    try {
+        const stocks = await db.all('SELECT * FROM stocks');
+        for (const stock of stocks) {
+            const vol = stock.volatility || 0.05;
+            const change = (Math.random() * 2 - 1) * vol; // -vol to +vol
+            const newPrice = Math.max(10, parseFloat((stock.price * (1 + change)).toFixed(2)));
+            let history = [];
+            try { history = JSON.parse(stock.history || '[]'); } catch (e) { }
+            history.push(newPrice);
+            if (history.length > 30) history.shift(); // Keep last 30 ticks
+
+            await db.run(
+                'UPDATE stocks SET previous_price = price, price = ?, history = ? WHERE symbol = ?',
+                [newPrice, JSON.stringify(history), stock.symbol]
+            );
+        }
+    } catch (e) {
+        console.error('[Stocks] Price update error:', e);
+    }
+}
+
+// GET /api/stocks — get all current stock prices
+app.get('/api/stocks', async (req, res) => {
+    try {
+        const stocks = await db.all('SELECT symbol, name, price, previous_price, history FROM stocks ORDER BY symbol');
+        res.json(stocks.map(s => ({
+            ...s,
+            change_pct: parseFloat((((s.price - s.previous_price) / s.previous_price) * 100).toFixed(2)),
+            history: JSON.parse(s.history || '[]')
+        })));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// POST /api/stocks/buy
+app.post('/api/stocks/buy', async (req, res) => {
+    try {
+        const { telegramId, symbol, quantity } = req.body;
+        if (!telegramId || !symbol || !quantity || quantity <= 0) {
+            return res.status(400).json({ error: 'Неверные параметры' });
+        }
+
+        const user = await getUser(telegramId);
+        if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+
+        const stock = await db.get('SELECT * FROM stocks WHERE symbol = ?', [symbol]);
+        if (!stock) return res.status(404).json({ error: 'Акция не найдена' });
+
+        const totalCost = parseFloat((stock.price * quantity).toFixed(2));
+        if (user.balance < totalCost) {
+            return res.status(400).json({ error: `Недостаточно средств. Нужно ${totalCost} PLN` });
+        }
+
+        user.stocks_data = user.stocks_data || {};
+        user.stocks_data[symbol] = (user.stocks_data[symbol] || 0) + quantity;
+        user.balance = parseFloat((user.balance - totalCost).toFixed(2));
+        await saveUser(user);
+
+        logActivity(telegramId, 'STOCK_BUY', { symbol, quantity, price: stock.price, total: totalCost });
+
+        res.json({
+            success: true,
+            message: `✅ Куплено ${quantity} акций ${stock.name} за ${totalCost} PLN`,
+            new_balance: user.balance,
+            portfolio: user.stocks_data
+        });
+    } catch (e) {
+        console.error('[Stocks] Buy error:', e);
+        res.status(500).json({ error: 'Ошибка сервера' });
+    }
+});
+
+// POST /api/stocks/sell
+app.post('/api/stocks/sell', async (req, res) => {
+    try {
+        const { telegramId, symbol, quantity } = req.body;
+        if (!telegramId || !symbol || !quantity || quantity <= 0) {
+            return res.status(400).json({ error: 'Неверные параметры' });
+        }
+
+        const user = await getUser(telegramId);
+        if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+
+        user.stocks_data = user.stocks_data || {};
+        const owned = user.stocks_data[symbol] || 0;
+        if (owned < quantity) {
+            return res.status(400).json({ error: `Недостаточно акций. У вас ${owned} шт.` });
+        }
+
+        const stock = await db.get('SELECT * FROM stocks WHERE symbol = ?', [symbol]);
+        if (!stock) return res.status(404).json({ error: 'Акция не найдена' });
+
+        const totalEarned = parseFloat((stock.price * quantity).toFixed(2));
+        user.stocks_data[symbol] = owned - quantity;
+        if (user.stocks_data[symbol] === 0) delete user.stocks_data[symbol];
+        user.balance = parseFloat((user.balance + totalEarned).toFixed(2));
+        await saveUser(user);
+
+        logActivity(telegramId, 'STOCK_SELL', { symbol, quantity, price: stock.price, total: totalEarned });
+
+        res.json({
+            success: true,
+            message: `✅ Продано ${quantity} акций ${stock.name} за ${totalEarned} PLN`,
+            new_balance: user.balance,
+            portfolio: user.stocks_data
+        });
+    } catch (e) {
+        console.error('[Stocks] Sell error:', e);
+        res.status(500).json({ error: 'Ошибка сервера' });
+    }
+});
+
 // ============= v3.6: SECONDARY CAR MARKET (БАРАХОЛКА) =============
 
 // Get all cars on the market
@@ -3847,21 +3992,21 @@ app.post('/api/market/sell', async (req, res) => {
         }
 
         const user = await getUser(telegramId);
-        if (!user || !user.cars || user.cars.length === 0) {
+        if (!user || !user.owned_cars || user.owned_cars.length === 0) {
             return res.status(400).json({ error: 'User or cars not found' });
         }
 
-        const carIndex = user.cars.findIndex(c => c.id === carId);
+        const carIndex = user.owned_cars.findIndex(c => c.id === carId);
         if (carIndex === -1) {
             return res.status(400).json({ error: 'Вы не владеете этой машиной' });
         }
 
-        if (user.cars.length <= 1) {
+        if (user.owned_cars.length <= 1) {
             return res.status(400).json({ error: 'Вы не можете продать свою последнюю машину!' });
         }
 
         // Remove the car from the user's inventory
-        user.cars.splice(carIndex, 1);
+        user.owned_cars.splice(carIndex, 1);
         await saveUser(user);
 
         // Add to market
@@ -3895,7 +4040,8 @@ app.post('/api/market/cancel/:id', async (req, res) => {
         // Return the car to user
         const carDef = CARS[listing.car_id];
         if (carDef) {
-            user.cars.push(JSON.parse(JSON.stringify(carDef))); // Deep copy
+            user.owned_cars = user.owned_cars || [];
+            user.owned_cars.push(JSON.parse(JSON.stringify(carDef))); // Deep copy
             await saveUser(user);
         }
 
@@ -3938,7 +4084,8 @@ app.post('/api/market/buy/:id', async (req, res) => {
         // 2. Add car to buyer
         const carDef = CARS[listing.car_id];
         if (carDef) {
-            buyer.cars.push(JSON.parse(JSON.stringify(carDef)));
+            buyer.owned_cars = buyer.owned_cars || [];
+            buyer.owned_cars.push(JSON.parse(JSON.stringify(carDef)));
         } else {
             return res.status(500).json({ error: 'Модель машины больше не существует в игре!' });
         }
@@ -3952,9 +4099,10 @@ app.post('/api/market/buy/:id', async (req, res) => {
             await saveUser(seller);
 
             // Notify seller via Telegram bot
-            await sendNotification(listing.seller_id, 'SYSTEM', {
-                text: `💰 Ваша машина (${carDef.name}) была продана на Барахолке за ${listing.price} PLN!\nНалог сервера (5%): ${tax.toFixed(2)} PLN.\nЗачислено: ${netProfit.toFixed(2)} PLN.`
-            });
+            try {
+                await sendNotification(listing.seller_id,
+                    `💰 Ваша машина <b>${carDef.name}</b> продана на Барахолке!\n💵 Цена: ${listing.price} PLN\n🏦 Налог 5%: -${(listing.price * 0.05).toFixed(2)} PLN\n✅ Зачислено: ${netProfit.toFixed(2)} PLN`);
+            } catch (e) { console.error('Market notif error:', e); }
         }
 
         // 4. Remove listing
@@ -5887,4 +6035,11 @@ http_server.listen(PORT, () => {
     console.log(`🚖 TAXI SIMULATOR PRO initialized successfully.\n`);
 
     try { scheduleDailyRentalCheck(); } catch (e) { }
+
+    // v3.8: Seed stocks and start price ticker
+    dbReady.then(() => {
+        seedStocks().catch(e => console.error('seedStocks error:', e));
+        setInterval(updateStockPrices, 2 * 60 * 1000); // every 2 minutes
+        console.log('📈 Stock market ticker started (every 2 min)');
+    });
 });

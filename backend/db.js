@@ -89,7 +89,8 @@ function initDB() {
                 tire_condition REAL DEFAULT 100.0,
                 referred_by TEXT,
                 referred_count INTEGER DEFAULT 0,
-                crypto_taxi_balance REAL DEFAULT 0
+                crypto_taxi_balance REAL DEFAULT 0,
+                stocks_data TEXT DEFAULT '{}'
             )`);
 
             db.run(`CREATE TABLE IF NOT EXISTS orders_history (
@@ -264,6 +265,16 @@ function initDB() {
                 FOREIGN KEY(seller_id) REFERENCES users(telegram_id)
             )`);
 
+            // v3.8: Stock Market
+            db.run(`CREATE TABLE IF NOT EXISTS stocks (
+                symbol TEXT PRIMARY KEY,
+                name TEXT,
+                price REAL DEFAULT 100,
+                previous_price REAL DEFAULT 100,
+                volatility REAL DEFAULT 0.05,
+                history TEXT DEFAULT '[]'
+            )`);
+
             // 2. RUN ALL MIGRATIONS
             // 2. RUN ALL MIGRATIONS DEFENSIVELY
             const addColumn = (table, column, definition) => {
@@ -322,6 +333,7 @@ function initDB() {
                     await addColumn('gas_stations', 'price_gas', 'REAL DEFAULT 3.60');
                     await addColumn('gas_stations', 'fuel_stock', 'REAL DEFAULT 0');
                     await addColumn('gas_stations', 'uncollected_revenue', 'REAL DEFAULT 0');
+                    await addColumn('users', 'stocks_data', "TEXT DEFAULT '{}'"); // v3.8
 
                     console.log('Database initialization and migrations check completed.');
 
