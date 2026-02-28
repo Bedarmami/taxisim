@@ -229,6 +229,30 @@
                     <h2>Управление АЗС</h2>
                     <button onclick="loadAdminGasStations()">🔄 Обновить</button>
                 </div>
+
+                <section class="add-promo-card"
+                    style="margin-bottom: 20px; background: rgba(52, 152, 219, 0.1); border: 1px solid rgba(52, 152, 219, 0.3);">
+                    <h3>🚖 Ручной запуск NPC (Ботов)</h3>
+                    <p style="font-size: 13px; opacity: 0.8; margin-bottom: 15px;">Запуск ботов немедленно скупит
+                        топливо и переведёт деньги на баланс кассы.</p>
+                    <div style="display: flex; gap: 15px; align-items: flex-end;">
+                        <div class="form-group" style="flex: 2;">
+                            <label>Целевая АЗС:</label>
+                            <select id="npc-target-station"
+                                style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.05); color: white; border: 1px solid rgba(255,255,255,0.1);">
+                                <option value="ALL">🌐 Все АЗС (глобальный трафик)</option>
+                                <!-- Сюда добавятся АЗС через JS -->
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label>Объем (Литры):</label>
+                            <input type="number" id="npc-target-liters" placeholder="Авто (10-50л)"
+                                title="Оставьте пустым для случайного объема">
+                        </div>
+                        <button onclick="triggerNPCBots()" class="btn-primary"
+                            style="background: #3498db; flex: 1; padding: 10px;">🚀 Запустить</button>
+                    </div>
+                </section>
                 <div class="table-container">
                     <table>
                         <thead>

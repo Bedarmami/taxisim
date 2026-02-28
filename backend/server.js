@@ -4838,10 +4838,17 @@ setInterval(async () => {
 }, 6 * 60 * 60 * 1000); // Every 6 hours
 
 // NPC Fuel Consumption (Live Economy)
-async function simulateNPCRefueling() {
+async function simulateNPCRefueling(targetStationId = null, forcedLiters = null) {
     try {
-        const stations = await db.query(`SELECT * FROM gas_stations WHERE owner_id IS NOT NULL AND fuel_stock > 0`);
-        if (!stations || stations.length === 0) return;
+        let query = `SELECT * FROM gas_stations WHERE owner_id IS NOT NULL AND fuel_stock > 0`;
+        const params = [];
+        if (targetStationId) {
+            query += ` AND id = ?`;
+            params.push(targetStationId);
+        }
+
+        const stations = await db.query(query, params);
+        if (!stations || stations.length === 0) return { sold: 0, revenue: 0 };
 
         // Base/Default global price for petrol to compare against
         const configs = await db.query(`SELECT key, value FROM global_configs WHERE category = 'prices'`);
@@ -4853,31 +4860,38 @@ async function simulateNPCRefueling() {
         let totalFuelSold = 0;
 
         for (const station of stations) {
-            // How much fuel do NPC bots buy? Base: 10 to 50 liters.
-            let litersSold = Math.floor(Math.random() * 40) + 10;
+            let litersSold = 0;
 
-            // Competitive pricing mechanic
-            const myPrice = station.price_petrol || basePetrolPrice;
-            if (myPrice < basePetrolPrice) {
-                litersSold = Math.floor(litersSold * 1.5); // x1.5 boost for cheap petrol
-            } else if (myPrice > basePetrolPrice) {
-                // Diminish sales if expensive (price elasticity)
-                const overchargePercent = (myPrice - basePetrolPrice) / basePetrolPrice;
-                litersSold = Math.floor(litersSold * Math.max(0.1, 1 - overchargePercent * 2)); // Up to 90% penalty
-            }
+            if (forcedLiters !== null) {
+                // Admin forced exact amount
+                litersSold = forcedLiters;
+            } else {
+                // Natural background flow
+                litersSold = Math.floor(Math.random() * 40) + 10;
 
-            // District demand adjustments
-            if (station.district_id === 'airport' || station.district_id === 'center') {
-                litersSold = Math.floor(litersSold * 1.3); // High traffic areas
-            } else if (station.district_id === 'night') {
-                litersSold = Math.floor(litersSold * 0.8); // Lower traffic overall
+                // Competitive pricing mechanic
+                const myPrice = station.price_petrol || basePetrolPrice;
+                if (myPrice < basePetrolPrice) {
+                    litersSold = Math.floor(litersSold * 1.5); // x1.5 boost for cheap petrol
+                } else if (myPrice > basePetrolPrice) {
+                    // Diminish sales if expensive (price elasticity)
+                    const overchargePercent = (myPrice - basePetrolPrice) / basePetrolPrice;
+                    litersSold = Math.floor(litersSold * Math.max(0.1, 1 - overchargePercent * 2)); // Up to 90% penalty
+                }
+
+                // District demand adjustments
+                if (station.district_id === 'airport' || station.district_id === 'center') {
+                    litersSold = Math.floor(litersSold * 1.3); // High traffic areas
+                } else if (station.district_id === 'night') {
+                    litersSold = Math.floor(litersSold * 0.8); // Lower traffic overall
+                }
             }
 
             // Cap sales by available stock
             litersSold = Math.min(litersSold, Math.floor(station.fuel_stock));
 
             if (litersSold > 0) {
-                const profit = litersSold * myPrice;
+                const profit = litersSold * (station.price_petrol || basePetrolPrice);
                 await db.run(
                     `UPDATE gas_stations SET fuel_stock = fuel_stock - ?, uncollected_revenue = uncollected_revenue + ?, revenue_total = revenue_total + ? WHERE id = ?`,
                     [litersSold, profit, profit, station.id]
@@ -4888,17 +4902,35 @@ async function simulateNPCRefueling() {
             }
         }
 
-        if (totalFuelSold > 0) {
+        if (totalFuelSold > 0 && !targetStationId) {
             console.log(`🚖 NPC Economy Tick: ${totalFuelSold}L petrol sold, generating ${totalRevenueGenerated.toFixed(2)} PLN for station owners.`);
         }
 
+        return { sold: totalFuelSold, revenue: totalRevenueGenerated };
+
     } catch (e) {
         console.error('NPC Refueling Error:', e);
+        return { sold: 0, revenue: 0, error: e.message };
     }
 }
 
 // Run NPC refueling simulation every 5 minutes
-setInterval(simulateNPCRefueling, 5 * 60 * 1000);
+setInterval(() => simulateNPCRefueling(), 5 * 60 * 1000);
+
+// Admin: Manual NPC Bot Trigger
+app.post('/api/admin/gas-stations/bots', adminAuth, async (req, res) => {
+    try {
+        const { stationId, liters } = req.body;
+        const targetId = stationId === 'ALL' ? null : stationId;
+        const forcedAmount = liters ? parseInt(liters) : null;
+
+        const result = await simulateNPCRefueling(targetId, forcedAmount);
+
+        res.json({ success: true, ...result });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 
 // Redundant auction endpoints removed. Using auction.js routes.
 

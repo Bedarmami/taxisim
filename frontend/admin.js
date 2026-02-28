@@ -122,8 +122,24 @@ async function loadAdminGasStations() {
         if (!stations || stations._isError) return;
 
         table.innerHTML = '';
+
+        // Populate the manual bot trigger dropdown
+        const npcSelect = document.getElementById('npc-target-station');
+        if (npcSelect) {
+            // Keep the 'ALL' option
+            npcSelect.innerHTML = '<option value="ALL">🌐 Все АЗС (глобальный трафик)</option>';
+        }
+
         stations.forEach(s => {
             const tr = document.createElement('tr');
+
+            // Populate select dropdown
+            if (npcSelect && s.owner_id) {
+                const opt = document.createElement('option');
+                opt.value = s.id;
+                opt.textContent = `${s.name} (${s.owner_name})`;
+                npcSelect.appendChild(opt);
+            }
 
             // Foreclosure highlighting
             let balanceColor = '#fff';
@@ -161,6 +177,31 @@ async function loadAdminGasStations() {
     } catch (e) {
         console.error('Error loading stations:', e);
         table.innerHTML = '<tr><td colspan="10">Ошибка загрузки</td></tr>';
+    }
+}
+
+async function triggerNPCBots() {
+    const stationId = document.getElementById('npc-target-station').value;
+    const litersInput = document.getElementById('npc-target-liters').value;
+    const liters = litersInput ? parseInt(litersInput) : null;
+
+    if (!confirm(`🚀 Запустить ботов на: ${stationId === 'ALL' ? 'ВЕХ АЗС' : stationId}?\nОбъем: ${liters ? liters + ' л.' : 'Случайный (10-50л)'}`)) return;
+
+    try {
+        const res = await safeFetchJson('/api/admin/gas-stations/bots', {
+            method: 'POST',
+            headers: { 'x-admin-password': adminPassword, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ stationId, liters })
+        });
+
+        if (res.success) {
+            alert(`✅ БОТЫ ЗАВЕРШИЛИ ПОКУПКИ!\nКуплено литров: ${res.sold} L\nВладельцы получили: ${res.revenue.toFixed(2)} PLN`);
+            loadAdminGasStations();
+        } else {
+            alert(`Произошла ошибка при запуске ботов: ${res.error}`);
+        }
+    } catch (e) {
+        alert('Ошибка связи с сервером');
     }
 }
 
