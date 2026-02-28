@@ -4056,7 +4056,8 @@ app.get('/api/stocks', async (req, res) => {
 // POST /api/stocks/buy
 app.post('/api/stocks/buy', async (req, res) => {
     try {
-        const { telegramId, symbol, quantity } = req.body;
+        const { telegramId, symbol } = req.body;
+        const quantity = parseInt(req.body.quantity);
         if (!telegramId || !symbol || !quantity || quantity <= 0) {
             return res.status(400).json({ error: 'Неверные параметры' });
         }
@@ -4072,18 +4073,24 @@ app.post('/api/stocks/buy', async (req, res) => {
             return res.status(400).json({ error: `Недостаточно средств. Нужно ${totalCost} PLN` });
         }
 
-        user.stocks_data = user.stocks_data || {};
-        user.stocks_data[symbol] = (user.stocks_data[symbol] || 0) + quantity;
-        user.balance = parseFloat((user.balance - totalCost).toFixed(2));
-        await saveUser(user);
+        const portfolio = { ...(user.stocks_data || {}) };
+        portfolio[symbol] = (portfolio[symbol] || 0) + quantity;
+        const newBalance = parseFloat((user.balance - totalCost).toFixed(2));
+
+        // Direct atomic update — avoids saveUser delta-balance issues
+        await db.run(
+            'UPDATE users SET balance = ?, stocks_data = ? WHERE telegram_id = ?',
+            [newBalance, JSON.stringify(portfolio), telegramId]
+        );
+        invalidateUserCache(telegramId);
 
         logActivity(telegramId, 'STOCK_BUY', { symbol, quantity, price: stock.price, total: totalCost });
 
         res.json({
             success: true,
             message: `✅ Куплено ${quantity} акций ${stock.name} за ${totalCost} PLN`,
-            new_balance: user.balance,
-            portfolio: user.stocks_data
+            new_balance: newBalance,
+            portfolio
         });
     } catch (e) {
         console.error('[Stocks] Buy error:', e);
@@ -4094,7 +4101,8 @@ app.post('/api/stocks/buy', async (req, res) => {
 // POST /api/stocks/sell
 app.post('/api/stocks/sell', async (req, res) => {
     try {
-        const { telegramId, symbol, quantity } = req.body;
+        const { telegramId, symbol } = req.body;
+        const quantity = parseInt(req.body.quantity);
         if (!telegramId || !symbol || !quantity || quantity <= 0) {
             return res.status(400).json({ error: 'Неверные параметры' });
         }
@@ -4102,8 +4110,8 @@ app.post('/api/stocks/sell', async (req, res) => {
         const user = await getUser(telegramId);
         if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
 
-        user.stocks_data = user.stocks_data || {};
-        const owned = user.stocks_data[symbol] || 0;
+        const portfolio = { ...(user.stocks_data || {}) };
+        const owned = portfolio[symbol] || 0;
         if (owned < quantity) {
             return res.status(400).json({ error: `Недостаточно акций. У вас ${owned} шт.` });
         }
@@ -4112,18 +4120,24 @@ app.post('/api/stocks/sell', async (req, res) => {
         if (!stock) return res.status(404).json({ error: 'Акция не найдена' });
 
         const totalEarned = parseFloat((stock.price * quantity).toFixed(2));
-        user.stocks_data[symbol] = owned - quantity;
-        if (user.stocks_data[symbol] === 0) delete user.stocks_data[symbol];
-        user.balance = parseFloat((user.balance + totalEarned).toFixed(2));
-        await saveUser(user);
+        portfolio[symbol] = owned - quantity;
+        if (portfolio[symbol] === 0) delete portfolio[symbol];
+        const newBalance = parseFloat((user.balance + totalEarned).toFixed(2));
+
+        // Direct atomic update — avoids saveUser delta-balance issues
+        await db.run(
+            'UPDATE users SET balance = ?, stocks_data = ? WHERE telegram_id = ?',
+            [newBalance, JSON.stringify(portfolio), telegramId]
+        );
+        invalidateUserCache(telegramId);
 
         logActivity(telegramId, 'STOCK_SELL', { symbol, quantity, price: stock.price, total: totalEarned });
 
         res.json({
             success: true,
             message: `✅ Продано ${quantity} акций ${stock.name} за ${totalEarned} PLN`,
-            new_balance: user.balance,
-            portfolio: user.stocks_data
+            new_balance: newBalance,
+            portfolio
         });
     } catch (e) {
         console.error('[Stocks] Sell error:', e);
