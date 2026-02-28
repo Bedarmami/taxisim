@@ -10,6 +10,7 @@ require('dotenv').config();
 
 console.log('🚀 Server initializing... [fs module:', typeof fs !== 'undefined' ? 'LOADED' : 'MISSING', ']');
 
+const { router: auctionRouter, initAuction, startAuction } = require('./routes/auction');
 const { initBot, sendNotification, bot } = require('./bot');
 const { runAIAnalysis } = require('./ai_analyst');
 
@@ -277,6 +278,10 @@ app.use((req, res, next) => {
     }
     next();
 });
+
+// v3.0: Register auction routes
+app.use('/api/auction', auctionRouter);
+app.use('/api/admin/containers', auctionRouter);
 
 // Serve static files from the frontend directory
 app.use(express.static(path.join(__dirname, '../frontend')));
