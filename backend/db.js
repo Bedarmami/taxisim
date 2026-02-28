@@ -275,6 +275,26 @@ function initDB() {
                 history TEXT DEFAULT '[]'
             )`);
 
+            // v4.0: Syndicates
+            db.run(`CREATE TABLE IF NOT EXISTS syndicates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE,
+                description TEXT,
+                leader_id TEXT,
+                treasury REAL DEFAULT 0,
+                score INTEGER DEFAULT 0,
+                created_at TEXT
+            )`);
+
+            db.run(`CREATE TABLE IF NOT EXISTS syndicate_members (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                syndicate_id INTEGER,
+                telegram_id TEXT UNIQUE,
+                role TEXT DEFAULT 'member',
+                joined_at TEXT,
+                contributed REAL DEFAULT 0
+            )`);
+
             // 2. RUN ALL MIGRATIONS
             // 2. RUN ALL MIGRATIONS DEFENSIVELY
             const addColumn = (table, column, definition) => {

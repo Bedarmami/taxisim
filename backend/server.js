@@ -3822,6 +3822,172 @@ app.post('/api/casino/slots', async (req, res) => {
     }
 });
 
+// ============= v4.0: СИНДИКАТЫ =============
+
+// GET /api/syndicates — list all syndicates ranked by score
+app.get('/api/syndicates', async (req, res) => {
+    try {
+        const rows = await db.all(`
+            SELECT s.*, COUNT(sm.id) as member_count
+            FROM syndicates s
+            LEFT JOIN syndicate_members sm ON sm.syndicate_id = s.id
+            GROUP BY s.id
+            ORDER BY s.score DESC
+            LIMIT 20
+        `);
+        res.json(rows);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/syndicates/mine — get my syndicate (if any)
+app.get('/api/syndicates/mine', async (req, res) => {
+    try {
+        const { telegramId } = req.query;
+        if (!telegramId) return res.status(400).json({ error: 'telegramId required' });
+        const membership = await db.get('SELECT * FROM syndicate_members WHERE telegram_id = ?', [telegramId]);
+        if (!membership) return res.json({ syndicate: null });
+        const syn = await db.get(`
+            SELECT s.*, COUNT(sm.id) as member_count
+            FROM syndicates s
+            LEFT JOIN syndicate_members sm ON sm.syndicate_id = s.id
+            WHERE s.id = ?
+            GROUP BY s.id
+        `, [membership.syndicate_id]);
+        if (!syn) return res.json({ syndicate: null });
+        const members = await db.all(`
+            SELECT sm.telegram_id, sm.role, sm.contributed, u.username
+            FROM syndicate_members sm
+            LEFT JOIN users u ON u.telegram_id = sm.telegram_id
+            WHERE sm.syndicate_id = ?
+            ORDER BY sm.contributed DESC
+        `, [syn.id]);
+        res.json({ syndicate: { ...syn, members }, role: membership.role });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/syndicates/create
+app.post('/api/syndicates/create', async (req, res) => {
+    try {
+        const { telegramId, name, description } = req.body;
+        if (!telegramId || !name) return res.status(400).json({ error: 'Заполните все поля' });
+        if (name.length < 3 || name.length > 20) return res.status(400).json({ error: 'Название: 3–20 символов' });
+
+        const user = await getUser(telegramId);
+        if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+
+        const existing = await db.get('SELECT id FROM syndicate_members WHERE telegram_id = ?', [telegramId]);
+        if (existing) return res.status(400).json({ error: 'Вы уже состоите в синдикате' });
+
+        const CREATION_COST = 2000;
+        if (user.balance < CREATION_COST) return res.status(400).json({ error: `Недостаточно средств (нужно ${CREATION_COST} PLN)` });
+
+        const nameTaken = await db.get('SELECT id FROM syndicates WHERE name = ?', [name]);
+        if (nameTaken) return res.status(400).json({ error: 'Это название уже занято' });
+
+        user.balance -= CREATION_COST;
+        await saveUser(user);
+
+        const result = await db.run(
+            'INSERT INTO syndicates (name, description, leader_id, treasury, score, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+            [name, description || '', telegramId, 0, 0, new Date().toISOString()]
+        );
+        await db.run(
+            'INSERT INTO syndicate_members (syndicate_id, telegram_id, role, joined_at, contributed) VALUES (?, ?, ?, ?, ?)',
+            [result.lastID, telegramId, 'leader', new Date().toISOString(), CREATION_COST]
+        );
+
+        logActivity(telegramId, 'SYNDICATE_CREATE', { name });
+        res.json({ success: true, message: `Синдикат «${name}» создан!`, syndicate_id: result.lastID, new_balance: user.balance });
+    } catch (e) {
+        console.error('[Syndicates] Create error:', e);
+        res.status(500).json({ error: e.message.includes('UNIQUE') ? 'Название уже занято' : 'Ошибка сервера' });
+    }
+});
+
+// POST /api/syndicates/join/:id
+app.post('/api/syndicates/join/:id', async (req, res) => {
+    try {
+        const { telegramId } = req.body;
+        const synId = parseInt(req.params.id);
+        if (!telegramId) return res.status(400).json({ error: 'telegramId required' });
+
+        const existing = await db.get('SELECT id FROM syndicate_members WHERE telegram_id = ?', [telegramId]);
+        if (existing) return res.status(400).json({ error: 'Вы уже состоите в синдикате' });
+
+        const syn = await db.get('SELECT * FROM syndicates WHERE id = ?', [synId]);
+        if (!syn) return res.status(404).json({ error: 'Синдикат не найден' });
+
+        const memberCount = await db.get('SELECT COUNT(*) as cnt FROM syndicate_members WHERE syndicate_id = ?', [synId]);
+        if (memberCount.cnt >= 20) return res.status(400).json({ error: 'Синдикат заполнен (макс. 20 игроков)' });
+
+        await db.run(
+            'INSERT INTO syndicate_members (syndicate_id, telegram_id, role, joined_at, contributed) VALUES (?, ?, ?, ?, ?)',
+            [synId, telegramId, 'member', new Date().toISOString(), 0]
+        );
+
+        // Give score for joining
+        await db.run('UPDATE syndicates SET score = score + 5 WHERE id = ?', [synId]);
+
+        res.json({ success: true, message: `Вы вступили в синдикат «${syn.name}»!` });
+    } catch (e) { res.status(500).json({ error: 'Ошибка сервера' }); }
+});
+
+// POST /api/syndicates/leave
+app.post('/api/syndicates/leave', async (req, res) => {
+    try {
+        const { telegramId } = req.body;
+        const membership = await db.get('SELECT * FROM syndicate_members WHERE telegram_id = ?', [telegramId]);
+        if (!membership) return res.status(400).json({ error: 'Вы не состоите в синдикате' });
+
+        if (membership.role === 'leader') {
+            // Promote another member or dissolve
+            const nextLeader = await db.get(
+                'SELECT * FROM syndicate_members WHERE syndicate_id = ? AND telegram_id != ? ORDER BY contributed DESC LIMIT 1',
+                [membership.syndicate_id, telegramId]
+            );
+            if (nextLeader) {
+                await db.run('UPDATE syndicate_members SET role = ? WHERE id = ?', ['leader', nextLeader.id]);
+                await db.run('UPDATE syndicates SET leader_id = ? WHERE id = ?', [nextLeader.telegram_id, membership.syndicate_id]);
+            } else {
+                // Last member — dissolve syndicate
+                await db.run('DELETE FROM syndicates WHERE id = ?', [membership.syndicate_id]);
+                await db.run('DELETE FROM syndicate_members WHERE syndicate_id = ?', [membership.syndicate_id]);
+                return res.json({ success: true, message: 'Синдикат расформирован (вы были последним участником)' });
+            }
+        }
+
+        await db.run('DELETE FROM syndicate_members WHERE telegram_id = ?', [telegramId]);
+        res.json({ success: true, message: 'Вы вышли из синдиката' });
+    } catch (e) { res.status(500).json({ error: 'Ошибка сервера' }); }
+});
+
+// POST /api/syndicates/contribute
+app.post('/api/syndicates/contribute', async (req, res) => {
+    try {
+        const { telegramId, amount } = req.body;
+        if (!telegramId || !amount || amount <= 0) return res.status(400).json({ error: 'Неверная сумма' });
+
+        const user = await getUser(telegramId);
+        if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+
+        const membership = await db.get('SELECT * FROM syndicate_members WHERE telegram_id = ?', [telegramId]);
+        if (!membership) return res.status(400).json({ error: 'Вы не состоите в синдикате' });
+
+        if (user.balance < amount) return res.status(400).json({ error: 'Недостаточно средств' });
+
+        user.balance -= amount;
+        await saveUser(user);
+
+        await db.run('UPDATE syndicates SET treasury = treasury + ?, score = score + ? WHERE id = ?',
+            [amount, Math.floor(amount / 100), membership.syndicate_id]);
+        await db.run('UPDATE syndicate_members SET contributed = contributed + ? WHERE telegram_id = ?',
+            [amount, telegramId]);
+
+        logActivity(telegramId, 'SYNDICATE_CONTRIBUTE', { amount, syndicate_id: membership.syndicate_id });
+        res.json({ success: true, message: `💰 +${amount} PLN в казну синдиката!`, new_balance: user.balance });
+    } catch (e) { res.status(500).json({ error: 'Ошибка сервера' }); }
+});
+
 // ============= v3.8: STOCK MARKET (ФОНДОВЫЙ РЫНОК) =============
 
 const STOCK_DEFINITIONS = [

@@ -2067,6 +2067,28 @@ async function showScreen(screenName) {
         updateGarageScreen();
     } else if (screenName === 'business') {
         if (window.businessManager) window.businessManager.loadData();
+        // v3.8: hook biz-tab clicks to load data for tabs that need it
+        const bizTabs = document.querySelectorAll('.biz-tab');
+        bizTabs.forEach(tab => {
+            // Remove existing listener to avoid duplicates
+            const newTab = tab.cloneNode(true);
+            tab.parentNode.replaceChild(newTab, tab);
+        });
+        document.querySelectorAll('.biz-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.dataset.tab;
+                // Toggle active class
+                document.querySelectorAll('.biz-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+                const tabContent = document.getElementById(`tab-${tabName}`);
+                if (tabContent) tabContent.classList.add('active');
+                // Load tab-specific data
+                if (tabName === 'investments') loadInvestments();
+                if (tabName === 'market') loadFleaMarket();
+                if (tabName === 'syndicates' && typeof loadSyndicates === 'function') loadSyndicates();
+            });
+        });
     } else if (screenName === 'skills') {
         if (window.skillsManager) window.skillsManager.loadData();
     }
@@ -3377,4 +3399,135 @@ async function sellStock(symbol, name) {
     } catch (e) {
         showNotification('Ошибка соединения', 'error');
     }
+}
+
+// ============= v4.0: СИНДИКАТЫ =============
+
+async function loadSyndicates() {
+    const list = document.getElementById('syndicates-list');
+    if (!list) return;
+    list.innerHTML = '<div style="text-align:center;color:#666;padding:20px;">Загрузка...</div>';
+
+    try {
+        const mineData = await safeFetchJson(`${API_BASE_URL}/syndicates/mine?telegramId=${TELEGRAM_ID}`);
+        const myBlock = document.getElementById('my-syndicate-block');
+        const noBlock = document.getElementById('no-syndicate-block');
+
+        if (mineData && mineData.syndicate) {
+            const syn = mineData.syndicate;
+            document.getElementById('my-syn-name').textContent = syn.name;
+            document.getElementById('my-syn-desc').textContent = syn.description || '—';
+            document.getElementById('my-syn-members').textContent = syn.member_count || 0;
+            document.getElementById('my-syn-treasury').textContent = Math.round(syn.treasury).toLocaleString();
+            document.getElementById('my-syn-score').textContent = syn.score;
+            document.getElementById('my-syn-role').textContent = mineData.role === 'leader' ? '👑 Лидер' : '👤 Участник';
+            if (syn.members && syn.members.length > 0) {
+                document.getElementById('syn-members-list').innerHTML =
+                    '<div style="margin-top:10px;font-weight:600;margin-bottom:6px;">Участники:</div>' +
+                    syn.members.map(m =>
+                        `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
+                            <span>${m.role === 'leader' ? '👑 ' : ''}${m.username || m.telegram_id}</span>
+                            <span style="color:#aaa;">💰 ${Math.round(m.contributed).toLocaleString()} PLN</span>
+                        </div>`
+                    ).join('');
+            }
+            if (myBlock) myBlock.style.display = 'block';
+            if (noBlock) noBlock.style.display = 'none';
+        } else {
+            if (myBlock) myBlock.style.display = 'none';
+            if (noBlock) noBlock.style.display = 'block';
+        }
+
+        const syndicates = await safeFetchJson(`${API_BASE_URL}/syndicates`);
+        if (!syndicates || !Array.isArray(syndicates)) {
+            list.innerHTML = '<div style="color:#ff3b30;padding:20px;">Ошибка загрузки</div>';
+            return;
+        }
+        const isMember = !!(mineData && mineData.syndicate);
+        list.innerHTML = syndicates.length === 0
+            ? '<div style="text-align:center;color:#666;padding:20px;">Синдикаты ещё не созданы</div>'
+            : syndicates.map((syn, idx) => {
+                const myMembership = mineData?.syndicate?.id === syn.id;
+                return `
+                <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:12px 14px;margin-bottom:10px;">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+                        <div>
+                            <span style="color:#ff9f0a;font-size:1em;margin-right:6px;">#${idx + 1}</span>
+                            <strong>${syn.name}</strong>
+                            ${myMembership ? '<span style="background:rgba(255,159,10,0.2);color:#ff9f0a;font-size:0.75em;padding:2px 8px;border-radius:10px;margin-left:6px;">Мой</span>' : ''}
+                        </div>
+                        <span style="color:#888;font-size:0.85em;">👥 ${syn.member_count}/20</span>
+                    </div>
+                    <div style="font-size:0.82em;color:#999;margin-bottom:8px;">${syn.description || 'Нет описания'}</div>
+                    <div style="display:flex;gap:10px;font-size:0.8em;flex-wrap:wrap;margin-bottom:10px;">
+                        <span>🏆 Очков: <strong>${syn.score}</strong></span>
+                        <span>💰 Казна: <strong>${Math.round(syn.treasury).toLocaleString()} PLN</strong></span>
+                    </div>
+                    ${!isMember ? `<button class="action-btn" style="font-size:0.85em;width:100%;" onclick="joinSyndicate(${syn.id})">🤝 Вступить</button>` : ''}
+                </div>`;
+            }).join('');
+    } catch (e) {
+        console.error('Syndicates load error:', e);
+        if (list) list.innerHTML = '<div style="color:#ff3b30;padding:20px;">Ошибка соединения</div>';
+    }
+}
+
+async function createSyndicate() {
+    const name = document.getElementById('syn-create-name')?.value?.trim();
+    const description = document.getElementById('syn-create-desc')?.value?.trim();
+    if (!name || name.length < 3) return showNotification('Название минимум 3 символа', 'error');
+    try {
+        const result = await safeFetchJson(`${API_BASE_URL}/syndicates/create`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ telegramId: TELEGRAM_ID, name, description })
+        });
+        if (result && result.success) {
+            userData.balance = result.new_balance;
+            updateMainScreen();
+            showNotification(result.message, 'success');
+            loadSyndicates();
+        } else { showNotification(result?.error || 'Ошибка создания', 'error'); }
+    } catch (e) { showNotification('Ошибка соединения', 'error'); }
+}
+
+async function joinSyndicate(synId) {
+    try {
+        const result = await safeFetchJson(`${API_BASE_URL}/syndicates/join/${synId}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ telegramId: TELEGRAM_ID })
+        });
+        if (result && result.success) { showNotification(result.message, 'success'); loadSyndicates(); }
+        else { showNotification(result?.error || 'Ошибка', 'error'); }
+    } catch (e) { showNotification('Ошибка соединения', 'error'); }
+}
+
+async function leaveSyndicate() {
+    if (!confirm('Выйти из синдиката?')) return;
+    try {
+        const result = await safeFetchJson(`${API_BASE_URL}/syndicates/leave`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ telegramId: TELEGRAM_ID })
+        });
+        if (result && result.success) { showNotification(result.message, 'success'); loadSyndicates(); }
+        else { showNotification(result?.error || 'Ошибка', 'error'); }
+    } catch (e) { showNotification('Ошибка соединения', 'error'); }
+}
+
+async function contributeSyndicate() {
+    const amtStr = prompt('Сколько PLN внести в казну синдиката?');
+    if (!amtStr) return;
+    const amount = parseFloat(amtStr);
+    if (isNaN(amount) || amount <= 0) return showNotification('Неверная сумма', 'error');
+    try {
+        const result = await safeFetchJson(`${API_BASE_URL}/syndicates/contribute`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ telegramId: TELEGRAM_ID, amount })
+        });
+        if (result && result.success) {
+            userData.balance = result.new_balance;
+            updateMainScreen();
+            showNotification(result.message, 'success');
+            loadSyndicates();
+        } else { showNotification(result?.error || 'Ошибка', 'error'); }
+    } catch (e) { showNotification('Ошибка соединения', 'error'); }
 }

@@ -467,10 +467,11 @@
             <div class="business-tabs">
                 <div class="biz-tab active" data-tab="drivers">👨‍✈️ Водители</div>
                 <div class="biz-tab" data-tab="fleet">🚗 Автопарк</div>
-                <div class="biz-tab" data-tab="investments">⛽ АЗС</div>
+                <div class="biz-tab" data-tab="investments">📈 Биржа</div>
                 <div class="biz-tab" data-tab="market">⚖️ Рынок</div>
                 <div class="biz-tab" data-tab="crypto">🪙 Крипто</div>
                 <div class="biz-tab" data-tab="shop">🏪 Магазин</div>
+                <div class="biz-tab" data-tab="syndicates">🤝 Синдикат</div>
             </div>
 
             <div class="business-content">
@@ -599,6 +600,63 @@
                         <div style="font-size:0.85em; color:#888; margin-bottom:10px;">Покупайте машины для сдачи
                             водителям</div>
                         <div id="fleet-shop"></div>
+                    </div>
+                </div>
+
+                <!-- Tab: Syndicates -->
+                <div id="tab-syndicates" class="tab-content">
+                    <div id="syndicates-section" class="investments-section">
+                        <!-- My Syndicate -->
+                        <div id="my-syndicate-block" style="display:none; margin-bottom:20px;">
+                            <div
+                                style="background:rgba(255,159,10,0.1); border:1px solid rgba(255,159,10,0.3); border-radius:14px; padding:16px;">
+                                <div
+                                    style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                    <h3 id="my-syn-name" style="color:#ff9f0a; margin:0;">Мой синдикат</h3>
+                                    <span id="my-syn-role"
+                                        style="font-size:0.8em; background:rgba(255,159,10,0.2); padding:3px 10px; border-radius:20px; color:#ff9f0a;">Участник</span>
+                                </div>
+                                <div style="font-size:0.9em; color:#aaa; margin-bottom:12px;" id="my-syn-desc">—</div>
+                                <div
+                                    style="display:flex; gap:10px; flex-wrap:wrap; font-size:0.85em; margin-bottom:14px;">
+                                    <span>👥 Участников: <strong id="my-syn-members">0</strong></span>
+                                    <span>💰 Казна: <strong id="my-syn-treasury">0</strong> PLN</span>
+                                    <span>🏆 Очков: <strong id="my-syn-score">0</strong></span>
+                                </div>
+                                <div style="display:flex; gap:8px;">
+                                    <button class="action-btn success" style="flex:1;"
+                                        onclick="contributeSyndicate()">💰 Взнос в казну</button>
+                                    <button class="action-btn error" style="flex:1;" onclick="leaveSyndicate()">🚪
+                                        Покинуть</button>
+                                </div>
+                                <div id="syn-members-list" style="margin-top:14px; font-size:0.85em;"></div>
+                            </div>
+                        </div>
+
+                        <!-- No Syndicate -->
+                        <div id="no-syndicate-block">
+                            <h3 style="color:white; margin:0 0 12px;">🤝 Синдикаты</h3>
+                            <p style="color:#888; font-size:0.9em; margin-bottom:16px;">Вступайте в синдикаты или
+                                создайте свой! Участники синдикатов соревнуются за еженедельный джекпот.</p>
+                            <div
+                                style="background:rgba(255,255,255,0.05); border-radius:12px; padding:14px; margin-bottom:16px;">
+                                <h4 style="color:#ff9f0a; margin:0 0 10px;">➕ Создать синдикат</h4>
+                                <input id="syn-create-name" type="text" placeholder="Название (макс. 20 символов)"
+                                    maxlength="20"
+                                    style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid #444; background:#111; color:#fff; margin-bottom:8px; box-sizing:border-box;">
+                                <input id="syn-create-desc" type="text" placeholder="Описание (необязательно)"
+                                    maxlength="60"
+                                    style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid #444; background:#111; color:#fff; margin-bottom:10px; box-sizing:border-box;">
+                                <button class="action-btn success" style="width:100%;"
+                                    onclick="createSyndicate()">Создать (2000 PLN)</button>
+                            </div>
+                        </div>
+
+                        <!-- Syndicate List -->
+                        <h4 style="color:#ccc; margin:0 0 10px;">🏆 Синдикаты (рейтинг)</h4>
+                        <div id="syndicates-list">
+                            <div style="text-align:center; color:#666; padding:20px;">Загрузка...</div>
+                        </div>
                     </div>
                 </div>
             </div>
