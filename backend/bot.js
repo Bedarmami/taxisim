@@ -27,7 +27,16 @@ async function saveSupportMessage(userId, message, fileId = null, isFromAdmin = 
 
 // Commands
 bot.start((ctx) => {
-    ctx.reply('Привет! Это бот симулятора такси. Чтобы связаться с поддержкой, нажми кнопку ниже.', mainKeyboard);
+    const webAppUrl = 'https://t.me/taxisimulator_vlad_bot/app'; // Or user's actual bot name, using a placeholder if unknown
+
+    const inlineKeyboard = Markup.inlineKeyboard([
+        [Markup.button.webApp("🎮 Играть", process.env.WEBAPP_URL || 'https://taxi-simulator-url.herokuapp.com')] // In production this should be the actual frontend URL
+    ]);
+
+    ctx.reply(
+        '👋 Привет! Добро пожаловать в Симулятор Такси.\n\n🚕 Покупай машины, выполняй заказы, открывай новые районы и построй свою империю!\n\nНажми кнопку ниже, чтобы начать игру:',
+        inlineKeyboard
+    );
 });
 
 // Handling user messages
