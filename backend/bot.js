@@ -27,16 +27,22 @@ async function saveSupportMessage(userId, message, fileId = null, isFromAdmin = 
 
 // Commands
 bot.start((ctx) => {
-    const webAppUrl = 'https://t.me/taxisimulator_vlad_bot/app'; // Or user's actual bot name, using a placeholder if unknown
+    const webAppUrl = process.env.WEBAPP_URL;
 
-    const inlineKeyboard = Markup.inlineKeyboard([
-        [Markup.button.webApp("🎮 Играть", process.env.WEBAPP_URL || 'https://taxi-simulator-url.herokuapp.com')] // In production this should be the actual frontend URL
-    ]);
+    if (webAppUrl) {
+        const inlineKeyboard = Markup.inlineKeyboard([
+            [Markup.button.webApp("🎮 Играть", webAppUrl)]
+        ]);
 
-    ctx.reply(
-        '👋 Привет! Добро пожаловать в Симулятор Такси.\n\n🚕 Покупай машины, выполняй заказы, открывай новые районы и построй свою империю!\n\nНажми кнопку ниже, чтобы начать игру:',
-        inlineKeyboard
-    );
+        ctx.reply(
+            '👋 Привет! Добро пожаловать в Симулятор Такси.\n\n🚕 Покупай машины, выполняй заказы, открывай новые районы и построй свою империю!\n\nНажми кнопку ниже, чтобы начать игру:',
+            inlineKeyboard
+        );
+    } else {
+        ctx.reply(
+            '👋 Привет! Добро пожаловать в Симулятор Такси.\n\n⚠️ Игра временно недоступна. Администратору необходимо установить переменную окружения WEBAPP_URL в настройках сервера.'
+        );
+    }
 });
 
 // Handling user messages
