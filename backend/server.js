@@ -6036,10 +6036,10 @@ http_server.listen(PORT, () => {
 
     try { scheduleDailyRentalCheck(); } catch (e) { }
 
-    // v3.8: Seed stocks and start price ticker
-    dbReady.then(() => {
+    // v3.8: Seed stocks and start price ticker (delay to allow DB to initialize)
+    setTimeout(() => {
         seedStocks().catch(e => console.error('seedStocks error:', e));
         setInterval(updateStockPrices, 2 * 60 * 1000); // every 2 minutes
         console.log('📈 Stock market ticker started (every 2 min)');
-    });
+    }, 3000);
 });
