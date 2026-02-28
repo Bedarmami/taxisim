@@ -3824,6 +3824,15 @@ app.post('/api/casino/slots', async (req, res) => {
 
 // ============= v4.0: СИНДИКАТЫ =============
 
+// One-time cleanup: remove orphaned syndicate_members (created by result.lastID bug)
+app.get('/api/admin/fix-syndicates', async (req, res) => {
+    try {
+        await db.run('DELETE FROM syndicate_members WHERE syndicate_id IS NULL');
+        await db.run('DELETE FROM syndicates WHERE id NOT IN (SELECT syndicate_id FROM syndicate_members WHERE syndicate_id IS NOT NULL)');
+        res.json({ success: true, message: 'Syndicates cleaned up!' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // GET /api/syndicates — list all syndicates ranked by score
 app.get('/api/syndicates', async (req, res) => {
     try {
