@@ -245,6 +245,94 @@ async function settlePoliceEncounter(action) {
     }
 }
 
+// ============= v3.7: ИНТЕРАКТИВНЫЕ КВЕСТЫ =============
+function handleInteractiveQuest(eventData) {
+    const modal = document.getElementById('quest-modal');
+    if (!modal) return;
+
+    const iconEl = document.getElementById('quest-icon');
+    const messageEl = document.getElementById('quest-message');
+    const actionsEl = document.getElementById('quest-actions');
+    const resultDiv = document.getElementById('quest-result');
+    const closeBtn = document.getElementById('quest-close-btn');
+
+    modal.style.display = 'flex';
+    if (iconEl) iconEl.textContent = eventData.icon || '❓';
+    if (messageEl) messageEl.textContent = eventData.message || 'Случайное событие!';
+
+    actionsEl.innerHTML = '';
+    actionsEl.style.display = 'flex';
+    resultDiv.style.display = 'none';
+    closeBtn.style.display = 'none';
+
+    if (eventData.choices && eventData.choices.length > 0) {
+        eventData.choices.forEach(choice => {
+            const btn = document.createElement('button');
+            btn.className = 'action-btn';
+            btn.textContent = choice.text;
+            btn.onclick = () => settleInteractiveQuest(eventData.quest_id, choice.id);
+            actionsEl.appendChild(btn);
+        });
+    } else {
+        // Fallback info event
+        closeBtn.style.display = 'block';
+    }
+
+    try { soundManager.play('siren'); } catch (e) { }
+}
+
+async function settleInteractiveQuest(questId, choiceId) {
+    try {
+        const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/resolve-event`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ questId, choiceId })
+        });
+
+        if (result && result.success) {
+            userData.balance = result.new_balance;
+            userData.stamina = result.stamina;
+            updateMainScreen();
+
+            const resultDiv = document.getElementById('quest-result');
+            const actions = document.getElementById('quest-actions');
+            const closeBtn = document.getElementById('quest-close-btn');
+
+            if (actions) actions.style.display = 'none';
+            if (resultDiv) {
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `
+                    <div style="font-size: 40px; margin-bottom: 10px;">${result.icon || 'ℹ️'}</div>
+                    <p>${result.rewardText}</p>
+                    ${result.deltaBalance ? `<div style="color: ${result.deltaBalance > 0 ? '#34C759' : '#ff3b30'}">${result.deltaBalance > 0 ? '+' : ''}${result.deltaBalance} PLN</div>` : ''}
+                    ${result.deltaStamina ? `<div style="color: ${result.deltaStamina > 0 ? '#34C759' : '#ff3b30'}">⚡ ${result.deltaStamina > 0 ? '+' : ''}${result.deltaStamina} Выносливости</div>` : ''}
+                    ${result.deltaWear ? `<div style="color: #ff9500">🔧 Износ авто: +${result.deltaWear}%</div>` : ''}
+                `;
+            }
+            if (closeBtn) {
+                closeBtn.style.display = 'block';
+                closeBtn.onclick = () => {
+                    const modal = document.getElementById('quest-modal');
+                    if (modal) modal.style.display = 'none';
+                };
+            }
+
+            if (result.deltaBalance > 0) {
+                try { soundManager.play('success'); } catch (e) { }
+            } else if (result.deltaBalance < 0 || result.deltaWear > 0) {
+                try { soundManager.play('error'); } catch (e) { }
+            } else {
+                try { soundManager.play('button'); } catch (e) { }
+            }
+        } else {
+            showNotification(result?.error || 'Ошибка связи с сервером', 'error');
+        }
+    } catch (e) {
+        console.error('Quest settle error:', e);
+        showNotification('Ошибка связи с сервером', 'error');
+    }
+}
+
 async function checkAnnouncements() {
     try {
         const data = await safeFetchJson(`${API_BASE_URL}/announcement`);
@@ -869,6 +957,10 @@ async function takeOrder(orderId, event, useAutopilot = false) {
             if (result.event) {
                 if (result.event.type === 'police_stopped') {
                     handlePoliceEncounter(result.event.fine);
+                    isProcessingOrder = false;
+                    return;
+                } else if (result.event.has_quest) {
+                    handleInteractiveQuest(result.event);
                     isProcessingOrder = false;
                     return;
                 }
@@ -2633,7 +2725,7 @@ async function createCustomPlate() {
 // ============= v3.6: SECONDARY CAR MARKET (БАРАХОЛКА) =============
 
 async function sellCarOnMarket(carId) {
-    if (!userData || !userData.cars || userData.cars.length <= 1) {
+    if (!userData || !userData.owned_cars || userData.owned_cars.length <= 1) {
         return showNotification('Нельзя выставить на продажу свою последнюю машину!', 'error');
     }
 

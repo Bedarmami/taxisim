@@ -726,6 +726,22 @@
         </div>
     </div>
 
+    <!-- v3.7: Интерактивные квесты -->
+    <div id="quest-modal" class="modal" style="display: none;">
+        <div class="modal-content quest-content">
+            <h2 style="color: #f39c12; margin-top: 10px;">❓ СЛУЧАЙНОЕ СОБЫТИИЕ</h2>
+            <div id="quest-icon" style="font-size: 50px; margin: 15px 0;">❓</div>
+            <p id="quest-message" style="margin-bottom: 20px; font-size: 16px;">Что-то произошло!</p>
+
+            <div id="quest-actions" style="display: flex; flex-direction: column; gap: 10px;">
+                <!-- Buttons are injected via JS -->
+            </div>
+
+            <div id="quest-result" style="display: none; margin-top: 15px; font-weight: bold; font-size: 18px;"></div>
+            <button id="quest-close-btn" class="take-order-btn"
+                style="display: none; width: 100%; margin-top: 20px;">Поехать дальше</button>
+        </div>
+    </div>
 
     <!-- v2.9: Обучение при первом входе -->
     <div id="tutorial-modal" class="modal tutorial-modal" style="display: none;">

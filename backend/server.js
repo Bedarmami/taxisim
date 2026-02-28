@@ -1884,23 +1884,44 @@ app.post('/api/user/:telegramId/ride', rateLimitMiddleware, async (req, res) => 
                 icon: '🚨'
             };
         } else if (Math.random() < 0.1) {
-            const events = [
-                { type: 'fine', text: '👮 Вы превысили скорость! Штраф 50 PLN', amount: -50, icon: '🚨' },
-                { type: 'tip', text: '💰 Клиент оставил щедрые чаевые!', amount: 50, icon: '💸' },
-                { type: 'pothole', text: '💥 Вы влетели в яму! Подвеска повреждена.', wear: 5, icon: '🚧' },
-                { type: 'traffic', text: '🚦 Пробки... Вы потратили больше выносливости.', stamina: -10, icon: '🚗' }
-            ];
-            const randomEvent = events[Math.floor(Math.random() * events.length)];
+            // v3.7: Interactive Mini-Quests
+            const isQuest = Math.random() < 0.5; // 50% chance for an interactive quest vs instant event
+            if (isQuest) {
+                const quests = [
+                    { id: 'lost_wallet', text: 'Вы нашли кошелек на заднем сиденье.', icon: '👛', choices: [{ id: 'return', text: 'Вернуть владельцу' }, { id: 'keep', text: 'Забрать себе' }] },
+                    { id: 'racing', text: 'Рядом останавливается спорткар и газует, предлагая гонку.', icon: '🏎️', choices: [{ id: 'race', text: 'Принять вызов' }, { id: 'ignore', text: 'Ехать спокойно' }] },
+                    { id: 'suspicious_client', text: 'Странный пассажир просит поехать в лес за двойную плату.', icon: '🌲', choices: [{ id: 'agree', text: 'Согласиться' }, { id: 'refuse', text: 'Отказаться' }] },
+                    { id: 'drunk_party', text: 'Пьяная компания просит включить музыку на максимум.', icon: '🎉', choices: [{ id: 'loud', text: 'Сделать громче' }, { id: 'quiet', text: 'Отказать' }] }
+                ];
+                const activeQuest = quests[Math.floor(Math.random() * quests.length)];
+                event = {
+                    type: 'interactive_quest',
+                    quest_id: activeQuest.id,
+                    message: activeQuest.text,
+                    choices: activeQuest.choices,
+                    icon: activeQuest.icon,
+                    has_quest: true
+                };
+            } else {
+                // Legacy instant events
+                const events = [
+                    { type: 'fine', text: '👮 Вы превысили скорость! Штраф 50 PLN', amount: -50, icon: '🚨' },
+                    { type: 'tip', text: '💰 Клиент оставил щедрые чаевые!', amount: 50, icon: '💸' },
+                    { type: 'pothole', text: '💥 Вы влетели в яму! Подвеска повреждена.', wear: 5, icon: '🚧' },
+                    { type: 'traffic', text: '🚦 Пробки... Вы потратили больше выносливости.', stamina: -10, icon: '🚗' }
+                ];
+                const randomEvent = events[Math.floor(Math.random() * events.length)];
 
-            if (randomEvent.amount) {
-                user.balance += randomEvent.amount;
-                event = randomEvent;
-            } else if (randomEvent.wear && user.car.is_owned) {
-                user.car.condition = Math.max(0, (user.car.condition || 100) - randomEvent.wear);
-                event = randomEvent;
-            } else if (randomEvent.stamina) {
-                user.stamina = Math.max(0, user.stamina + randomEvent.stamina);
-                event = randomEvent;
+                if (randomEvent.amount) {
+                    user.balance += randomEvent.amount;
+                    event = randomEvent;
+                } else if (randomEvent.wear && user.car.is_owned) {
+                    user.car.condition = Math.max(0, (user.car.condition || 100) - randomEvent.wear);
+                    event = randomEvent;
+                } else if (randomEvent.stamina) {
+                    user.stamina = Math.max(0, user.stamina + randomEvent.stamina);
+                    event = randomEvent;
+                }
             }
         }
 
@@ -2019,7 +2040,10 @@ app.post('/api/user/:telegramId/ride', rateLimitMiddleware, async (req, res) => 
             event: event ? {
                 message: event.message,
                 icon: event.icon,
-                type: event.type
+                type: event.type,
+                has_quest: event.has_quest,
+                quest_id: event.quest_id,
+                choices: event.choices
             } : null,
             new_achievements: newAchievements,
             jackpot_pool: Number(JACKPOT_POOL.toFixed(2)),
@@ -2028,6 +2052,124 @@ app.post('/api/user/:telegramId/ride', rateLimitMiddleware, async (req, res) => 
 
     } catch (error) {
         console.error('Error:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// v3.7: Обработка выбора игрока в интерактивных квестах
+app.post('/api/user/:telegramId/resolve-event', rateLimitMiddleware, async (req, res) => {
+    try {
+        const { telegramId } = req.params;
+        const { questId, choiceId } = req.body;
+
+        const user = await getUser(telegramId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        let rewardText = '';
+        let deltaBalance = 0;
+        let deltaStamina = 0;
+        let deltaWear = 0;
+        let icon = 'ℹ️';
+
+        const rng = Math.random();
+
+        // Hardcoded outcomes for each quest choice
+        if (questId === 'lost_wallet') {
+            if (choiceId === 'return') {
+                if (rng < 0.7) {
+                    deltaBalance = 150;
+                    rewardText = 'Владелец оказался очень благодарен и щедро вознаградил вас!';
+                    icon = '🎁';
+                } else {
+                    rewardText = 'Вы вернули кошелек, но владелец даже не сказал "спасибо".';
+                    icon = '🤷';
+                }
+            } else if (choiceId === 'keep') {
+                if (rng < 0.4) {
+                    deltaBalance = 500;
+                    rewardText = 'Вы нашли в кошельке крупную сумму наличных. Никто ничего не заметил.';
+                    icon = '💰';
+                } else {
+                    deltaBalance = -300;
+                    rewardText = 'Вас вычислила полиция по камерам. Пришлось вернуть деньги и оплатить штраф.';
+                    icon = '🚨';
+                }
+            }
+        } else if (questId === 'racing') {
+            if (choiceId === 'race') {
+                if (rng < 0.5) {
+                    deltaBalance = 300;
+                    deltaWear = 5;
+                    rewardText = 'Вы обогнали пижона! Зрители дали вам денег, но машина пострадала.';
+                    icon = '🏁';
+                } else {
+                    deltaBalance = -200;
+                    deltaWear = 10;
+                    rewardText = 'Вы проиграли гонку и сожгли сцепление. Ещё и штраф с камер пришел.';
+                    icon = '💥';
+                }
+            } else if (choiceId === 'ignore') {
+                deltaStamina = 5;
+                rewardText = 'Спорткар с ревом уезжает. Вы спокойно едете дальше, сохраняя энергию.';
+                icon = '😌';
+            }
+        } else if (questId === 'suspicious_client') {
+            if (choiceId === 'agree') {
+                if (rng < 0.3) {
+                    deltaBalance = 1000;
+                    rewardText = 'Пассажир оказался бизнесменом, который просто хотел посмотреть участок в лесу. Отличная оплата!';
+                    icon = '💵';
+                } else {
+                    deltaBalance = -500;
+                    deltaStamina = -30;
+                    rewardText = 'Это была подстава! Вас ограбили в лесу.';
+                    icon = '🔪';
+                }
+            } else if (choiceId === 'refuse') {
+                deltaBalance = 20;
+                rewardText = 'Вы отказались и взяли безопасный местный заказ вместо него.';
+                icon = '✅';
+            }
+        } else if (questId === 'drunk_party') {
+            if (choiceId === 'loud') {
+                deltaBalance = Math.floor(rng * 100) + 50; // Random tip 50-150
+                deltaStamina = -10;
+                rewardText = 'Пассажирам очень понравилось! Они оставили хорошие чаевые, хотя у вас теперь болит голова.';
+                icon = '🎶';
+            } else if (choiceId === 'quiet') {
+                rewardText = 'Пассажиры немного повозмущались, но доехали спокойно.';
+                icon = '🤐';
+            }
+        } else {
+            return res.status(400).json({ error: 'Неизвестный квест' });
+        }
+
+        // Apply changes
+        user.balance = Math.max(0, user.balance + deltaBalance);
+        user.stamina = Math.max(0, Math.min(100, user.stamina + deltaStamina));
+
+        if (deltaWear > 0 && user.car.is_owned) {
+            user.car.condition = Math.max(0, (user.car.condition || 100) - deltaWear);
+        }
+
+        await saveUser(user);
+        logActivity(telegramId, 'QUEST_RESOLVED', { questId, choiceId, deltaBalance, deltaStamina });
+
+        res.json({
+            success: true,
+            rewardText,
+            icon,
+            deltaBalance,
+            deltaStamina,
+            deltaWear,
+            new_balance: Number(user.balance.toFixed(2)),
+            stamina: user.stamina
+        });
+
+    } catch (error) {
+        console.error('Error resolving event:', error);
         res.status(500).json({ error: 'Server error' });
     }
 });
