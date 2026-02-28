@@ -3827,7 +3827,7 @@ app.post('/api/casino/slots', async (req, res) => {
 // GET /api/syndicates — list all syndicates ranked by score
 app.get('/api/syndicates', async (req, res) => {
     try {
-        const rows = await db.all(`
+        const rows = await db.query(`
             SELECT s.*, COUNT(sm.id) as member_count
             FROM syndicates s
             LEFT JOIN syndicate_members sm ON sm.syndicate_id = s.id
@@ -3854,7 +3854,7 @@ app.get('/api/syndicates/mine', async (req, res) => {
             GROUP BY s.id
         `, [membership.syndicate_id]);
         if (!syn) return res.json({ syndicate: null });
-        const members = await db.all(`
+        const members = await db.query(`
             SELECT sm.telegram_id, sm.role, sm.contributed, u.username
             FROM syndicate_members sm
             LEFT JOIN users u ON u.telegram_id = sm.telegram_id
@@ -4019,7 +4019,7 @@ async function seedStocks() {
 // Update stock prices every 2 minutes
 async function updateStockPrices() {
     try {
-        const stocks = await db.all('SELECT * FROM stocks');
+        const stocks = await db.query('SELECT * FROM stocks');
         for (const stock of stocks) {
             const vol = stock.volatility || 0.05;
             const change = (Math.random() * 2 - 1) * vol; // -vol to +vol
@@ -4042,7 +4042,7 @@ async function updateStockPrices() {
 // GET /api/stocks — get all current stock prices
 app.get('/api/stocks', async (req, res) => {
     try {
-        const stocks = await db.all('SELECT symbol, name, price, previous_price, history FROM stocks ORDER BY symbol');
+        const stocks = await db.query('SELECT symbol, name, price, previous_price, history FROM stocks ORDER BY symbol');
         res.json(stocks.map(s => ({
             ...s,
             change_pct: parseFloat((((s.price - s.previous_price) / s.previous_price) * 100).toFixed(2)),
@@ -6202,10 +6202,10 @@ http_server.listen(PORT, () => {
 
     try { scheduleDailyRentalCheck(); } catch (e) { }
 
-    // v3.8: Seed stocks and start price ticker (delay to allow DB to initialize)
-    setTimeout(() => {
+    // v3.8: Seed stocks and start price ticker
+    db.dbReady.then(() => {
         seedStocks().catch(e => console.error('seedStocks error:', e));
         setInterval(updateStockPrices, 2 * 60 * 1000); // every 2 minutes
         console.log('📈 Stock market ticker started (every 2 min)');
-    }, 3000);
+    });
 });
