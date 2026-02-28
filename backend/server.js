@@ -3893,11 +3893,11 @@ app.post('/api/syndicates/create', async (req, res) => {
         );
         await db.run(
             'INSERT INTO syndicate_members (syndicate_id, telegram_id, role, joined_at, contributed) VALUES (?, ?, ?, ?, ?)',
-            [result.lastID, telegramId, 'leader', new Date().toISOString(), CREATION_COST]
+            [result.id, telegramId, 'leader', new Date().toISOString(), CREATION_COST]
         );
 
         logActivity(telegramId, 'SYNDICATE_CREATE', { name });
-        res.json({ success: true, message: `Синдикат «${name}» создан!`, syndicate_id: result.lastID, new_balance: user.balance });
+        res.json({ success: true, message: `Синдикат «${name}» создан!`, syndicate_id: result.id, new_balance: user.balance });
     } catch (e) {
         console.error('[Syndicates] Create error:', e);
         res.status(500).json({ error: e.message.includes('UNIQUE') ? 'Название уже занято' : 'Ошибка сервера' });
