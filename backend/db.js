@@ -255,6 +255,15 @@ function initDB() {
                 created_at TEXT
             )`);
 
+            db.run(`CREATE TABLE IF NOT EXISTS car_market (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                seller_id TEXT,
+                car_id TEXT,
+                price REAL,
+                created_at TEXT,
+                FOREIGN KEY(seller_id) REFERENCES users(telegram_id)
+            )`);
+
             // 2. RUN ALL MIGRATIONS
             // 2. RUN ALL MIGRATIONS DEFENSIVELY
             const addColumn = (table, column, definition) => {

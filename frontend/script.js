@@ -1350,7 +1350,8 @@ async function loadMyCars() {
                         } else {
                             actionButton = `
                                 <button class="action-btn" onclick="selectCar('${car.id}')" style="margin-bottom: 5px; width: 100%;">Сесть за руль</button>
-                                ${car.purchase_price > 0 ? `<button class="action-btn" onclick="moveToFleet(${myCars.indexOf(car)})" style="background: #5856D6; width: 100%;">Отправить в автопарк</button>` : ''}
+                                ${car.purchase_price > 0 ? `<button class="action-btn" onclick="moveToFleet(${myCars.indexOf(car)})" style="background: #5856D6; width: 100%; margin-bottom: 5px;">Отправить в автопарк</button>` : ''}
+                                <button class="action-btn" onclick="sellCarOnMarket('${car.id}')" style="background: #FF9500; width: 100%;">Продать (Барахолка)</button>
                             `;
                         }
 
@@ -2627,6 +2628,136 @@ async function createCustomPlate() {
             showNotification(`❌ ${data.error}`, 'error');
         }
     } catch (e) { console.error(e); }
+}
+
+// ============= v3.6: SECONDARY CAR MARKET (БАРАХОЛКА) =============
+
+async function sellCarOnMarket(carId) {
+    if (!userData || !userData.cars || userData.cars.length <= 1) {
+        return showNotification('Нельзя выставить на продажу свою последнюю машину!', 'error');
+    }
+
+    const priceInput = prompt('Введите цену продажи в PLN (налог 5%):');
+    if (!priceInput) return;
+
+    const price = parseFloat(priceInput);
+    if (isNaN(price) || price <= 0) {
+        return showNotification('Некорректная цена', 'error');
+    }
+
+    try {
+        const data = await safeFetchJson(`${API_BASE_URL}/market/sell`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ telegramId: TELEGRAM_ID, carId, price })
+        });
+        if (data.success) {
+            showNotification('✅ Машина выставлена на продажу!', 'success');
+            // Refresh local data
+            const userDataResult = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}`);
+            if (userDataResult && !userDataResult._isError) userData = userDataResult;
+            updateGarageScreen();
+            loadFleaMarket();
+        } else {
+            showNotification(`❌ ${data.error}`, 'error');
+        }
+    } catch (e) {
+        console.error(e);
+        showNotification('Ошибка сети', 'error');
+    }
+}
+
+async function loadFleaMarket() {
+    const list = document.getElementById('flea-market-list');
+    if (!list) return;
+
+    list.innerHTML = '<div class="loading">Загрузка барахолки...</div>';
+
+    try {
+        const data = await safeFetchJson(`${API_BASE_URL}/market`);
+        if (data && !data._isError) {
+            if (data.length === 0) {
+                list.innerHTML = '<div class="text-center p-4">На барахолке пока нет машин.</div>';
+                return;
+            }
+
+            // We need CARS object to get the names
+            const carsDefReq = await safeFetchJson(`${API_BASE_URL}/configs/cars`);
+            const carsDef = (carsDefReq && !carsDefReq._isError) ? Object.fromEntries(carsDefReq.map(c => [c.id, c])) : {};
+
+            list.innerHTML = data.map(item => {
+                const car = carsDef[item.car_id] || { name: 'Неизвестная модель', image: '🚗' };
+                const isOwner = String(item.seller_id) === String(TELEGRAM_ID);
+
+                let actionBtn = isOwner
+                    ? `<button class="action-btn" style="background:#FF3B30;" onclick="cancelFleaMarketListing(${item.id})">Снять с продажи</button>`
+                    : `<button class="action-btn" style="background:#34C759;" onclick="buyFleaMarketCar(${item.id}, ${item.price})">Купить</button>`;
+
+                return `
+                    <div class="market-investment-card">
+                        <div style="font-size: 24px; margin-right: 15px;">${car.image || '🚗'}</div>
+                        <div class="inv-info">
+                            <div class="inv-name" style="color: #fff; font-weight: bold;">${car.name}</div>
+                            <div class="inv-district" style="color: #FFD700;">Цена: ${item.price.toLocaleString()} PLN</div>
+                            <div class="inv-revenue" style="font-size: 0.8em; color: #888;">Продавец: ${item.seller_name || 'Неизвестный'}</div>
+                        </div>
+                        <div class="inv-actions">${actionBtn}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+    } catch (e) { console.error(e); }
+}
+
+async function buyFleaMarketCar(listingId, price) {
+    if (!confirm(`Вы уверены, что хотите купить этот авто за ${price.toLocaleString()} PLN?`)) return;
+
+    try {
+        const data = await safeFetchJson(`${API_BASE_URL}/market/buy/${listingId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ telegramId: TELEGRAM_ID })
+        });
+
+        if (data.success) {
+            showNotification(data.message, 'success');
+            userData.balance = data.newBalance;
+            updateMainScreen();
+            loadFleaMarket();
+
+            // Reload user data to fetch new car
+            const userDataResult = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}`);
+            if (userDataResult && !userDataResult._isError) userData = userDataResult;
+        } else {
+            showNotification(`❌ ${data.error}`, 'error');
+        }
+    } catch (e) {
+        console.error(e);
+        showNotification('Ошибка сети', 'error');
+    }
+}
+
+async function cancelFleaMarketListing(listingId) {
+    try {
+        const data = await safeFetchJson(`${API_BASE_URL}/market/cancel/${listingId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ telegramId: TELEGRAM_ID })
+        });
+
+        if (data.success) {
+            showNotification(data.message, 'success');
+            loadFleaMarket();
+            // Reload user data to retrieve returned car
+            const userDataResult = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}`);
+            if (userDataResult && !userDataResult._isError) userData = userDataResult;
+        } else {
+            showNotification(`❌ ${data.error}`, 'error');
+        }
+    } catch (e) {
+        console.error(e);
+        showNotification('Ошибка сети', 'error');
+    }
 }
 
 async function loadMarketPlates() {

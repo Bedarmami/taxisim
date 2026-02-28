@@ -526,10 +526,23 @@
 
                 <!-- Tab: Market -->
                 <div id="tab-market" class="tab-content">
-                    <div id="market-section" class="market-section">
-                        <h3 style="color:white; margin:10px 0;">⚖️ Рынок (Marketplace)</h3>
+                    <!-- Flea Market Section -->
+                    <div id="flea-market-section" class="market-section"
+                        style="margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px;">
+                        <h3 style="color:white; margin:10px 0;">🛒 Барахолка (Авторынок)</h3>
                         <div style="font-size:0.85em; color:#888; margin-bottom:15px;">
-                            Перепродажа АЗС и уникальных номеров.
+                            Покупайте машины с рук дешевле салона! Налог при продаже — 5%.
+                        </div>
+                        <div id="flea-market-list">
+                            <div class="loading">⏳ Загрузка барахолки...</div>
+                        </div>
+                    </div>
+
+                    <!-- Existing Market Section (Plates) -->
+                    <div id="market-section" class="market-section">
+                        <h3 style="color:white; margin:10px 0;">⚖️ Рынок Номеров</h3>
+                        <div style="font-size:0.85em; color:#888; margin-bottom:15px;">
+                            Перепродажа уникальных автомобильных номеров.
                         </div>
                         <div id="market-list"></div>
                     </div>

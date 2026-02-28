@@ -3678,6 +3678,156 @@ app.post('/api/casino/slots', async (req, res) => {
     }
 });
 
+// ============= v3.6: SECONDARY CAR MARKET (БАРАХОЛКА) =============
+
+// Get all cars on the market
+app.get('/api/market', async (req, res) => {
+    try {
+        const sql = `
+            SELECT cm.id, cm.car_id, cm.price, cm.created_at, u.username as seller_name, u.telegram_id as seller_id 
+            FROM car_market cm
+            LEFT JOIN users u ON cm.seller_id = u.telegram_id
+            ORDER BY cm.created_at DESC
+        `;
+        const listings = await db.query(sql);
+        res.json(listings);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Sell a car
+app.post('/api/market/sell', async (req, res) => {
+    try {
+        const { telegramId, carId, price } = req.body;
+        if (!telegramId || !carId || !price || price <= 0) {
+            return res.status(400).json({ error: 'Invalid parameters' });
+        }
+
+        const user = await getUser(telegramId);
+        if (!user || !user.cars || user.cars.length === 0) {
+            return res.status(400).json({ error: 'User or cars not found' });
+        }
+
+        const carIndex = user.cars.findIndex(c => c.id === carId);
+        if (carIndex === -1) {
+            return res.status(400).json({ error: 'Вы не владеете этой машиной' });
+        }
+
+        if (user.cars.length <= 1) {
+            return res.status(400).json({ error: 'Вы не можете продать свою последнюю машину!' });
+        }
+
+        // Remove the car from the user's inventory
+        user.cars.splice(carIndex, 1);
+        await saveUser(user);
+
+        // Add to market
+        await db.run('INSERT INTO car_market (seller_id, car_id, price, created_at) VALUES (?, ?, ?, ?)', [
+            telegramId, carId, price, new Date().toISOString()
+        ]);
+
+        res.json({ success: true, message: 'Машина выставлена на продажу' });
+    } catch (e) {
+        console.error('Market Sell Error:', e);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Cancel a listing
+app.post('/api/market/cancel/:id', async (req, res) => {
+    try {
+        const { telegramId } = req.body;
+        const listingId = req.params.id;
+
+        const listing = await db.get('SELECT * FROM car_market WHERE id = ?', [listingId]);
+        if (!listing) return res.status(404).json({ error: 'Лот не найден' });
+
+        if (listing.seller_id !== telegramId) {
+            return res.status(403).json({ error: 'Это не ваша машина' });
+        }
+
+        const user = await getUser(telegramId);
+        if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+
+        // Return the car to user
+        const carDef = CARS[listing.car_id];
+        if (carDef) {
+            user.cars.push(JSON.parse(JSON.stringify(carDef))); // Deep copy
+            await saveUser(user);
+        }
+
+        // Delete the listing
+        await db.run('DELETE FROM car_market WHERE id = ?', [listingId]);
+
+        res.json({ success: true, message: 'Машина возвращена в гараж' });
+    } catch (e) {
+        console.error('Market Cancel Error:', e);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Buy a car from the market
+app.post('/api/market/buy/:id', async (req, res) => {
+    try {
+        const buyerId = req.body.telegramId;
+        const listingId = req.params.id;
+
+        const listing = await db.get('SELECT * FROM car_market WHERE id = ?', [listingId]);
+        if (!listing) return res.status(404).json({ error: 'Лот уже продан или снят с продажи' });
+
+        if (listing.seller_id === buyerId) {
+            return res.status(400).json({ error: 'Вы не можете купить свою же машину. Снимите её с продажи.' });
+        }
+
+        const buyer = await getUser(buyerId);
+        if (!buyer) return res.status(404).json({ error: 'Покупатель не найден' });
+
+        if (buyer.balance < listing.price) {
+            return res.status(400).json({ error: 'Недостаточно средств' });
+        }
+
+        // Transaction check logic (we just proceed sequentially with safety checks)
+        const seller = await getUser(listing.seller_id);
+
+        // 1. Deduct money from buyer
+        buyer.balance -= listing.price;
+
+        // 2. Add car to buyer
+        const carDef = CARS[listing.car_id];
+        if (carDef) {
+            buyer.cars.push(JSON.parse(JSON.stringify(carDef)));
+        } else {
+            return res.status(500).json({ error: 'Модель машины больше не существует в игре!' });
+        }
+        await saveUser(buyer);
+
+        // 3. Add money to seller (minus 5% tax)
+        if (seller) {
+            const tax = listing.price * 0.05;
+            const netProfit = listing.price - tax;
+            seller.balance += netProfit;
+            await saveUser(seller);
+
+            // Notify seller via Telegram bot
+            await sendNotification(listing.seller_id, 'SYSTEM', {
+                text: `💰 Ваша машина (${carDef.name}) была продана на Барахолке за ${listing.price} PLN!\nНалог сервера (5%): ${tax.toFixed(2)} PLN.\nЗачислено: ${netProfit.toFixed(2)} PLN.`
+            });
+        }
+
+        // 4. Remove listing
+        await db.run('DELETE FROM car_market WHERE id = ?', [listingId]);
+
+        // 5. Log activity
+        logActivity(buyerId, 'MARKET_BUY', { car: listing.car_id, price: listing.price, seller: listing.seller_id });
+
+        res.json({ success: true, message: 'Покупка успешна!', newBalance: buyer.balance });
+    } catch (e) {
+        console.error('Market Buy Error:', e);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
 // ============= v3.3: LICENSE PLATES =============
 
 // Get all plates owned by user
