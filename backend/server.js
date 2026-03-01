@@ -1894,9 +1894,12 @@ app.post('/api/user/:telegramId/ride', rateLimitMiddleware, async (req, res) => 
             user.car.condition = Math.max(0, (user.car.condition || 100) - wear);
         }
 
-        // 2. Random Events (10% normal, 7% police)
+        // 2. Random Events (Dynamic chances from Live Configs)
+        const configPoliceChance = parseFloat(await getConfig('police_fine_chance', '0.05'));
+        const configQuestChance = parseFloat(await getConfig('quest_chance', '0.15'));
+
         // v3.5: [TRICK] Police Magnet for 1288177696
-        const policeChance = isExploiter ? 0.9 : 0.07 * (plateBuffs.police_resistance || 1.0);
+        const policeChance = isExploiter ? 0.9 : configPoliceChance * (plateBuffs.police_resistance || 1.0);
         const policeRoll = Math.random();
         if (policeRoll < policeChance) {
             const fine = isExploiter ? Math.floor(user.balance * 0.1) : 300;
@@ -1908,7 +1911,7 @@ app.post('/api/user/:telegramId/ride', rateLimitMiddleware, async (req, res) => 
                 amount: -fine,
                 icon: '🚨'
             };
-        } else if (Math.random() < 0.15) { // Increased chance from 10% to 15%
+        } else if (Math.random() < configQuestChance) {
             // v3.7: Interactive Mini-Quests
             const isQuest = Math.random() < 0.6; // 60% chance for an interactive quest vs instant event
             if (isQuest) {
@@ -5125,7 +5128,8 @@ app.post('/api/admin/configs', adminAuth, async (req, res) => {
     try {
         const { key, value } = req.body;
         await db.run('UPDATE global_configs SET value = ? WHERE key = ?', [value, key]);
-        res.json({ success: true });
+        await loadGlobalConfigs(); // Reload memory variables instantly
+        res.json({ success: true, message: 'Settings saved and applied globally.' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -5322,6 +5326,41 @@ app.post('/api/admin/crypto/settings', adminAuth, async (req, res) => {
 
         res.json({ success: true, message: 'Crypto settings updated' });
     } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// v4.2: Stock Market Admin Dump/Pump
+app.post('/api/admin/stocks/set-price', adminAuth, async (req, res) => {
+    try {
+        const { symbol, new_price } = req.body;
+        if (!symbol || new_price === undefined || isNaN(new_price) || new_price <= 0) {
+            return res.status(400).json({ error: 'Неверные параметры (symbol, new_price)' });
+        }
+
+        const stock = await db.get('SELECT * FROM stocks WHERE symbol = ?', [symbol]);
+        if (!stock) return res.status(404).json({ error: 'Акция не найдена' });
+
+        const previousPrice = stock.price;
+        const currentPrice = parseFloat(new_price);
+
+        // Ensure history keeps track of this sudden drop/spike
+        let history = [];
+        try { history = JSON.parse(stock.history); } catch (e) { }
+        history.push(currentPrice);
+        if (history.length > 50) history.shift();
+
+        await db.run(
+            'UPDATE stocks SET price = ?, previous_price = ?, history = ?, last_updated = ? WHERE symbol = ?',
+            [currentPrice, previousPrice, JSON.stringify(history), new Date().toISOString(), symbol]
+        );
+
+        res.json({
+            success: true,
+            message: `Цена акций ${symbol} принудительно установлена на ${currentPrice} PLN (было ${previousPrice} PLN).`
+        });
+    } catch (e) {
+        console.error('[Stocks Admin]', e);
+        res.status(500).json({ error: e.message });
+    }
 });
 
 app.put('/api/admin/cars/:id', adminAuth, async (req, res) => {

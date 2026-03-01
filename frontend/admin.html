@@ -66,6 +66,8 @@
                     style="background: #e74c3c; color: white;">🌪️ События</button>
                 <button class="tab-link" onclick="openTab(event, 'tab-crypto')"
                     style="background: #f1c40f; color: white; color: #000;">🪙 Крипто</button>
+                <button class="tab-link" onclick="openTab(event, 'tab-stocks')"
+                    style="background: #9b59b6; color: white;">📈 Акции</button>
             </nav>
 
             <!-- Вкладка: Дашборд -->
@@ -723,6 +725,60 @@
                             </thead>
                             <tbody id="crypto-holders-tbody">
                                 <!-- Список держателей -->
+                            </tbody>
+                        </table>
+                    </section>
+                </div>
+            </div>
+
+            <!-- Вкладка: Акции (Фондовый рынок) -->
+            <div id="tab-stocks" class="tab-content">
+                <div class="section-header">
+                    <h2>📈 Управление Фондовым рынком</h2>
+                    <button onclick="loadStocksAdmin()">🔄 Обновить</button>
+                </div>
+
+                <div class="dashboard-grid" style="margin-top: 20px;">
+                    <section class="add-promo-card" style="border-left: 4px solid #9b59b6;">
+                        <h3>📉 Памп и Дамп (Управление ценами)</h3>
+                        <p style="font-size: 13px; opacity: 0.8; margin-bottom: 15px;">Установите точную цену для акции,
+                            чтобы обвалить её или заставить расти.</p>
+
+                        <div class="form-group">
+                            <label>Выберите Акцию:</label>
+                            <select id="admin-stock-ticker"
+                                style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.05); color: white; border: 1px solid rgba(255,255,255,0.1);">
+                                <option value="YDX">Yandex (YDX)</option>
+                                <option value="GZPR">Газпром (GZPR)</option>
+                                <option value="SBR">Сбер (SBR)</option>
+                                <option value="LUK">LUKOIL (LUK)</option>
+                                <option value="AFLT">Aeroflot (AFLT)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Новая цена (PLN):</label>
+                            <input type="number" id="admin-stock-price-input" step="0.01"
+                                placeholder="Например: 120.50">
+                        </div>
+
+                        <button onclick="setAdminStockPrice()" class="btn-primary"
+                            style="background: #9b59b6; width: 100%;">Установить цену</button>
+                    </section>
+
+                    <section class="table-container" style="flex: 2;">
+                        <h3>Текущие котировки</h3>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Символ</th>
+                                    <th>Название</th>
+                                    <th>Цена (PLN)</th>
+                                    <th>Пред. цена</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-stocks-tbody">
+                                <!-- Список акций -->
                             </tbody>
                         </table>
                     </section>

@@ -66,6 +66,7 @@ let staminaInterval = null;
 let eventInterval = null;
 // v6.1.0: Crypto State
 let cryptoPrice = { currentPrice: 1.0, history: [] };
+let mySyndicateData = null; // v4.0: Syndicate State
 
 // ============= КОНФИГУРАЦИЯ =============
 const API_BASE_URL = window.location.origin + '/api';
@@ -3417,7 +3418,8 @@ async function loadSyndicates() {
         const noBlock = document.getElementById('no-syndicate-block');
 
         if (mineData && mineData.syndicate) {
-            const syn = mineData.syndicate;
+            mySyndicateData = mineData.syndicate;
+            const syn = mySyndicateData;
             document.getElementById('my-syn-name').textContent = syn.name;
             document.getElementById('my-syn-desc').textContent = syn.description || '—';
             document.getElementById('my-syn-members').textContent = syn.member_count || 0;
@@ -3437,6 +3439,7 @@ async function loadSyndicates() {
             if (myBlock) myBlock.style.display = 'block';
             if (noBlock) noBlock.style.display = 'none';
         } else {
+            mySyndicateData = null;
             if (myBlock) myBlock.style.display = 'none';
             if (noBlock) noBlock.style.display = 'block';
         }

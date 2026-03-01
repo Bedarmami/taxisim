@@ -489,6 +489,19 @@ async function seedDB() {
         for (const conf of cryptoDefaults) {
             await run(`INSERT OR IGNORE INTO global_settings(key, value) VALUES(?, ?)`, [conf.key, conf.value]);
         }
+
+        // 6. Seed Dynamic Global Configs
+        const dynamicConfigs = [
+            { key: 'earnings_multiplier', value: '1.0', category: 'Economy', description: 'Множитель заработка' },
+            { key: 'experience_multiplier', value: '1.0', category: 'Economy', description: 'Множитель опыта' },
+            { key: 'quest_chance', value: '0.15', category: 'Events', description: 'Шанс квеста (0.0 - 1.0)' },
+            { key: 'police_fine_chance', value: '0.05', category: 'Events', description: 'Шанс штрафа полиции (0.0 - 1.0)' }
+        ];
+
+        for (const cfg of dynamicConfigs) {
+            await run(`INSERT OR IGNORE INTO global_configs(key, value, category, description) VALUES(?, ?, ?, ?)`,
+                [cfg.key, cfg.value, cfg.category, cfg.description]);
+        }
     } catch (e) {
         console.error('Error seeding database:', e);
     }

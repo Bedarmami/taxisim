@@ -4320,7 +4320,10 @@ button {
 .streak-header span:first-child,
 .feature-label,
 .f-label,
-.bar-labels span {
+.bar-labels span,
+.stat-box .label,
+.label,
+.info-row span {
     color: #333333 !important;
     font-weight: 600;
 }
@@ -4328,7 +4331,9 @@ button {
 .q-value,
 .p-value,
 .streak-header span:last-child,
-.feature-value {
+.feature-value,
+.stat-box .value,
+.value {
     color: #111111 !important;
     font-weight: 700;
 }
@@ -4357,7 +4362,10 @@ button {
 [data-theme="dark"] .streak-header span:first-child,
 [data-theme="dark"] .feature-label,
 [data-theme="dark"] .f-label,
-[data-theme="dark"] .bar-labels span {
+[data-theme="dark"] .bar-labels span,
+[data-theme="dark"] .stat-box .label,
+[data-theme="dark"] .label,
+[data-theme="dark"] .info-row span {
     color: #aaaaaa !important;
     font-weight: 500;
 }
@@ -4365,8 +4373,10 @@ button {
 [data-theme="dark"] .q-value,
 [data-theme="dark"] .p-value,
 [data-theme="dark"] .streak-header span:last-child,
-[data-theme="dark"] .feature-value {
-    color: #e0e0e0 !important;
+[data-theme="dark"] .feature-value,
+[data-theme="dark"] .stat-box .value,
+[data-theme="dark"] .value {
+    color: #ffffff !important;
 }
 
 [data-theme="dark"] .action-item {
@@ -4374,8 +4384,8 @@ button {
 }
 
 [data-theme="dark"] :root {
-    --text-color: #e0e0e0;
-    --text-secondary: #8e8e93;
+    --text-color: #ffffff;
+    --text-secondary: #aaaaaa;
 }
 
 .online-count-badge {

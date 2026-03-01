@@ -1345,7 +1345,10 @@ async function loadConfigs() {
     configs.forEach(cfg => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td><b>${cfg.key}</b></td>
+            <td>
+                <b>${cfg.key}</b><br>
+                <small style="color:#aaa;">${cfg.description || cfg.category || ''}</small>
+            </td>
             <td><input type="text" id="cfg-${cfg.key}" value="${cfg.value}" style="width: 80px;"></td>
             <td><button onclick="updateConfig('${cfg.key}')" class="btn-small">💾</button></td>
         `;
@@ -1701,4 +1704,63 @@ async function saveCryptoSettings() {
             alert('Ошибка: ' + (res?.error || 'Не удалось сохранить'));
         }
     } catch (e) { alert('Ошибка сети'); }
+}
+
+// === Вкладка: Акции (Фондовый рынок) ===
+
+async function loadStocksAdmin() {
+    try {
+        const stocks = await safeFetchJson('/api/stocks', {
+            headers: { 'x-admin-password': adminPassword }
+        });
+
+        const tbody = document.getElementById('admin-stocks-tbody');
+        if (stocks && !stocks._isError && Array.isArray(stocks)) {
+            tbody.innerHTML = stocks.map(s => {
+                const diff = s.price - s.previous_price;
+                const color = diff >= 0 ? '#2ecc71' : '#e74c3c';
+                return `
+                <tr>
+                    <td><b>${s.symbol}</b></td>
+                    <td>${s.name}</td>
+                    <td style="color:${color}; font-weight:bold;">${s.price.toFixed(2)}</td>
+                    <td style="color:#aaa;">${s.previous_price.toFixed(2)}</td>
+                </tr>
+                `;
+            }).join('');
+        }
+    } catch (e) {
+        console.error('Error loadStocksAdmin:', e);
+    }
+}
+
+async function setAdminStockPrice() {
+    const symbol = document.getElementById('admin-stock-ticker').value;
+    const priceInput = document.getElementById('admin-stock-price-input').value;
+    const newPrice = parseFloat(priceInput);
+
+    if (!symbol || isNaN(newPrice) || newPrice <= 0) {
+        alert('Пожалуйста, введите корректную цену (больше 0).');
+        return;
+    }
+
+    if (!confirm(`Вы уверены, что хотите установить цену ${symbol} на ${newPrice} PLN? Это резко изменит портфели игроков!`)) return;
+
+    try {
+        const res = await safeFetchJson('/api/admin/stocks/set-price', {
+            method: 'POST',
+            headers: { 'x-admin-password': adminPassword, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ symbol: symbol, new_price: newPrice })
+        });
+
+        if (res && res.success) {
+            alert(res.message || `Цена ${symbol} успешно изменена!`);
+            document.getElementById('admin-stock-price-input').value = '';
+            loadStocksAdmin(); // Refresh the table
+        } else {
+            alert('Ошибка: ' + (res?.error || 'Не удалось изменить цену'));
+        }
+    } catch (e) {
+        alert('Ошибка сети');
+    }
 }
