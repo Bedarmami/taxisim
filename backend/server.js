@@ -1886,15 +1886,17 @@ app.post('/api/user/:telegramId/ride', rateLimitMiddleware, async (req, res) => 
                 amount: -fine,
                 icon: '🚨'
             };
-        } else if (Math.random() < 0.1) {
+        } else if (Math.random() < 0.15) { // Increased chance from 10% to 15%
             // v3.7: Interactive Mini-Quests
-            const isQuest = Math.random() < 0.5; // 50% chance for an interactive quest vs instant event
+            const isQuest = Math.random() < 0.6; // 60% chance for an interactive quest vs instant event
             if (isQuest) {
                 const quests = [
                     { id: 'lost_wallet', text: 'Вы нашли кошелек на заднем сиденье.', icon: '👛', choices: [{ id: 'return', text: 'Вернуть владельцу' }, { id: 'keep', text: 'Забрать себе' }] },
                     { id: 'racing', text: 'Рядом останавливается спорткар и газует, предлагая гонку.', icon: '🏎️', choices: [{ id: 'race', text: 'Принять вызов' }, { id: 'ignore', text: 'Ехать спокойно' }] },
                     { id: 'suspicious_client', text: 'Странный пассажир просит поехать в лес за двойную плату.', icon: '🌲', choices: [{ id: 'agree', text: 'Согласиться' }, { id: 'refuse', text: 'Отказаться' }] },
-                    { id: 'drunk_party', text: 'Пьяная компания просит включить музыку на максимум.', icon: '🎉', choices: [{ id: 'loud', text: 'Сделать громче' }, { id: 'quiet', text: 'Отказать' }] }
+                    { id: 'drunk_party', text: 'Пьяная компания просит включить музыку на максимум.', icon: '🎉', choices: [{ id: 'loud', text: 'Сделать громче' }, { id: 'quiet', text: 'Отказать' }] },
+                    { id: 'mafioso', text: 'Мафиози прыгает в машину: «Гони, уходим от погони!»', icon: '🕴️', choices: [{ id: 'drive', text: 'Вдавить газ в пол' }, { id: 'kick', text: 'Выгнать из машины' }] },
+                    { id: 'vip_client', text: 'В машину сел VIP-пассажир. Просит включить премиум-музыку.', icon: '⭐', choices: [{ id: 'music', text: 'Включить' }, { id: 'silent', text: 'Ехать молча' }] }
                 ];
                 const activeQuest = quests[Math.floor(Math.random() * quests.length)];
                 event = {
