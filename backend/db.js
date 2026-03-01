@@ -289,12 +289,21 @@ function initDB() {
             db.run(`CREATE TABLE IF NOT EXISTS syndicate_members (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 syndicate_id INTEGER,
-                telegram_id TEXT UNIQUE,
+                telegram_id TEXT,
                 role TEXT DEFAULT 'member',
                 joined_at TEXT,
-                contributed REAL DEFAULT 0
+                contributed REAL DEFAULT 0,
+                FOREIGN KEY(syndicate_id) REFERENCES syndicates(id),
+                FOREIGN KEY(telegram_id) REFERENCES users(telegram_id)
             )`);
 
+            // v4.1: Turf Wars (District Control)
+            db.run(`CREATE TABLE IF NOT EXISTS syndicate_districts (
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                controlling_syndicate_id INTEGER,
+                capture_points REAL DEFAULT 0
+            )`);
             // 2. RUN ALL MIGRATIONS
             // 2. RUN ALL MIGRATIONS DEFENSIVELY
             const addColumn = (table, column, definition) => {

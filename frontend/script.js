@@ -903,10 +903,13 @@ async function takeOrder(orderId, event, useAutopilot = false) {
         const rideDuration = 3000; // 3 seconds visual ride
         const animationPromise = animateRide(orderId, rideDuration);
 
+        // v4.1: Send current district to apply Turf Wars bonus if applicable
+        const district = window.currentDistrictId || 'center'; // defaulting to center if not set
+
         const result = await safeFetchJson(`${API_BASE_URL}/user/${TELEGRAM_ID}/ride`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ order: orderId, useGas: false, autopilot: useAutopilot })
+            body: JSON.stringify({ order: orderId, useGas: false, autopilot: useAutopilot, district })
         });
 
         if (result && result._isError) {
@@ -3530,4 +3533,106 @@ async function contributeSyndicate() {
             loadSyndicates();
         } else { showNotification(result?.error || 'Ошибка', 'error'); }
     } catch (e) { showNotification('Ошибка соединения', 'error'); }
+}
+
+// ============= TURF WARS (ЗАХВАТ РАЙОНОВ) =============
+let selectedDistrictForInvestment = null;
+
+async function openTurfWarsMap() {
+    const modal = document.getElementById('turf-wars-modal');
+    if (modal) {
+        modal.style.display = 'block';
+        document.getElementById('turf-invest-block').style.display = 'none';
+        await renderTurfWarsMap();
+    }
+}
+
+async function renderTurfWarsMap() {
+    const list = document.getElementById('districts-list');
+    if (!list) return;
+
+    list.innerHTML = '<div class="loading">Загрузка карты...</div>';
+    try {
+        const districts = await safeFetchJson(`${API_BASE_URL}/syndicates/districts`);
+        if (!districts || districts.error) {
+            list.innerHTML = '<div class="error">Ошибка загрузки районов</div>';
+            return;
+        }
+
+        list.innerHTML = districts.map(d => {
+            const isOurs = mySyndicateData && d.controlling_syndicate_id === mySyndicateData.id;
+            const controllerName = d.controlling_syndicate_name || 'Никто (Нейтрально)';
+            const color = isOurs ? '#34C759' : (d.controlling_syndicate_id ? '#ff3b30' : '#888');
+
+            return `
+                <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; border-left: 4px solid ${color};">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <strong style="color: white; font-size: 1.1em;">${d.name}</strong>
+                        <span style="color: ${color}; font-size: 0.85em; background: rgba(0,0,0,0.3); padding: 3px 8px; border-radius: 12px;">
+                            Владелец: ${controllerName}
+                        </span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9em; color: #ccc;">
+                        <span>Очки контроля: <strong>${Math.floor(d.capture_points)}</strong></span>
+                        <button class="action-btn" style="padding: 5px 15px; background: rgba(255,159,10,0.2); color: #ff9f0a; border: 1px solid #ff9f0a;" onclick="prepareTurfInvestment('${d.id}', '${d.name}')">
+                            ${isOurs ? 'Укрепить' : 'Захватить'}
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } catch (e) {
+        list.innerHTML = '<div class="error">Ошибка сервера</div>';
+    }
+}
+
+function prepareTurfInvestment(districtId, districtName) {
+    if (!mySyndicateData) {
+        showNotification('Вы не состоите в синдикате', 'error');
+        return;
+    }
+    selectedDistrictForInvestment = districtId;
+    const block = document.getElementById('turf-invest-block');
+    document.getElementById('invest-district-name').innerText = `База: ${districtName}`;
+    document.getElementById('turf-invest-amount').value = '';
+    block.style.display = 'block';
+    block.scrollIntoView({ behavior: 'smooth' });
+}
+
+async function submitTurfInvestment() {
+    if (!selectedDistrictForInvestment || !mySyndicateData) return;
+
+    const amountInput = document.getElementById('turf-invest-amount');
+    const amount = parseFloat(amountInput.value);
+
+    if (isNaN(amount) || amount <= 0) {
+        showNotification('Введите корректную сумму', 'error');
+        return;
+    }
+
+    // mySyndicateData is global in script.js when user opens syndicate tab
+    if (amount > mySyndicateData.treasury) {
+        showNotification('В казне Синдиката недостаточно средств!', 'error');
+        return;
+    }
+
+    try {
+        const result = await safeFetchJson(`${API_BASE_URL}/syndicates/districts/capture`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ telegramId: TELEGRAM_ID, districtId: selectedDistrictForInvestment, amount })
+        });
+
+        if (result && result.success) {
+            showNotification(result.message, 'success');
+            document.getElementById('turf-invest-block').style.display = 'none';
+            await renderTurfWarsMap();
+            loadSyndicates(); // Refresh mySyndicateData to update treasury display
+        } else {
+            showNotification(result?.error || 'Ошибка', 'error');
+        }
+    } catch (e) {
+        console.error(e);
+        showNotification('Ошибка сети', 'error');
+    }
 }

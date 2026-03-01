@@ -617,6 +617,9 @@
                                         style="font-size:0.8em; background:rgba(255,159,10,0.2); padding:3px 10px; border-radius:20px; color:#ff9f0a;">Участник</span>
                                 </div>
                                 <div style="font-size:0.9em; color:#aaa; margin-bottom:12px;" id="my-syn-desc">—</div>
+                                <button class="action-btn"
+                                    style="width: 100%; margin-bottom: 12px; background: rgba(255,159,10,0.2); border: 1px solid #ff9f0a; color: #ff9f0a;"
+                                    onclick="openTurfWarsMap()">🗺️ Карта Районов</button>
                                 <div
                                     style="display:flex; gap:10px; flex-wrap:wrap; font-size:0.85em; margin-bottom:14px;">
                                     <span>👥 Участников: <strong id="my-syn-members">0</strong></span>
@@ -779,6 +782,30 @@
                 <p id="game-ann-message">Текст сообщения...</p>
             </div>
             <button class="take-order-btn" id="close-ann-btn" style="width: 100%;">Понятно</button>
+        </div>
+        <!-- Turf Wars Map Modal -->
+        <div id="turf-wars-modal" class="modal">
+            <div class="modal-content" style="max-width: 400px;">
+                <span id="turf-close-btn" class="close"
+                    onclick="document.getElementById('turf-wars-modal').style.display = 'none';">&times;</span>
+                <h2 style="color: #ff9f0a; margin-top: 0;">🗺️ Карта Районов</h2>
+                <p style="font-size: 0.9em; color: #aaa; margin-bottom: 15px;">Захватывайте районы, вкладывая казну
+                    синдиката. Контроль района дает +10% к доходу за поездки в нем.</p>
+
+                <div id="districts-list" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
+                    <!-- Рендерится через JS -->
+                </div>
+
+                <div id="turf-invest-block"
+                    style="display: none; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 12px; margin-top: 15px;">
+                    <h3 id="invest-district-name" style="margin-top: 0; color: white;">Район</h3>
+                    <p style="font-size: 0.85em; color: #ccc;">Сумма инвестиций из казны Синдиката:</p>
+                    <input type="number" id="turf-invest-amount" placeholder="Сумма (PLN)"
+                        style="width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 8px; border: none; background: #222; color: #fff; box-sizing: border-box;">
+                    <button class="action-btn success" style="width: 100%;" onclick="submitTurfInvestment()">Вложить
+                        средства</button>
+                </div>
+            </div>
         </div>
     </div>
 

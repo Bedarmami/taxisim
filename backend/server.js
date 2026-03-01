@@ -487,6 +487,8 @@ app.post('/api/user/:telegramId/claim-streak', async (req, res) => {
     }
 });
 
+
+
 // ============= ПАРТНЁРЫ =============
 const PARTNERS = [
     {
@@ -1862,6 +1864,26 @@ app.post('/api/user/:telegramId/ride', rateLimitMiddleware, async (req, res) => 
         // v3.3: Plate Buffs
         const plateBuffs = user.car.plate?.buffs || { tip_multiplier: 1.0, police_resistance: 1.0 };
         earnings *= (plateBuffs.tip_multiplier || 1.0);
+
+        // v4.1: Turf Wars (District Control Bonus)
+        let turfBonusApplied = false;
+        try {
+            // Get user's current district (passed from frontend in v4.1, fallback to a default if not present)
+            const currentDistrict = req.body.district || 'center';
+
+            // Check if user is in a syndicate
+            const membership = await db.get('SELECT syndicate_id FROM syndicate_members WHERE telegram_id = ?', [telegramId]);
+            if (membership) {
+                // Check if this syndicate controls the current district
+                const district = await db.get('SELECT controlling_syndicate_id FROM syndicate_districts WHERE id = ?', [currentDistrict]);
+                if (district && district.controlling_syndicate_id === membership.syndicate_id) {
+                    earnings *= 1.10; // +10% bonus for controlling the turf
+                    turfBonusApplied = true;
+                }
+            }
+        } catch (e) {
+            console.error('Turf War Bonus Error:', e);
+        }
 
         // --- v2.1 Features ---
         let event = null;
@@ -3997,6 +4019,86 @@ app.post('/api/syndicates/contribute', async (req, res) => {
 
         logActivity(telegramId, 'SYNDICATE_CONTRIBUTE', { amount, syndicate_id: membership.syndicate_id });
         res.json({ success: true, message: `💰 +${amount} PLN в казну синдиката!`, new_balance: user.balance });
+    } catch (e) { res.status(500).json({ error: 'Ошибка сервера' }); }
+});
+
+// ============= v4.1: TURF WARS (ЗАХВАТ РАЙОНОВ) =============
+
+const SYNDICATE_DISTRICTS = [
+    { id: 'suburbs', name: 'Пригород' },
+    { id: 'center', name: 'Центр Города' },
+    { id: 'airport', name: 'Аэропорт' },
+    { id: 'night', name: 'Ночной Город' }
+];
+
+// Initialize districts if they don't exist
+db.dbReady.then(async () => {
+    try {
+        for (const d of SYNDICATE_DISTRICTS) {
+            const exists = await db.get('SELECT * FROM syndicate_districts WHERE id = ?', [d.id]);
+            if (!exists) {
+                await db.run('INSERT INTO syndicate_districts (id, name, capture_points) VALUES (?, ?, 0)', [d.id, d.name]);
+            }
+        }
+    } catch (e) {
+        console.error('Error seeding districts:', e);
+    }
+});
+
+// GET /api/syndicates/districts - get all districts and their controllers
+app.get('/api/syndicates/districts', async (req, res) => {
+    try {
+        const districts = await db.query(`
+            SELECT d.*, s.name as controlling_syndicate_name 
+            FROM syndicate_districts d
+            LEFT JOIN syndicates s ON s.id = d.controlling_syndicate_id
+        `);
+        res.json(districts);
+    } catch (e) { res.status(500).json({ error: 'Ошибка сервера' }); }
+});
+
+// POST /api/syndicates/districts/capture - spend treasury to capture
+app.post('/api/syndicates/districts/capture', async (req, res) => {
+    try {
+        const { telegramId, districtId, amount } = req.body;
+        if (!telegramId || !districtId || !amount || amount <= 0) {
+            return res.status(400).json({ error: 'Неверные данные' });
+        }
+
+        const membership = await db.get('SELECT * FROM syndicate_members WHERE telegram_id = ?', [telegramId]);
+        if (!membership) return res.status(400).json({ error: 'Вы не состоите в синдикате' });
+
+        // Members or leaders can invest, but let's allow anyone in the syndicate to invest from the treasury
+        const syndicate = await db.get('SELECT * FROM syndicates WHERE id = ?', [membership.syndicate_id]);
+        if (syndicate.treasury < amount) return res.status(400).json({ error: 'В казне синдиката недостаточно средств' });
+
+        const district = await db.get('SELECT * FROM syndicate_districts WHERE id = ?', [districtId]);
+        if (!district) return res.status(404).json({ error: 'Район не найден' });
+
+        // Decrease treasury
+        await db.run('UPDATE syndicates SET treasury = treasury - ? WHERE id = ?', [amount, syndicate.id]);
+
+        if (district.controlling_syndicate_id === syndicate.id) {
+            // Reinforce own district
+            await db.run('UPDATE syndicate_districts SET capture_points = capture_points + ? WHERE id = ?', [amount, district.id]);
+        } else {
+            // Attack enemy district
+            const remaining = district.capture_points - amount;
+            if (remaining < 0) {
+                // Captured!
+                await db.run('UPDATE syndicate_districts SET controlling_syndicate_id = ?, capture_points = ? WHERE id = ?',
+                    [syndicate.id, Math.abs(remaining), district.id]);
+            } else if (remaining === 0) {
+                // Neutralized
+                await db.run('UPDATE syndicate_districts SET controlling_syndicate_id = NULL, capture_points = 0 WHERE id = ?', [district.id]);
+            } else {
+                // Weakened
+                await db.run('UPDATE syndicate_districts SET capture_points = ? WHERE id = ?', [remaining, district.id]);
+            }
+        }
+
+        res.json({ success: true, message: `Вы успешно вложили ${amount} PLN в захват района!` });
+
     } catch (e) { res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 
