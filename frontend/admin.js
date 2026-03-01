@@ -1715,7 +1715,10 @@ async function loadStocksAdmin() {
         });
 
         const tbody = document.getElementById('admin-stocks-tbody');
+        const selectBox = document.getElementById('admin-stock-ticker');
+
         if (stocks && !stocks._isError && Array.isArray(stocks)) {
+            // Populate the table
             tbody.innerHTML = stocks.map(s => {
                 const diff = s.price - s.previous_price;
                 const color = diff >= 0 ? '#2ecc71' : '#e74c3c';
@@ -1728,6 +1731,15 @@ async function loadStocksAdmin() {
                 </tr>
                 `;
             }).join('');
+
+            // Dynamically populate the select dropdown
+            if (selectBox) {
+                const currentValue = selectBox.value; // Store current selection
+                selectBox.innerHTML = stocks.map(s => `<option value="${s.symbol}">${s.name} (${s.symbol})</option>`).join('');
+                if (currentValue && stocks.some(s => s.symbol === currentValue)) {
+                    selectBox.value = currentValue; // Restore selection if it still exists
+                }
+            }
         }
     } catch (e) {
         console.error('Error loadStocksAdmin:', e);

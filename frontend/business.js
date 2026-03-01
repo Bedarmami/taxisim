@@ -275,7 +275,7 @@ class BusinessManager {
     }
 
     renderInvestments() {
-        const invList = document.getElementById('investments-list');
+        const invList = document.getElementById('gas-investments-list');
         if (!invList) return; // Should exist in index.html now
 
         invList.innerHTML = '';

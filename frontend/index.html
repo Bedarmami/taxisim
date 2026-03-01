@@ -468,6 +468,7 @@
                 <div class="biz-tab active" data-tab="drivers">👨‍✈️ Водители</div>
                 <div class="biz-tab" data-tab="fleet">🚗 Автопарк</div>
                 <div class="biz-tab" data-tab="investments">📈 Биржа</div>
+                <div class="biz-tab" data-tab="gas">⛽ АЗС</div>
                 <div class="biz-tab" data-tab="market">⚖️ Рынок</div>
                 <div class="biz-tab" data-tab="crypto">🪙 Крипто</div>
                 <div class="biz-tab" data-tab="shop">🏪 Магазин</div>
@@ -534,14 +535,17 @@
                             <div style="text-align:center; color:#666; padding:30px;">Загрузка рынка...</div>
                         </div>
 
-                        <!-- Gas Stations section preserved -->
-                        <div id="investments-section" style="margin-top:24px;">
-                            <h3 style="color:white; margin:10px 0;">⛽ Инвестиции в АЗС</h3>
-                            <div style="font-size:0.85em; color:#888; margin-bottom:15px;">
-                                Владение заправкой приносит комиссию с каждой заправки игроков в этом районе.
-                            </div>
-                            <div id="gas-investments-list"></div>
+                    </div>
+                </div>
+
+                <!-- Tab: Gas Stations -->
+                <div id="tab-gas" class="tab-content">
+                    <div id="investments-section" class="investments-section">
+                        <h3 style="color:white; margin:10px 0;">⛽ Инвестиции в АЗС</h3>
+                        <div style="font-size:0.85em; color:#888; margin-bottom:15px;">
+                            Владение заправкой приносит комиссию с каждой заправки игроков в этом районе.
                         </div>
+                        <div id="gas-investments-list"></div>
                     </div>
                 </div>
 
@@ -783,28 +787,28 @@
             </div>
             <button class="take-order-btn" id="close-ann-btn" style="width: 100%;">Понятно</button>
         </div>
-        <!-- Turf Wars Map Modal -->
-        <div id="turf-wars-modal" class="modal">
-            <div class="modal-content" style="max-width: 400px;">
-                <span id="turf-close-btn" class="close"
-                    onclick="document.getElementById('turf-wars-modal').style.display = 'none';">&times;</span>
-                <h2 style="color: #ff9f0a; margin-top: 0;">🗺️ Карта Районов</h2>
-                <p style="font-size: 0.9em; color: #aaa; margin-bottom: 15px;">Захватывайте районы, вкладывая казну
-                    синдиката. Контроль района дает +10% к доходу за поездки в нем.</p>
+    </div>
+    <!-- Turf Wars Map Modal -->
+    <div id="turf-wars-modal" class="modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <span id="turf-close-btn" class="close"
+                onclick="document.getElementById('turf-wars-modal').style.display = 'none';">&times;</span>
+            <h2 style="color: #ff9f0a; margin-top: 0;">🗺️ Карта Районов</h2>
+            <p style="font-size: 0.9em; color: #aaa; margin-bottom: 15px;">Захватывайте районы, вкладывая казну
+                синдиката. Контроль района дает +10% к доходу за поездки в нем.</p>
 
-                <div id="districts-list" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
-                    <!-- Рендерится через JS -->
-                </div>
+            <div id="districts-list" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
+                <!-- Рендерится через JS -->
+            </div>
 
-                <div id="turf-invest-block"
-                    style="display: none; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 12px; margin-top: 15px;">
-                    <h3 id="invest-district-name" style="margin-top: 0; color: white;">Район</h3>
-                    <p style="font-size: 0.85em; color: #ccc;">Сумма инвестиций из казны Синдиката:</p>
-                    <input type="number" id="turf-invest-amount" placeholder="Сумма (PLN)"
-                        style="width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 8px; border: none; background: #222; color: #fff; box-sizing: border-box;">
-                    <button class="action-btn success" style="width: 100%;" onclick="submitTurfInvestment()">Вложить
-                        средства</button>
-                </div>
+            <div id="turf-invest-block"
+                style="display: none; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 12px; margin-top: 15px;">
+                <h3 id="invest-district-name" style="margin-top: 0; color: white;">Район</h3>
+                <p style="font-size: 0.85em; color: #ccc;">Сумма инвестиций из казны Синдиката:</p>
+                <input type="number" id="turf-invest-amount" placeholder="Сумма (PLN)"
+                    style="width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 8px; border: none; background: #222; color: #fff; box-sizing: border-box;">
+                <button class="action-btn success" style="width: 100%;" onclick="submitTurfInvestment()">Вложить
+                    средства</button>
             </div>
         </div>
     </div>
