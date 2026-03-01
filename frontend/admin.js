@@ -1575,10 +1575,12 @@ async function loadEventsAdmin() {
             list.innerHTML = events.map(ev => `
                 <div class="event-admin-card ${ev.is_active ? 'active' : ''}">
                     <div class="event-info">
-                        <h3>${ev.name} (x${ev.multiplier})</h3>
+                        <h3>${ev.name}</h3>
                         <p>${ev.description}</p>
                     </div>
                     <div class="event-controls">
+                        <input type="number" id="multiplier-${ev.id}" value="${ev.multiplier}" step="0.1" min="1" max="20" style="width: 60px; margin-right: 10px; padding: 4px; border-radius: 4px; border: 1px solid #555; background: #333; color: white;">
+                        <button class="btn btn-primary" style="padding: 4px 8px; margin-right: 15px;" onclick="updateEventMultiplier('${ev.id}')">💾</button>
                         <label class="switch">
                             <input type="checkbox" ${ev.is_active ? 'checked' : ''} 
                                    onchange="toggleEvent('${ev.id}', this.checked)">
@@ -1613,6 +1615,29 @@ async function toggleEvent(eventId, active) {
     } catch (e) {
         alert('Ошибка сети');
         loadEventsAdmin();
+    }
+}
+
+async function updateEventMultiplier(eventId) {
+    const el = document.getElementById(`multiplier-${eventId}`);
+    if (!el) return;
+    const multiplier = parseFloat(el.value);
+
+    try {
+        const res = await safeFetchJson('/api/admin/events/multiplier', {
+            method: 'POST',
+            headers: { 'x-admin-password': adminPassword, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ eventId, multiplier })
+        });
+
+        if (res && res.success) {
+            loadEventsAdmin();
+            alert('Множитель обновлён!');
+        } else {
+            alert('Ошибка: ' + (res?.error || 'Не удалось обновить'));
+        }
+    } catch (e) {
+        alert('Ошибка сети');
     }
 }
 // ============= CRYPTO MANAGEMENT =============

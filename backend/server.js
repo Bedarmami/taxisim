@@ -1840,9 +1840,10 @@ app.post('/api/user/:telegramId/ride', rateLimitMiddleware, async (req, res) => 
         if (isNaN(user.gas_fuel)) user.gas_fuel = 0;
 
         // Расчет дохода
-        // v6.1.0: Global Event Multiplier (v6.1.1: Already included in order.price, but we multiply by config anyway)
-        const multiplier = parseFloat(await getConfig('earnings_multiplier', '1.0'));
-        let earnings = order.price * multiplier;
+        // Админские настройки: базовый множитель (в конфигах) и активное событие
+        let configMultiplier = parseFloat(await getConfig('earnings_multiplier', '1.0'));
+        let eventMultiplier = GLOBAL_ACTIVE_EVENT ? parseFloat(GLOBAL_ACTIVE_EVENT.multiplier || 1.0) : 1.0;
+        let earnings = order.price * configMultiplier * eventMultiplier;
 
         // v3.5 Sanity Check: Revenue/Distance ratio (prevent price manipulation)
         if (earnings / order.distance > 5000) { // Increased limit for multipliers
@@ -6094,6 +6095,21 @@ app.post('/api/admin/events/toggle', adminAuth, async (req, res) => {
             await db.run('UPDATE global_events SET is_active = 1 WHERE id = ?', [eventId]);
         }
 
+        await loadActiveEvent();
+        res.json({ success: true, currentEvent: GLOBAL_ACTIVE_EVENT });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Admin: Set Custom Multiplier
+app.post('/api/admin/events/multiplier', adminAuth, async (req, res) => {
+    try {
+        const { eventId, multiplier } = req.body;
+        if (!eventId || !multiplier || multiplier < 1 || multiplier > 50) {
+            return res.status(400).json({ error: 'Неверный множитель (от 1 до 50)' });
+        }
+        await db.run('UPDATE global_events SET multiplier = ? WHERE id = ?', [multiplier, eventId]);
         await loadActiveEvent();
         res.json({ success: true, currentEvent: GLOBAL_ACTIVE_EVENT });
     } catch (e) {
