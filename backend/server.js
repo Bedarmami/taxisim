@@ -5349,8 +5349,8 @@ app.post('/api/admin/stocks/set-price', adminAuth, async (req, res) => {
         if (history.length > 50) history.shift();
 
         await db.run(
-            'UPDATE stocks SET price = ?, previous_price = ?, history = ?, last_updated = ? WHERE symbol = ?',
-            [currentPrice, previousPrice, JSON.stringify(history), new Date().toISOString(), symbol]
+            'UPDATE stocks SET price = ?, previous_price = ?, history = ? WHERE symbol = ?',
+            [currentPrice, previousPrice, JSON.stringify(history), symbol]
         );
 
         res.json({
